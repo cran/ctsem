@@ -15,9 +15,10 @@
 #' should be given the label 'groupfree'.  
 #' If specified, all other parameters will be fixed across groups.  
 #' If left NULL, the default, all parameters are free across groups.
-#' @param confidenceintervals Character vector of parameter labels to estimate confidence intervals for.  
-#' Unlike with \code{\link{ctFit}}, entire matrices cannot be specified.
 #' @param showInits Displays start values prior to optimization
+#' @param omxStartValues A named vector containing the raw (potentially log transformed) OpenMx starting values for free parameters, as captured by
+#' OpenMx function \code{omxGetParameters(ctmodelobj$mxobj)}. These values will take precedence 
+#' over any starting values already specified using ctModel.
 #' @param carefulFit if TRUE, first fits the specified model with a penalised likelihood function 
 #' to encourage parameters to remain closer to 0, then
 #' fits the specified model normally, using these estimates as starting values. 
@@ -25,7 +26,8 @@
 #' @param retryattempts Number of fit retries to make.
 #' @param ... additional arguments to pass to \code{\link{ctFit}}.
 #' @return Returns an OpenMx fit object.
-#' @details Additional \code{\link{ctFit}} parameters may be specified as required.
+#' @details Additional \code{\link{ctFit}} parameters may be specified as required. Confidence intervals for any matrices and or parameters 
+#' may be estimated afer fitting using \code{\link{ctCI}}.
 #' 
 #' @examples 
 #' \dontrun{
@@ -63,8 +65,8 @@
 
 
 ctMultigroupFit<-function(datawide,groupings,ctmodelobj,fixedmodel=NA,freemodel=NA,
- carefulFit=FALSE,
-  retryattempts=5,showInits=TRUE,confidenceintervals=NULL,...){
+ carefulFit=FALSE,omxStartValues=NULL,
+  retryattempts=5,showInits=FALSE,...){
 
   if(any(suppressWarnings(!is.na(as.numeric(groupings))))) stop("grouping variable must not contain purely numeric items")
   if(length(groupings)!= nrow(datawide)) stop('length of groupings does not equal number of rows of datawide')
@@ -112,7 +114,10 @@ ctMultigroupFit<-function(datawide,groupings,ctmodelobj,fixedmodel=NA,freemodel=
     
     
     if(carefulFit==TRUE) message('Begin carefulFit start value estimation for group ', i)
+    
     omxmodel<-ctFit(singlegroup,singlectspec,nofit=TRUE, carefulFit=carefulFit,...) #omxmodel for group i
+    ctfitargs<-omxmodel$ctfitargs
+    omxmodel<-omxmodel$mxobj
     
     if(carefulFit==TRUE) {
       startparams<-c( startparams[ !( names(startparams) %in%  #get inits
@@ -134,7 +139,7 @@ ctMultigroupFit<-function(datawide,groupings,ctmodelobj,fixedmodel=NA,freemodel=
 #       mxComputeSequence(list(
 #         mxComputeGradientDescent(gradientAlgo="central", nudgeZeroStarts=FALSE, 
 #           maxMajorIter=1000, gradientIterations = 1),
-        mxComputeReportDeriv(),
+        # mxComputeReportDeriv(),
       omxmodels)
     
 
@@ -414,13 +419,21 @@ ctMultigroupFit<-function(datawide,groupings,ctmodelobj,fixedmodel=NA,freemodel=
 
     fullmodel<-OpenMx::omxAssignFirstParameters(fullmodel)
 
-    if(!is.null(confidenceintervals)) fullmodel <- OpenMx::mxModel(fullmodel, mxCI(confidenceintervals,interval = 0.95,type = "both")) #if 95% confidence intervals are to be calculated
+    # if(!is.null(confidenceintervals)) fullmodel <- OpenMx::mxModel(fullmodel, mxCI(confidenceintervals,interval = 0.95,type = "both")) #if 95% confidence intervals are to be calculated
 
-      fullmodel<-OpenMx::mxTryHard(fullmodel,initialTolerance=1e-18,
+    if(!is.null(omxStartValues)) fullmodel<-omxSetParameters(fullmodel,
+      labels=names(omxStartValues)[names(omxStartValues) %in% names(omxGetParameters(fullmodel))],
+      values=omxStartValues[names(omxStartValues) %in% names(omxGetParameters(fullmodel))],strict=FALSE)
+    
+      fullmodel<-OpenMx::mxTryHard(fullmodel,initialTolerance=1e-16,
       showInits=showInits,
       bestInitsOutput=FALSE,
-      extraTries=retryattempts,loc=1,scale=.2,paste=FALSE,iterationSummary=TRUE,...) 
+      extraTries=retryattempts,loc=1,scale=.2,paste=FALSE,...) 
     
+      fullmodel<-list(mxobj=fullmodel, ctfitargs=ctfitargs, ctmodelobj=ctmodelobj, groups=unique(groupings))
+      class(fullmodel)<-'ctsemMultigroupFit'
+      
+      
     return(fullmodel)
   
 }

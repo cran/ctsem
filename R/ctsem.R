@@ -12,8 +12,9 @@
 #'time for multiple latent processes, measured by multiple noisy indicators with varying time intervals between observations. 
 #'Within and between effects are estimated simultaneously by modelling both observed covariates and unobserved heterogeneity. 
 #'Exogenous shocks with different shapes, group differences, higher order diffusion effects and oscillating processes can all 
-#'be simply modelled. To use ctsem, one first specifies a model using ctModel, fits this to wide format data using ctFit, then 
-#'plot and summary methods are available to analyse the fitted object.  ctMultigroupFit may be used in place of ctFit to specify a multi group model.
+#'be simply modelled. To use ctsem, one first specifies a model using \code{\link{ctModel}}, fits this to wide format data using \code{\link{ctFit}}, then 
+#'\code{plot} (\code{\link{plot.ctsemFit}}) and \code{summary} (\code{\link{summary.ctsemFit}}) methods are available to analyse the fitted object.  
+#'\code{\link{ctMultigroupFit}} may be used in place of \code{\link{ctFit}} to specify a multi group model.
 #'For examples, see \code{\link{ctFit}}. For more detailed information, see the vignette by running: \code{vignette('ctsem')}
 #' 
 #' @docType package

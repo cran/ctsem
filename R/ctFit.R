@@ -1,4 +1,4 @@
-utils::globalVariables(c("invDRIFT","II","DRIFTlog","vec2diag","diag2vec",
+utils::globalVariables(c("invDRIFT","II","negDRIFTlog","vec2diag","diag2vec",
 "mxData","mxMatrix","mxAlgebra","MANIFESTVARlogchol","MANIFESTVARcholdiag",
 "MANIFESTVARchol","T0VARlogchol","T0VARcholdiag","T0VARchol","DIFFUSIONlogchol",
 "DIFFUSIONcholdiag","DIFFUSIONchol","invDRIFTHATCH","cvectorize","DRIFTHATCH",
@@ -11,8 +11,8 @@ utils::globalVariables(c("invDRIFT","II","DRIFTlog","vec2diag","diag2vec",
   "mxExpectationNormal","omxSelectRowsAndCols","expCov","existenceVector",
   "omxSelectCols","expMean","log2pi","numVar_i","filteredExpCov","%&%",
   "filteredDataRow","filteredExpMean","firstHalfCalc","secondHalfCalc",
-  "rowResults","mxFitFunctionRow","TdpredNames","intd1","discreteDRIFT_T1",
-  "Qd1","mxExpectationStateSpace","mxExpectationSSCT","ctsem.fitfunction",
+  "rowResults","mxFitFunctionRow","TdpredNames","discreteCINT_T1","discreteDRIFT_T1",
+  "discreteDIFFUSION_T1","mxExpectationStateSpace","mxExpectationSSCT","ctsem.fitfunction",
   "ctsem.penalties","FIMLpenaltyweight","ctsem.simpleDynPenalty","ieigenval",
   "mxFitFunctionAlgebra","mxCI","mxComputeConfidenceInterval","DRIFT",
   "n.latent","DIFFUSION","TRAITVAR","n.TDpred","TDPREDEFFECT","TDPREDMEANS",
@@ -27,8 +27,6 @@ utils::globalVariables(c("invDRIFT","II","DRIFTlog","vec2diag","diag2vec",
 #' @param datawide the data you wish to fit a ctsem model to.
 #' @param ctmodelobj the ctsem model object you wish to use, specified via the \code{\link{ctModel}} function.
 #' @param nofit if TRUE, output only openmx model without fitting
-#' @param confidenceintervals vector of character strings of matrices or single parameters
-#' to calculate 95\% confidence intervals for.  e.g. c("DRIFT", "TRAITVAR").
 #' @param objective 'auto' selects either 'Kalman', if fitting to single subject data, 
 #' or 'mxRAM' for multiple subjects. For single subject data, 'Kalman' uses the \code{mxExpectationStateSpace }
 #' function from OpenMx to implement the Kalman filter. 
@@ -45,17 +43,19 @@ utils::globalVariables(c("invDRIFT","II","DRIFTlog","vec2diag","diag2vec",
 #' set to 'all' to constrain all T0 matrices to stationarity. 
 #' @param optimizer character string, defaults to the open-source 'SLSQP' optimizer that is distributed
 #' in all versions of OpenMx. However, 'NPSOL' may sometimes perform better for these problems,
-#' though requires that you have installed OpenMx manually, by running:
+#' though requires that you have installed OpenMx via the OpenMx web site, by running:
 #' \code{source('http://openmx.psyc.virginia.edu/getOpenMx.R')} 
-#' @param showInits if TRUE, prints the list of user specified and auto generated 
-#' starting values for free parameters.
+#' @param showInits if TRUE, prints the list of 
+#' starting values for free parameters. These are the 'raw' values used by OpenMx, 
+#' and reflect the log (var / cov matrices) or -log(DRIFT matrices) transformations used in ctsem.
+#' These are saved in the fit object under \code{fitobject$omxStartValues}.
 #' @param retryattempts Number of times to retry the start value randomisation and fit procedure, if non-convergance or uncertain fits occur.
 #' @param iterationSummary if TRUE, outputs limited fit details after every fit attempt.
 #' @param carefulFit if TRUE, first fits the specified model with a penalised likelihood function 
 #' to force MANIFESTVAR, DRIFT, TRAITVAR, MANIFESTTRAITVAR parameters to remain close to 0, then
 #' fits the specified model normally, using these estimates as starting values. 
-#' Can help with optimization when extreme parameter estimates are returned, 
-#' though results in user specified start values being ignored for the final fit.
+#' Can help to ensure optimization begins at sensible, non-exteme values, 
+#' though results in any user specified start values being ignored for the final fit (though they are still used for initial fit).
 #' @param plotOptimization If TRUE, uses checkpointing for OpenMx function \code{mxRun}, set to checkpoint every iteration, 
 #' output checkpoint file to working directory, then creates a plot for each parameter's values over iterations.
 #' @param meanIntervals Use average time intervals for each column for calculation 
@@ -65,24 +65,28 @@ utils::globalVariables(c("invDRIFT","II","DRIFTlog","vec2diag","diag2vec",
 #' OpenMx fit object will be directly output, thus ctsem summary and plot functionality will be unavailable.
 #' Time dependent predictor type also becomes irrelevant.
 #' @param asymptotes when TRUE, optimizes over asymptotic parameter matrices instead of continuous time parameter matrices. 
-#' Can be useful for optimization and model development, but should result in equivalent models if optimization is adequate.
+#' Can be faster for optimization and in some cases makes reliable convergance easier. Will result in equivalent models 
+#' when continuous time input matrices (DRIFT, DIFFUSION, CINT) are free, but fixing the values of 
+#' any such matrices will result in large differences - a value of 0 in a cell of the normal continuous time DIFFUSION matrix
+#' does not necessarily result in a value of 0 for the asymptotic DIFFUSION matrix, for instance.
 #' @param verbose Integer between 0 and 3. Sets mxComputeGradientDescent messaging level, defaults to 0.
 #' @param useOptimizer Logical. Defaults to TRUE.  Passes argument to \code{mxRun}, 
 #' useful for using custom optimizers or fitting to specified parameters.
-#' @param omxStartValues A named vector containing already transformed (e.g. \code{log(-(driftdiagonalparam))} or 
-#' \code{log(diffusionvarianceeparam)} starting values for free parameters, as captured by
+#' @param omxStartValues A named vector containing the raw (potentially log transformed) OpenMx starting values for free parameters, as captured by
 #' OpenMx function \code{omxGetParameters(ctmodelobj$mxobj)}. These values will take precedence 
 #' over any starting values already specified using ctModel.
-#'
-#'  @details
-#'  DATA STRUCTURE:
-#'  Single row per subject. Manifest variables first, grouped by measurement occasion (with later measurements to the right), 
-#'  then 1st time dependent predictor (all observations 1:(Tpoints-1)), further time dependent predictors, 
-#'  time intervals between observations, time independent predictors.  
-#' 
-#' @import OpenMx
-#' @examples
-#' 
+#' @param transformedParams Logical indicating whether or not to log transform parameters internally to allow unconstrained estimation over
+#' entire 'sensible' range for parameters. When TRUE (default) raw OpenMx parameters will reflect these transformations and may be harder to 
+#' interpret, but summary matrices 
+#' are re-transformed into regular continuous time parameter matrices, and may be interpreted as normal.
+#'  @details For full discussion of how to structure the data and use this function, see the vignette using: \code{vignette('ctsem')}.
+#'  Models are specified using the \code{\link{ctModel}} function.
+#'  For help regarding the summary function, see \code{\link{summary.ctsemFit}}, 
+#'  and for the plot function, \code{\link{plot.ctsemFit}}.
+#'  Multigroup models may be specified using \code{\link{ctMultigroupFit}}.
+#'  Confidence intervals for any matrices and or parameters 
+#'  may be estimated using \code{\link{ctCI}}.
+#' @examples 
 #' mfrowOld<-par()$mfrow
 #' par(mfrow=c(2, 3))
 #' 
@@ -117,33 +121,40 @@ utils::globalVariables(c("invDRIFT","II","DRIFTlog","vec2diag","diag2vec",
 #' 
 #' 
 #' ###Oscillating model from Voelkle & Oud (2013). 
-#' data(Oscillating)
-#' inits <- c(-38,-.5,1,10,10)
-#' names(inits)<-c('cross','auto','diffusion22','T0var11','T0var22')
-#' oscillatingm<-ctModel(n.latent = 2, n.manifest=1, Tpoints=11,
-#'  MANIFESTVAR=matrix(c(0), nrow=1, ncol=1),
-#'  LAMBDA=matrix(c(1, 0), nrow=1, ncol=2),
-#'  DRIFT=matrix(c(0, "cross", 1, "auto"), nrow=2, ncol=2),
-#'  CINT=matrix(c(0,0), ncol=1, nrow=2, ),
-#'  DIFFUSION=matrix(c(0, 0, 0, "diffusion22"), nrow=2, ncol=2),
-#'  startValues = inits)
-#' oscillatingf<-ctFit(Oscillating, oscillatingm, optimizer='SLSQP')
-#' summary(oscillatingf)
+#' data("Oscillating")
+#' 
+#' inits <- c(-38, -.5, 1, 1, .1, 1, 0, .9)
+#' names(inits) <- c("crosseffect","autoeffect", "diffusion",
+#'   "T0var11", "T0var21", "T0var22","m1", "m2")
+#' 
+#' oscillatingm <- ctModel(n.latent = 2, n.manifest = 1, Tpoints = 11, 
+#'   MANIFESTVAR = matrix(c(0), nrow = 1, ncol = 1), 
+#'   LAMBDA = matrix(c(1, 0), nrow = 1, ncol = 2),
+#'   T0MEANS = matrix(c('m1', 'm2'), nrow = 2, ncol = 1), 
+#'   T0VAR = matrix(c("T0var11", "T0var21", 0, "T0var22"), nrow = 2, ncol = 2),
+#'   DRIFT = matrix(c(0, "crosseffect", 1, "autoeffect"), nrow = 2, ncol = 2), 
+#'   CINT = matrix(0, ncol = 1, nrow = 2),
+#'   DIFFUSION = matrix(c(0, 0, 0, "diffusion"), nrow = 2, ncol = 2),
+#'   startValues = inits)
+#' 
+#' oscillatingf <- ctFit(Oscillating, oscillatingm)
 #' }
+#' @import OpenMx
 #' @export
 
-ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL, 
+ctFit  <- function(datawide, ctmodelobj, 
   objective='auto', 
   stationary=c('T0TIPREDEFFECT'), 
   optimizer='SLSQP', 
-  retryattempts=10, iterationSummary=TRUE, carefulFit=FALSE,  
+  retryattempts=30, iterationSummary=FALSE, carefulFit=TRUE,  
   showInits=FALSE, asymptotes=FALSE,
   meanIntervals=FALSE, plotOptimization=F, 
   nofit = FALSE, discreteTime=FALSE, verbose=0, useOptimizer=TRUE,
-  omxStartValues=NULL){
+  omxStartValues=NULL, transformedParams=TRUE){
   
- transformedParams<-TRUE
+ # transformedParams<-TRUE
  simpleDynamics<-FALSE
+ if(nofit == TRUE) carefulFit <- FALSE
   
   n.latent<-ctmodelobj$n.latent
   n.manifest<-ctmodelobj$n.manifest
@@ -183,10 +194,10 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
   if(objective=='auto' & nrow(datawide) > 1 & n.TIpred + n.TDpred >0 ) objective<-'mxRAM'
   
   #capture arguments
-  ctfitargs<- list(confidenceintervals, stationary, optimizer, 
-    retryattempts, carefulFit, showInits, meanIntervals, nofit, objective, discreteTime, asymptotes)
-  names(ctfitargs)<-c('confidenceintervals', 'stationary', 'optimizer', 
-    'retryattempts', 'carefulFit', 'showInits', 'meanIntervals', 'nofit', 'objective', 'discreteTime', 'asymptotes')
+  ctfitargs<- list(stationary, optimizer, 
+    retryattempts, carefulFit, showInits, meanIntervals, nofit, objective, discreteTime, asymptotes, transformedParams)
+  names(ctfitargs)<-c('stationary', 'optimizer', 
+    'retryattempts', 'carefulFit', 'showInits', 'meanIntervals', 'nofit', 'objective', 'discreteTime', 'asymptotes', 'transformedParams')
   
   #ensure data is a matrix
   datawide<-as.matrix(datawide)
@@ -244,7 +255,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
       all(is.na(suppressWarnings(as.numeric(ctmodelobj$T0MEANS)))) & nofit==FALSE) stop('Cannot estimate model for single individuals unless either 
         T0VAR or T0MEANS matrices are fixed, or set to stationary')
   
-  if(nrow(datawide)==1 || objective=='Kalman'){
+  if(nrow(datawide)==1 | objective=='Kalman'){
     message('Single subject dataset or Kalman objective specified - ignoring any specified between subject 
       variance matrices (TRAITVAR, MANIFESTTRAITVAR, TIPREDEFFECT, TIPREDVAR, TDTIPREDCOV, T0TIPREDEFFECT)')
     if(objective != "Kalman") message('Estimation could be much faster if objective="Kalman" was specified!')  
@@ -268,7 +279,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
   if(all(ctmodelobj$MANIFESTTRAITVAR == 0)  | nrow(datawide)==1 | objective=='Kalman') manifestTraitvarExtension <- FALSE
   
   ## if Kalman objective, rearrange data to long format and set Tpoints to 2 (so only single discrete algebras are generated)
-  if(objective=='Kalman' || objective=='Kalmanmx') {
+  if(objective=='Kalman' | objective=='Kalmanmx') {
     #     if(nrow(datawide) > 1) stop('To use Kalman filter implementation with multiple subjects, see function ctMultigroupFit')
     
     if(n.TDpred >0){
@@ -289,7 +300,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     colnames(datawide)[which(colnames(datawide)=='dT')]<-'dT1'
     
     if(objective == 'Kalmanmx') {
-      datawide<-ctDeintervalise(datawide,n.manifest,n.TDpred,n.TIpred)
+      datawide<-ctDeintervalise(datawide,dT='dT1')
     colnames(datawide)[which(colnames(datawide)=='AbsTime')] <-'dT1'
     }
     
@@ -359,41 +370,65 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
   
   #function to process ctModel specification:  seperate labels and values, fixed and free, and generate start values
   processInputMatrix <- function(x, symmetric = FALSE, diagadd = 0, randomscale=0.01, addvalues=FALSE, chol=FALSE){
-    
+
     inputm<-x[[1]]
-    inputmFixed <- suppressWarnings(matrix(as.numeric(inputm), nrow = nrow(inputm), ncol = ncol(inputm))) #calc fixed only matrix  
-    inputmStarts <- matrix(NA,nrow(inputm),ncol(inputm))
-    inputmStarts[grep('^[$]',inputm)] <- inputm[grep('^[$]',inputm)]
     
-    #label matrix
-    inputmCharacter <- inputm    
-    inputmCharacter[!is.na(inputmFixed)] <- NA #extract free label matrix
-    inputmCharacter[!is.na(inputmStarts)] <- NA
+    free<-suppressWarnings(is.na(matrix(as.numeric(inputm), nrow = nrow(inputm), ncol = ncol(inputm))))
+    
     labels <- ctLabel(TDpredNames=TDpredNames, TIpredNames=TIpredNames, manifestNames=manifestNames, latentNames=latentNames, matrixname=names(x), n.latent=n.latent, 
       n.manifest=n.manifest, n.TDpred=n.TDpred, n.TIpred=n.TIpred, Tpoints=Tpoints)
-    if(any(!is.na(inputmCharacter)))  labels[!is.na(inputmCharacter)] <- inputmCharacter[!is.na(inputmCharacter)]
+
+    labels[free==TRUE]<-inputm[free==TRUE]
+    labels[free==FALSE]<-NA
     
-    #starting values matrix
-    values <- matrix(round(stats::rnorm(length(inputmFixed), 0, randomscale), 3), nrow = nrow(inputm), ncol = ncol(inputm)) #generate start values according to randomscale
-    if(diagadd!= 0)  {values <- values+diag(diagadd, ncol(inputm))} #increase diagonals if specified
-    if(addvalues[1]!=FALSE) values <- values+addvalues #add values if specified
+    values <- matrix(round(stats::rnorm(length(inputm), 0, randomscale), 3), nrow = nrow(inputm), ncol = ncol(inputm)) #generate start values according to randomscale
+    if(diagadd!= 0)  values <- values+diag(diagadd, ncol(inputm)) #increase diagonals if specified
+    if(all(addvalues!=FALSE)) values <- values+addvalues #add values if specified
     if(symmetric == TRUE)  {values[row(values) > col(values)] <- t(values)[col(values) < row(values)]} #set symmetric if necessary
-    values[!is.na(inputmFixed)] <- inputmFixed[!is.na(inputmFixed)] #overwite with any fixed values
-    values[grep('^[$]',inputmStarts)] <- as.numeric(gsub('^[$]','', inputmStarts[grep('^[$]',inputmStarts)]))
+    values[free==FALSE] <- as.numeric(inputm[free==FALSE])
     
     if(!is.null(startValues)){ #if there are some startValues specified, check each part of x
       for( i in 1:length(startValues)){
-        values[grepl(names(startValues)[i], inputmCharacter)] <- startValues[i]
+        values[which(inputm %in% names(startValues[i]))] <- startValues[i]
       }
     }
     
-    inits<-values #output inits matrix without fixed specification (for calculation, eg discrete drift inits)
+
     
-    # values[!is.na(inputmFixed)] <- paste0(addCharacters, inputm[!is.na(inputmFixed)]) #append addcharacters to fixed values    
     
-    #free matrix
-   
-    free <- suppressWarnings(is.na(matrix(as.numeric(inputm), nrow = nrow(inputm))))
+#     inputmFixed <- suppressWarnings(is.na(matrix(as.numeric(inputm), nrow = nrow(inputm), ncol = ncol(inputm)))) #calc fixed only matrix  
+#     inputmStarts <- matrix(NA,nrow(inputm),ncol(inputm))
+#     inputmStarts[grep('^[$]',inputm)] <- inputm[grep('^[$]',inputm)]
+#     
+#     #label matrix
+#     inputmCharacter <- inputm    
+#     inputmCharacter[!is.na(inputmFixed)] <- NA #extract free label matrix
+#     inputmCharacter[!is.na(inputmStarts)] <- NA
+#     labels <- ctLabel(TDpredNames=TDpredNames, TIpredNames=TIpredNames, manifestNames=manifestNames, latentNames=latentNames, matrixname=names(x), n.latent=n.latent, 
+#       n.manifest=n.manifest, n.TDpred=n.TDpred, n.TIpred=n.TIpred, Tpoints=Tpoints)
+#     if(any(!is.na(inputmCharacter)))  labels[!is.na(inputmCharacter)] <- inputmCharacter[!is.na(inputmCharacter)]
+#     
+#     #starting values matrix
+#     values <- matrix(round(stats::rnorm(length(inputmFixed), 0, randomscale), 3), nrow = nrow(inputm), ncol = ncol(inputm)) #generate start values according to randomscale
+#     if(diagadd!= 0)  {values <- values+diag(diagadd, ncol(inputm))} #increase diagonals if specified
+#     if(addvalues[1]!=FALSE) values <- values+addvalues #add values if specified
+#     if(symmetric == TRUE)  {values[row(values) > col(values)] <- t(values)[col(values) < row(values)]} #set symmetric if necessary
+#     values[!is.na(inputmFixed)] <- inputmFixed[!is.na(inputmFixed)] #overwite with any fixed values
+#     values[grep('^[$]',inputmStarts)] <- as.numeric(gsub('^[$]','', inputmStarts[grep('^[$]',inputmStarts)]))
+#     
+#     if(!is.null(startValues)){ #if there are some startValues specified, check each part of x
+#       for( i in 1:length(startValues)){
+#         values[which(inputmCharacter %in% names(startValues[i]))] <- startValues[i]
+#       }
+#     }
+#     
+#     inits<-values #output inits matrix without fixed specification (for calculation, eg discrete drift inits)
+#     
+#     # values[!is.na(inputmFixed)] <- paste0(addCharacters, inputm[!is.na(inputmFixed)]) #append addcharacters to fixed values    
+#     
+#     #free matrix
+#    
+#     free <- suppressWarnings(is.na(matrix(as.numeric(inputm), nrow = nrow(inputm))))
     
     if(chol==TRUE){
       # if(any(diag(values)=='FFF0')) warning('Diagonal element of log variance input matrix fixed to 0 - to fix variance to 0, diagonal elements should tend towards -Inf, e.g. -9999',immediate. = TRUE)
@@ -403,40 +438,57 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     }
 
     
-    output<-list(values, labels, free, inits)
-    names(output)<-c('values', 'labels', 'free', 'inits')
+    output<-list(values, labels, free)
+    names(output)<-c('values', 'labels', 'free')
     return(output)
   }
 
   T0VAR <- processInputMatrix(ctmodelobj['T0VAR'], symmetric = FALSE, randomscale=0.01, diagadd = 1, chol=TRUE)
-  diag(T0VAR$values) <- log(diag(T0VAR$values))
-  diag(T0VAR$values)[diag(T0VAR$values)== -Inf] <- -999
+
   T0MEANS <- processInputMatrix(ctmodelobj["T0MEANS"], symmetric = FALSE, randomscale=1, diagadd = 0)
   MANIFESTMEANS <- processInputMatrix(ctmodelobj["MANIFESTMEANS"], symmetric = FALSE, randomscale=1, diagadd = 0)
   LAMBDA <- processInputMatrix(ctmodelobj["LAMBDA"], symmetric = FALSE, randomscale=.1, addvalues=1, diagadd = 0)
-  MANIFESTVAR <- processInputMatrix(ctmodelobj["MANIFESTVAR"],  symmetric = FALSE, randomscale=.01, diagadd = 1, chol=TRUE)    
-  diag(MANIFESTVAR$values) <- log(diag(MANIFESTVAR$values))
-  diag(MANIFESTVAR$values)[diag(MANIFESTVAR$values)== -Inf] <- -999
-  DRIFT <- processInputMatrix(ctmodelobj["DRIFT"],  symmetric = FALSE,randomscale=0, diagadd=ifelse(discreteTime==TRUE,.5,-.6))
-  diag(DRIFT$values) <- log(-diag(DRIFT$values))
-  diag(DRIFT$values)[diag(DRIFT$values)== -Inf] <- -999
-  DIFFUSION <- processInputMatrix(ctmodelobj["DIFFUSION"], symmetric = FALSE, randomscale=0.01, diagadd = 1, chol=TRUE)      
-  diag(DIFFUSION$values) <- log(diag(DIFFUSION$values))
-  diag(DIFFUSION$values)[diag(DIFFUSION$values)== -Inf] <- -999
+  MANIFESTVAR <- processInputMatrix(ctmodelobj["MANIFESTVAR"],  symmetric = FALSE, randomscale=.01, diagadd = 1)    
+
+  DRIFT <- processInputMatrix(ctmodelobj["DRIFT"],  symmetric = FALSE,randomscale=0, addvalues= -.05, diagadd=ifelse(discreteTime==TRUE,.5,-.4))
+
+  DIFFUSION <- processInputMatrix(ctmodelobj["DIFFUSION"], symmetric = FALSE, randomscale=0.01, diagadd = 1)      
+
   CINT <- processInputMatrix(ctmodelobj["CINT"], randomscale=.1)    
+  
+  if(transformedParams==TRUE){
+    diag(T0VAR$values) <- log(diag(T0VAR$values))
+    diag(T0VAR$values)[diag(T0VAR$values)== -Inf] <- -999
+    
+    diag(MANIFESTVAR$values) <- log(diag(MANIFESTVAR$values))
+    diag(MANIFESTVAR$values)[diag(MANIFESTVAR$values)== -Inf] <- -999
+    
+    if(any(diag(DRIFT$values) >=0)) message('transformedParams=TRUE and non negative DRIFT diagonal specified, setting to -.00001.')
+    diag(DRIFT$values) <- suppressWarnings(log(-diag(DRIFT$values)) + .00001)
+
+    diag(DRIFT$values)[is.nan(diag(DRIFT$values)) | diag(DRIFT$values) == -Inf ] <- -999
+    
+    if(any(diag(DIFFUSION$values) <=0)) message('transformedParams=TRUE and non positive DIFFUSION diagonal specified, setting to .00001.')
+    diag(DIFFUSION$values) <- suppressWarnings(log(diag(DIFFUSION$values)- .00001) )
+    diag(DIFFUSION$values)[is.nan(diag(DIFFUSION$values)) | diag(DIFFUSION$values)== -Inf] <- -999
+  }
   
   
   if(traitExtension == TRUE){ #if needed, process and include traits in matrices
-    TRAITVAR <- processInputMatrix(ctmodelobj["TRAITVAR"],symmetric = FALSE, diagadd = 1, randomscale=.1, chol=TRUE)
+    TRAITVAR <- processInputMatrix(ctmodelobj["TRAITVAR"],symmetric = FALSE, diagadd = 1, randomscale=.1)
+    if(transformedParams==TRUE){
     diag(TRAITVAR$values) <- log(diag(TRAITVAR$values))
     diag(TRAITVAR$values)[diag(TRAITVAR$values)== -Inf] <- -999
+    }
   }
   
   
   if(manifestTraitvarExtension == TRUE){
-    MANIFESTTRAITVAR <- processInputMatrix(ctmodelobj["MANIFESTTRAITVAR"],  symmetric = FALSE, randomscale=.01, diagadd = 1, chol=TRUE)
+    MANIFESTTRAITVAR <- processInputMatrix(ctmodelobj["MANIFESTTRAITVAR"],  symmetric = FALSE, randomscale=.01, diagadd = 1)
+    if(transformedParams==TRUE){
     diag(MANIFESTTRAITVAR$values) <- log(diag(MANIFESTTRAITVAR$values))
     diag(MANIFESTTRAITVAR$values)[diag(MANIFESTTRAITVAR$values)== -Inf] <- -999
+    }
   }
   
   
@@ -449,18 +501,22 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     TDPREDEFFECT <- processInputMatrix(ctmodelobj["TDPREDEFFECT"], symmetric = FALSE, diagadd = 0, randomscale=0.1)
     T0TDPREDCOV <- processInputMatrix(ctmodelobj["T0TDPREDCOV"], symmetric = FALSE, diagadd = 0, randomscale=0.01) 
 
-    TDPREDVAR <- processInputMatrix(ctmodelobj["TDPREDVAR"], symmetric = FALSE, diagadd = 1, randomscale=0.01, chol=TRUE)    
+    TDPREDVAR <- processInputMatrix(ctmodelobj["TDPREDVAR"], symmetric = FALSE, diagadd = 1, randomscale=0.01) 
+    if(transformedParams==TRUE){
     diag(TDPREDVAR$values) <- log(diag(TDPREDVAR$values))
     diag(TDPREDVAR$values)[diag(TDPREDVAR$values)== -Inf] <- -999
+    }
   }
   
   if (n.TIpred > 0){ 
     TIPREDMEANS <- processInputMatrix(ctmodelobj["TIPREDMEANS"], symmetric = FALSE, diagadd = 0)
     TIPREDEFFECT <- processInputMatrix(ctmodelobj["TIPREDEFFECT"], symmetric = FALSE, diagadd = 0, randomscale=1)
     T0TIPREDEFFECT <- processInputMatrix(ctmodelobj["T0TIPREDEFFECT"], symmetric = FALSE, diagadd = 0, randomscale=1)
-    TIPREDVAR <- processInputMatrix(ctmodelobj["TIPREDVAR"], symmetric = FALSE, diagadd = 1, randomscale=0.01, chol=TRUE)    
+    TIPREDVAR <- processInputMatrix(ctmodelobj["TIPREDVAR"], symmetric = FALSE, diagadd = 1, randomscale=0.01)    
+    if(transformedParams==TRUE){
     diag(TIPREDVAR$values) <- log(diag(TIPREDVAR$values))
     diag(TIPREDVAR$values)[diag(TIPREDVAR$values)== -Inf] <- -999
+    }
   }
   
   if(n.TIpred > 0 & n.TDpred > 0) TDTIPREDCOV <- processInputMatrix(ctmodelobj["TDTIPREDCOV"], symmetric = FALSE, randomscale=0.01)    
@@ -504,7 +560,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     
     
     #DRIFT constraints
-    OpenMx::omxExponential(DRIFT$inits) -> # discrete drift values goes into A$values 
+    OpenMx::omxExponential(DRIFT$values) -> # discrete drift values goes into A$values 
       A$values[(row(A$values) - 1 - n.latent)%/%n.latent ==  # when the rows and columns, grouped by n.latent, 
           (col(A$values) - 1)%/%n.latent & row(A$values) <= latentend] #are equal, and not greater than the total number of latent variables
     
@@ -524,7 +580,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     
     
     #LAMBDA matrix
-    LAMBDA$inits ->  A$values[(row(A$values) - 1 - latentend)%/%n.manifest == #insert LAMBDA loadings into A$values
+    LAMBDA$values ->  A$values[(row(A$values) - 1 - latentend)%/%n.manifest == #insert LAMBDA loadings into A$values
         (col(A$values) - 1)%/%n.latent & col(A$values) <= latentend]
     
     LAMBDA$ref <- matrix(paste0('LAMBDA[', rep(1:n.manifest, times=n.latent), ',', rep(1:n.latent, each=n.manifest), ']'), nrow=n.manifest)    
@@ -534,7 +590,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     
     
     #measurement residuals
-    MANIFESTVAR$inits ->  S$values[(row(S$values) - latentend - 1)%/%n.manifest ==  
+    MANIFESTVAR$values ->  S$values[(row(S$values) - latentend - 1)%/%n.manifest ==  
         (col(S$values) - latentend - 1) %/% n.manifest &
         col(S$values) >  latentend &
         row(S$values) >  latentend]
@@ -552,23 +608,23 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     
     
     #latent (dynamic) residuals    
-    DIFFUSION$inits ->  S$values[(row(S$values) - 1) %/%n.latent == #initial DIFFUSION values with fixed coding
+    DIFFUSION$values ->  S$values[(row(S$values) - 1) %/%n.latent == #initial DIFFUSION values with fixed coding
         (col(S$values) - 1) %/% n.latent &
         col(S$values) <= latentend]
     
-    qdlabels <- paste0("Qd", rep(1:Tpoints - 1, each = n.latent^2), 
+    discreteDIFFUSIONlabels <- paste0("discreteDIFFUSION_T", rep(1:Tpoints - 1, each = n.latent^2), 
       "[", 
       seq(1, n.latent^2, 1), 
       ",1]") 
     
     
-    qdlabels-> S$labels[(row(S$labels) - 1)%/%n.latent ==  # qdlabels goes into S$labels where the row and column groups
+    discreteDIFFUSIONlabels-> S$labels[(row(S$labels) - 1)%/%n.latent ==  # discreteDIFFUSIONlabels goes into S$labels where the row and column groups
         (col(S$labels) - 1) %/% n.latent & # which are based on number of manifest variables, are equal, 
         col(S$labels) <= latentend] # and less than total number of latent.
     
     
     #initial latent residuals
-    T0VAR$inits ->  S$values[1:n.latent, 1:n.latent] 
+    T0VAR$values ->  S$values[1:n.latent, 1:n.latent] 
     
     T0VAR$ref <- paste0("T0VAR[", 1:n.latent, ",", rep(1:n.latent, each=n.latent), "]")
     
@@ -587,13 +643,13 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     
     ### 4. M matrix
     M<-list()
-    M$values    <- matrix(c(T0MEANS$inits, #insert appropriate T0MEANS values
-      rep(T0MEANS$inits, each = Tpoints-1), #follow with fixed params for later time points
+    M$values    <- matrix(c(T0MEANS$values, #insert appropriate T0MEANS values
+      rep(T0MEANS$values, each = Tpoints-1), #follow with fixed params for later time points
       rep(MANIFESTMEANS$values, times = Tpoints)), #then insert manifest intercepts
       nrow = manifestend, ncol = 1)
     
     
-    latentMlabels <- matrix(paste0("intd", #this name 'intd' is referenced below to check which parameters to free
+    latentMlabels <- matrix(paste0("discreteCINT_T", #this name is referenced below to check which parameters to free
       0:(latentend - 1)%/%n.latent, 
       "[", 1:n.latent, ",1]"), ncol = 1)#construct continuous latent mean labels
     
@@ -651,12 +707,12 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
         rep(1:n.latent,each=Tpoints*n.manifest),']')
 
     A$values[manifeststart:manifestend, 
-      (latentend+1):(latentend+n.latent)] <- LAMBDA$inits[cbind(
+      (latentend+1):(latentend+n.latent)] <- LAMBDA$values[cbind(
         rep(1:n.manifest,times=Tpoints*n.latent),
         rep(1:n.latent,each=Tpoints*n.manifest))]
     
     #trait variance
-    S$values[(latentend+1):(latentend+n.latent), (latentend+1):(latentend+n.latent)] <- TRAITVAR$inits
+    S$values[(latentend+1):(latentend+n.latent), (latentend+1):(latentend+n.latent)] <- TRAITVAR$values
     TRAITVAR$ref <- matrix(paste0("TRAITVAR[", indexMatrix(symmetrical = TRUE, dimension = n.latent, sep = ","), "]"), nrow = n.latent)
     S$labels[(latentend+1):(latentend+n.latent), (latentend+1):(latentend+n.latent)] <- TRAITVAR$ref    
     
@@ -719,7 +775,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     MANIFESTTRAITVAR$ref<- indexMatrix(dimension=n.manifest, symmetrical=TRUE, 
       sep=',', starttext='MANIFESTTRAITVAR[', endtext=']')
     
-    S$values[manifesttraitstart:traitend, manifesttraitstart:traitend] <- MANIFESTTRAITVAR$inits
+    S$values[manifesttraitstart:traitend, manifesttraitstart:traitend] <- MANIFESTTRAITVAR$values
     S$labels[manifesttraitstart:traitend, manifesttraitstart:traitend] <- MANIFESTTRAITVAR$ref    
     #manifest trait effect on manifests
     for(i in 0:(Tpoints-1)){
@@ -784,7 +840,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     
     #create time dependent predictor effects on processes
     TDPREDEFFECT$ref <- paste0(
-      "TDPREDEFFECT", 
+      "discreteTDPREDEFFECT", 
       "_T", 
       rep(1:(Tpoints - 1), each=n.latent), 
       "[", 
@@ -795,14 +851,14 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     
     
     A$values[cbind(rep( (1+n.latent):latentend, times=n.TDpred), 
-      rep(predictorTDstart:predictorTDend, each=n.latent))] <- TDPREDEFFECT$inits #insert starting values specifying fixed for algebras
+      rep(predictorTDstart:predictorTDend, each=n.latent))] <- TDPREDEFFECT$values #insert starting values specifying fixed for algebras
     A$labels[cbind(rep( (1+n.latent):latentend, times=n.TDpred), 
       rep(predictorTDstart:predictorTDend, each=n.latent))] <- TDPREDEFFECT$ref #insert TDPREDEFFECT algebra references to A$labels    
     
     #add cov of time dependent predictors with T0
     T0TDPREDCOV$ref <- paste0('T0TDPREDCOV[', 1:n.latent, ',', rep( 1:(n.TDpred*(Tpoints-1)), each=n.latent ), ']')
-    S$values[1:n.latent, predictorTDstart:predictorTDend] <- T0TDPREDCOV$inits #add starting values 
-    S$values[predictorTDstart:predictorTDend, 1:n.latent] <- t(T0TDPREDCOV$inits) #add starting values 
+    S$values[1:n.latent, predictorTDstart:predictorTDend] <- T0TDPREDCOV$values #add starting values 
+    S$values[predictorTDstart:predictorTDend, 1:n.latent] <- t(T0TDPREDCOV$values) #add starting values 
     
     S$labels[1:n.latent, predictorTDstart:predictorTDend]  <-  T0TDPREDCOV$ref #insert combined labels to S matrix
     S$labels[predictorTDstart:predictorTDend, 1:n.latent]  <-  t(T0TDPREDCOV$ref) #insert combined labels to S matrix
@@ -833,14 +889,14 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     #       if(any(is.na(temp))) message('Too much missingness in TD predictors to use calculated covariance for TDPREDVAR, so estimating...')
     #     }
     TDPREDVAR$ref<-paste0('TDPREDVAR[', 1:(n.TDpred*(Tpoints-1)), ',', rep( 1:(n.TDpred*(Tpoints-1)), each=n.TDpred*(Tpoints-1) ), ']')
-    S$values[predictorTDstart:predictorTDend, predictorTDstart:predictorTDend]  <- TDPREDVAR$inits    #insert values    
+    S$values[predictorTDstart:predictorTDend, predictorTDstart:predictorTDend]  <- TDPREDVAR$values    #insert values    
     S$labels[predictorTDstart:predictorTDend, predictorTDstart:predictorTDend ] <- TDPREDVAR$ref #insert combined labels into S matrix
     
     #introduce covariance between TDpreds and traits    
     if(traitExtension == TRUE && !is.null(ctmodelobj$TRAITTDPREDCOV)){
       TRAITTDPREDCOV$ref<-paste0('TRAITTDPREDCOV[', 1:n.latent, ',', rep( 1:(n.TDpred*(Tpoints-1)), each=n.latent ), ']')
-      S$values[traitstart:(latentend+n.latent), predictorTDstart:predictorTDend ]  <- TRAITTDPREDCOV$inits #insert starting values
-      S$values[predictorTDstart:predictorTDend, traitstart:(latentend+n.latent) ]  <- t(TRAITTDPREDCOV$inits)#insert symmetric starting values
+      S$values[traitstart:(latentend+n.latent), predictorTDstart:predictorTDend ]  <- TRAITTDPREDCOV$values #insert starting values
+      S$values[predictorTDstart:predictorTDend, traitstart:(latentend+n.latent) ]  <- t(TRAITTDPREDCOV$values)#insert symmetric starting values
       
       S$labels[traitstart:(latentend+n.latent), predictorTDstart:predictorTDend ]  <- TRAITTDPREDCOV$ref #insert combined labels to s matrix      
       S$labels[predictorTDstart:predictorTDend, traitstart:(latentend+n.latent) ]  <- t(TRAITTDPREDCOV$ref) #insert symmetric labels      
@@ -896,10 +952,10 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     S$labels <- insertTIpredsToMatrix(S$labels, NA)    
     
     #Effect of TIpreds on processes
-    A$values[(n.latent+1):latentend, predictorTIstart:predictorTIend] <- TIPREDEFFECT$inits #add rough starting values, fixed for algebras
+    A$values[(n.latent+1):latentend, predictorTIstart:predictorTIend] <- TIPREDEFFECT$values #add rough starting values, fixed for algebras
     
     TIPREDEFFECT$ref <- paste0( #create time Tindependent predictor algebra reference labels for A matrix 
-      "TIPREDEFFECT_T", 
+      "discreteTIPREDEFFECT_T", 
       rep(1:(Tpoints - 1), each = n.latent), 
       "[", 
       1:n.latent, 
@@ -917,13 +973,13 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
       ",",    
       rep(1:n.TIpred, each=n.latent), 
       "]")
-    A$values[1:n.latent, predictorTIstart:predictorTIend] <- T0TIPREDEFFECT$inits
+    A$values[1:n.latent, predictorTIstart:predictorTIend] <- T0TIPREDEFFECT$values
     A$labels[1:n.latent, predictorTIstart:predictorTIend ]  <-  T0TIPREDEFFECT$ref 
     
     
     #add cov between TIpreds
     TIPREDVAR$ref<-paste0('TIPREDVAR[', 1:n.TIpred, ',', rep( 1:n.TIpred, each=n.TIpred ), ']')
-    S$values[predictorTIstart:predictorTIend, predictorTIstart:predictorTIend]  <- TIPREDVAR$inits
+    S$values[predictorTIstart:predictorTIend, predictorTIstart:predictorTIend]  <- TIPREDVAR$values
     S$labels[predictorTIstart:predictorTIend, predictorTIstart:predictorTIend ] <- TIPREDVAR$ref 
     
     #add cov between TDpreds and TIpreds
@@ -943,10 +999,10 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
       #       }
       
       TDTIPREDCOV$ref <- paste0('TDTIPREDCOV[',rep(1:(n.TDpred*Tpoints-1),each=n.TIpred),',',rep(1:n.TIpred,n.TDpred*(Tpoints-1)),']')
-      S$values[predictorTDstart:predictorTDend, predictorTIstart:predictorTIend]  <- TDTIPREDCOV$inits        
+      S$values[predictorTDstart:predictorTDend, predictorTIstart:predictorTIend]  <- TDTIPREDCOV$values        
       S$labels[predictorTDstart:predictorTDend, predictorTIstart:predictorTIend] <- TDTIPREDCOV$ref 
       
-      S$values[predictorTIstart:predictorTIend, predictorTDstart:predictorTDend]  <- t(TDTIPREDCOV$inits)
+      S$values[predictorTIstart:predictorTIend, predictorTDstart:predictorTDend]  <- t(TDTIPREDCOV$values)
       S$labels[predictorTIstart:predictorTIend, predictorTDstart:predictorTDend] <- t(TDTIPREDCOV$ref)
     }
     
@@ -971,63 +1027,180 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   # Define OpenMx RAM Algebras for the continuous time drift matrix (A), intercept (INT), and error covariance (DIFFUSION)
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
   
-  #set up definition variables
-  defcall <- paste0("data.dT", 1:(Tpoints-1)) 
-  if(meanIntervals==TRUE) defcall <- apply(datawide[, paste0("dT", 1:(Tpoints-1))], 2, mean)
+   if(meanIntervals==TRUE) datawide[,paste0('dT', 1:(Tpoints-1))] <- 
+    matrix(apply(datawide[,paste0('dT', 1:(Tpoints-1))],2,mean,na.rm=T), byrow=T,nrow=nrow(datawide), ncol=(Tpoints-1))
   
-  EXPalgs <- list()
-  for(i in 1:(Tpoints - 1)){
-    if(discreteTime==FALSE) fullAlgString <- paste0("omxExponential(DRIFT %x%", defcall[i], ")")
+  uniqueintervals<-c(sort(unique(c(datawide[,paste0('dT', 1:(Tpoints-1))]))))
+  
+  intervalsi <- matrix(apply(datawide[,paste0('dT', 1:(Tpoints-1)),drop=F], 2, 
+    function(x) match(x, uniqueintervals)),ncol=(Tpoints-1))
+  colnames(intervalsi)<-paste0('intervalID_T',1:(Tpoints-1))
+  
+  if(objective != 'cov') intervalID_T<-mxMatrix(name='intervalID_T',nrow=1,ncol=(Tpoints-1), free=F,
+    labels=paste0('data.intervalID_T',1:(Tpoints-1)))
+  
+  if(objective == 'cov') intervalID_T<-mxMatrix(name='intervalID_T',nrow=1,ncol=(Tpoints-1), free=F,
+    values=intervalsi[1,])
+  
+  datawide<-cbind(datawide,intervalsi)
+  
+  ######## discreteDRIFT
+  #discreteDRIFTallintervals
+  discreteDRIFTallintervals <- list()
+  for( i in 1:length(uniqueintervals)){
+    if(discreteTime==FALSE) fullAlgString <- paste0("omxExponential(DRIFT %x%", uniqueintervals[i], ")")
     
     if(discreteTime==TRUE) fullAlgString <- paste0("DRIFT")
     
-    EXPalgs[i] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDRIFT_T", i)), 
+    discreteDRIFTallintervals[[i]] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDRIFT_i", i)), 
       list(theExpression = parse(text = fullAlgString)[[1]])))
   }
   
+  #discreteDRIFTbig
+  partAlgString<- paste0('discreteDRIFT_i', 1:(length(uniqueintervals)),collapse=', ')
+  fullAlgString <- paste0('rbind(',partAlgString,')')
+  discreteDRIFTbig <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDRIFTbig")), 
+    list(theExpression = parse(text = fullAlgString)[[1]])))
+  
+  #discreteDRIFTtpoints
+  discreteDRIFTtpoints <- list()
+  for( i in 1:(Tpoints-1)){
+    if(discreteTime==FALSE) fullAlgString <- paste0('discreteDRIFTbig[
+      ((intervalID_T[1,',i,'] -1) * nlatent + 1) : (intervalID_T[1,',i,'] * nlatent),1:nlatent]')
+    
+    if(discreteTime==TRUE) fullAlgString <- paste0("DRIFT")
+    
+    discreteDRIFTtpoints[[i]] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDRIFT_T", i)), 
+      list(theExpression = parse(text = fullAlgString)[[1]])))
+  }
+  
+  nlatent<-mxMatrix(name='nlatent',nrow=1,ncol=1,free=F,values=n.latent)
+  
+  EXPalgs<-list(nlatent, intervalID_T, discreteDRIFTtpoints, discreteDRIFTbig, discreteDRIFTallintervals)
+  
+  
+    
+     
+  
+  
+  ######## discreteDRIFTHATCH
   discreteDRIFTHATCHalgs <- list()
   if(discreteTime==FALSE && asymptotes==FALSE){
-  for(i in 1:(Tpoints - 1)){
-     fullAlgString <- paste0("omxExponential(DRIFTHATCH %x% ", defcall[i], ")")
-    discreteDRIFTHATCHalgs[i] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDRIFTHATCH_T", i)), 
+  
+    
+    #discreteDRIFTHATCHallintervals
+    discreteDRIFTHATCHallintervals <- list()
+    for( i in 1:length(uniqueintervals)){
+      fullAlgString <- paste0("omxExponential(DRIFTHATCH %x%", uniqueintervals[i], ")")
+      
+      discreteDRIFTHATCHallintervals[[i]] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDRIFTHATCH_i", i)), 
+        list(theExpression = parse(text = fullAlgString)[[1]])))
+    }
+    
+    #discreteDRIFTHATCHbig
+    partAlgString<- paste0('discreteDRIFTHATCH_i', 1:(length(uniqueintervals)),collapse=', ')
+    fullAlgString <- paste0('rbind(',partAlgString,')')
+    discreteDRIFTHATCHbig <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDRIFTHATCHbig")), 
       list(theExpression = parse(text = fullAlgString)[[1]])))
-  }
+    
+    #discreteDRIFTHATCHtpoints
+    discreteDRIFTHATCHtpoints <- list()
+    for( i in 1:(Tpoints-1)){
+    fullAlgString <- paste0('discreteDRIFTHATCHbig[
+      ((intervalID_T[1,',i,']-1) * nlatent^2 + 1) : (intervalID_T[1,',i,'] * nlatent^2), 1:(nlatent^2)]')
+      
+      discreteDRIFTHATCHtpoints[[i]] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDRIFTHATCH_T", i)), 
+        list(theExpression = parse(text = fullAlgString)[[1]])))
+    }
+    
+    nlatent<-mxMatrix(name='nlatent',nrow=1,ncol=1,free=F,values=n.latent)
+    
+    discreteDRIFTHATCHalgs<-list(discreteDRIFTHATCHtpoints, discreteDRIFTHATCHbig, discreteDRIFTHATCHallintervals)
   }
   
-  INTalgs <- list()
-  for(i in 1:(Tpoints - 1)){
+  
+  
+  
+  
+  ######## continuous intercept
+  #discreteCINTallintervals
+  discreteCINTallintervals <- list()
+  for( i in 1:length(uniqueintervals)){
+    if(discreteTime==FALSE & asymptotes==FALSE) fullAlgString <- 
+        paste0('invDRIFT %*% (discreteDRIFT_i',i, '- II) %*% CINT')
     
-    if(discreteTime==FALSE){
-      #         if(asymptotes==FALSE) 
-      fullAlgString <- paste0('invDRIFT %*%   (discreteDRIFT_T', i, ' - II) %*% CINT') #optimize based on continuous CINT
-      
-              if(asymptotes==TRUE) fullAlgString <- paste0("(II - discreteDRIFT_T", i, ") %*% CINT") #discrete cint based on asymptotic CINT
-    }
+    if(discreteTime==FALSE & asymptotes==TRUE) fullAlgString <- paste0('(II - discreteDRIFT_i',i, ') %*% CINT')
     
     if(discreteTime==TRUE) fullAlgString <- paste0("CINT")
     
-    INTalgs[i] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("intd", i)), 
+    discreteCINTallintervals[[i]] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteCINT_i", i)), 
       list(theExpression = parse(text = fullAlgString)[[1]])))
   }
   
-  Qdalgs <- list()
-  for(i in 1:(Tpoints - 1)){
+  
+  #discreteCINTbig
+  partAlgString<- paste0('discreteCINT_i', 1:(length(uniqueintervals)),collapse=', ')
+  fullAlgString <- paste0('rbind(',partAlgString,')')
+  discreteCINTbig <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteCINTbig")), 
+    list(theExpression = parse(text = fullAlgString)[[1]])))
+  
+  #discreteCINTtpoints
+  discreteCINTtpoints <- list()
+  for( i in 1:(Tpoints-1)){
+    if(discreteTime==FALSE) fullAlgString <- paste0('discreteCINTbig[
+      ((intervalID_T[1,',i,'] -1) * nlatent + 1) : (intervalID_T[1,',i,'] * nlatent),1]')
     
-    if(discreteTime==FALSE){
-      #         if(asymptotes==FALSE) 
-      fullAlgString <- paste0("(invDRIFTHATCH %*% 
-        ((discreteDRIFTHATCH_T",i,")) - invDRIFTHATCH ) %*% rvectorize(DIFFUSION)") #optimize over continuous diffusion variance
-      
-              if(asymptotes==TRUE) fullAlgString <- paste0(" ( II %x% II  - 
-                (discreteDRIFT_T", i, ") %x% (discreteDRIFT_T", i, ") )  %*%  cvectorize(DIFFUSION) ") #from asymptotic diffusion variance
-    }   
+    if(discreteTime==TRUE) fullAlgString <- paste0("CINT")
     
-    if(discreteTime==TRUE) fullAlgString <- paste0("rvectorize(DIFFUSION)")
-    
-    Qdalgs[i] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("Qd", i)), 
+    discreteCINTtpoints[[i]] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteCINT_T", i)), 
       list(theExpression = parse(text = fullAlgString)[[1]])))
   }
+  
+  INTalgs<-list(discreteCINTtpoints, discreteCINTbig, discreteCINTallintervals)
+  
+  
+
+  
+  
+  
+  ######## diffusion
+  #discreteDIFFUSIONallintervals
+  discreteDIFFUSIONallintervals <- list()
+  for( i in 1:length(uniqueintervals)){
+    if(discreteTime==FALSE & asymptotes==FALSE) fullAlgString <- 
+         paste0("(invDRIFTHATCH %*% ((discreteDRIFTHATCH_i",i,")) - invDRIFTHATCH ) %*% rvectorize(DIFFUSION)") #optimize over continuous diffusion variance
+          
+          if(discreteTime==FALSE & asymptotes==TRUE) fullAlgString <- 
+paste0(" ( II %x% II  - (discreteDRIFT_i", i, ") %x% (discreteDRIFT_i", i, ") )  %*%  cvectorize(DIFFUSION) ") 
+
+    if(discreteTime==TRUE) fullAlgString <- paste0("DIFFUSION")
+    
+    discreteDIFFUSIONallintervals[[i]] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDIFFUSION_i", i)), 
+      list(theExpression = parse(text = fullAlgString)[[1]])))
+  }
+  
+  
+  #discreteDIFFUSIONbig
+  partAlgString<- paste0('discreteDIFFUSION_i', 1:(length(uniqueintervals)),collapse=', ')
+  fullAlgString <- paste0('rbind(',partAlgString,')')
+  discreteDIFFUSIONbig <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDIFFUSIONbig")), 
+    list(theExpression = parse(text = fullAlgString)[[1]])))
+  
+  #discreteDIFFUSIONtpoints
+  discreteDIFFUSIONtpoints <- list()
+  for( i in 1:(Tpoints-1)){
+    if(discreteTime==FALSE) fullAlgString <- paste0('discreteDIFFUSIONbig[
+      ((intervalID_T[1,',i,']-1) * nlatent^2 + 1) : (intervalID_T[1,',i,'] * nlatent^2), 1]')
+    
+    if(discreteTime==TRUE) fullAlgString <- paste0("DIFFUSION")
+    
+    discreteDIFFUSIONtpoints[[i]] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteDIFFUSION_T", i)), 
+      list(theExpression = parse(text = fullAlgString)[[1]])))
+  }
+  
+  Qdalgs<-list(discreteDIFFUSIONtpoints, discreteDIFFUSIONbig, discreteDIFFUSIONallintervals)
   
   #end base algebra definition function
   
@@ -1061,24 +1234,48 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
   
   
   #### Predictors algebra setup
-  if(n.TDpred + n.TIpred > 0){
-    
     if( n.TDpred > 0 ) { #if there are TD predictors     
       TDPREDEFFECTalgs <- list()
       
-      for(j in 1:(Tpoints - 1)){
+      
+      ######## diffusion
+      #discreteDIFFUSIONallintervals
+      discreteTDPREDEFFECTallintervals <- list()
+      for( i in 1:length(uniqueintervals)){
+        if(discreteTime==FALSE) fullAlgString <- paste0("discreteDRIFT_i", i, " %*% TDPREDEFFECT")
+        if(discreteTime==TRUE) fullAlgString <- paste0("TDPREDEFFECT")
         
-          if(discreteTime==FALSE) fullAlgString <- paste0("discreteDRIFT_T", j, " %*% TDPREDEFFECT")
-          if(discreteTime==TRUE) fullAlgString <- paste0("TDPREDEFFECT")
-
-        TDPREDEFFECTalgs[j] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("TDPREDEFFECT", "_T", j)), 
-          list(theExpression = parse(text = fullAlgString)[[1]]))) 
+        discreteTDPREDEFFECTallintervals[[i]] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteTDPREDEFFECT_i", i)), 
+          list(theExpression = parse(text = fullAlgString)[[1]])))
       }
+      
+      
+      #discreteTDPREDEFFECTbig
+      partAlgString<- paste0('discreteTDPREDEFFECT_i', 1:(length(uniqueintervals)),collapse=', ')
+      fullAlgString <- paste0('rbind(',partAlgString,')')
+      discreteTDPREDEFFECTbig <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteTDPREDEFFECTbig")), 
+        list(theExpression = parse(text = fullAlgString)[[1]])))
+      
+      #discreteTDPREDEFFECTtpoints
+      discreteTDPREDEFFECTtpoints <- list()
+      for( i in 1:(Tpoints-1)){
+        if(discreteTime==FALSE) fullAlgString <- paste0('discreteTDPREDEFFECTbig[
+          ((intervalID_T[1,',i,']-1) * nlatent + 1) : (intervalID_T[1,',i,'] * nlatent), 1:nTDpred]')
+        
+        if(discreteTime==TRUE) fullAlgString <- paste0("TDPREDEFFECT")
+        
+        discreteTDPREDEFFECTtpoints[[i]] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteTDPREDEFFECT_T", i)), 
+          list(theExpression = parse(text = fullAlgString)[[1]])))
+      }
+      
+      nTDpred<-mxMatrix(name='nTDpred',values=n.TDpred,nrow=1,ncol=1,free=FALSE)
+      
+      TDPREDEFFECTalgs<-list(nTDpred,discreteTDPREDEFFECTtpoints, discreteTDPREDEFFECTbig, discreteTDPREDEFFECTallintervals)
     }
     
     
     if (n.TIpred > 0){ #if there are fixed time independent predictors
-      TIPREDEFFECTalgs <- list()
+      discreteTIPREDEFFECTalgs <- list()
       for(j in 1:(Tpoints - 1)){
         
         if(discreteTime==FALSE){        
@@ -1091,11 +1288,10 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
         }
         if(discreteTime==TRUE) fullAlgString <- paste0("TIPREDEFFECT") 
         
-        TIPREDEFFECTalgs[j] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("TIPREDEFFECT", "_T", j)), 
+        discreteTIPREDEFFECTalgs[j] <- eval(substitute(OpenMx::mxAlgebra(theExpression, name = paste0("discreteTIPREDEFFECT", "_T", j)), 
           list(theExpression = parse(text = fullAlgString)[[1]])))  
       }
-    }
-  } # end predictors model section
+    } # end predictors model section
   
   
   
@@ -1129,17 +1325,47 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     if(discreteTime==TRUE) asymCINTalg <- OpenMx::mxAlgebra(name='asymCINT', solve(II-DRIFT) %*% CINT ) 
   }
   
-  ### Set DRIFT matrix
+  ### Set transformed or non transformed matrices
   if(discreteTime==FALSE && transformedParams==TRUE){
     DRIFT$mxmatrix<-list(
-      OpenMx::mxMatrix(name = "DRIFTlog", type = "Full", labels = DRIFT$labels, values = DRIFT$values, free = DRIFT$free), 
-      OpenMx::mxAlgebra(name='DRIFT', DRIFTlog - vec2diag(diag2vec(DRIFTlog)) + vec2diag(-exp(diag2vec(DRIFTlog)))  - II %x% 0.00001)
+      OpenMx::mxMatrix(name = "negDRIFTlog", type = "Full", labels = DRIFT$labels, values = DRIFT$values, free = DRIFT$free), 
+      OpenMx::mxAlgebra(name='DRIFT', dimnames=list(latentNames,latentNames),
+        negDRIFTlog - vec2diag(diag2vec(negDRIFTlog)) + vec2diag(-exp(diag2vec(negDRIFTlog)))  - II %x% 0.00001)
     )
+    
+    T0VAR$mxmatrix<-list(
+      OpenMx::mxMatrix(name = "T0VARlogchol", values=T0VAR$values, labels=T0VAR$labels, ncol=n.latent, nrow=n.latent, free=T0VAR$free), 
+      OpenMx::mxAlgebra(name='T0VARcholdiag', exp(diag2vec(T0VARlogchol))),
+      OpenMx::mxAlgebra(name='T0VARchol', T0VARlogchol + vec2diag(T0VARcholdiag) - vec2diag(diag2vec(T0VARlogchol))),
+      OpenMx::mxAlgebra(name='T0VAR', t(T0VARchol) %*% T0VARchol)
+    )
+      
+      DIFFUSION$mxmatrix<- list(
+        OpenMx::mxMatrix(name = "DIFFUSIONlogchol",type = "Full", labels = DIFFUSION$labels, values = DIFFUSION$values, #DIFFUSION matrix of dynamic innovations
+        free = DIFFUSION$free, nrow = n.latent, ncol = n.latent),     
+      OpenMx::mxAlgebra(name='DIFFUSIONcholdiag', exp(diag2vec(DIFFUSIONlogchol))),
+      OpenMx::mxAlgebra(name='DIFFUSIONchol', DIFFUSIONlogchol + vec2diag(DIFFUSIONcholdiag) - vec2diag(diag2vec(DIFFUSIONlogchol)) + II %x% .00001),
+      OpenMx::mxAlgebra(name='DIFFUSION', t(DIFFUSIONchol) %*% DIFFUSIONchol)
+      )
+      
+      MANIFESTVAR$mxmatrix<- list(
+        OpenMx::mxMatrix(name='MANIFESTVARlogchol', free=MANIFESTVAR$free, values=MANIFESTVAR$values, 
+        labels=MANIFESTVAR$labels, nrow=n.manifest, ncol=n.manifest),
+        OpenMx::mxAlgebra(name='MANIFESTVARcholdiag', exp(diag2vec(MANIFESTVARlogchol))),
+        OpenMx::mxAlgebra(name='MANIFESTVARchol', MANIFESTVARlogchol + vec2diag(MANIFESTVARcholdiag) - vec2diag(diag2vec(MANIFESTVARlogchol))),
+        OpenMx::mxAlgebra(name='MANIFESTVAR', t(MANIFESTVARchol) %*% MANIFESTVARchol)
+      )
   }
   
-  if(discreteTime==TRUE || transformedParams==FALSE){
+  if(discreteTime==TRUE | transformedParams==FALSE){
     DRIFT$mxmatrix <- list( OpenMx::mxMatrix(name = "DRIFT", type = "Full", labels = DRIFT$labels, values = DRIFT$values, free = DRIFT$free))
+    T0VAR$mxmatrix<-list(OpenMx::mxMatrix(name = "T0VAR", values=T0VAR$values, labels=T0VAR$labels, ncol=n.latent, nrow=n.latent, free=T0VAR$free))
+    MANIFESTVAR$mxmatrix<-list(OpenMx::mxMatrix(name='MANIFESTVAR', free=MANIFESTVAR$free, values=MANIFESTVAR$values))
+    DIFFUSION$mxmatrix<-list(OpenMx::mxMatrix(name = "DIFFUSION",type = "Full", labels = DIFFUSION$labels, values = DIFFUSION$values, #DIFFUSION matrix of dynamic innovations
+      free = DIFFUSION$free, nrow = n.latent, ncol = n.latent))
   }
+  
+
   
   
   model  <-  OpenMx::mxModel("ctsem", #type="RAM", #begin specifying the mxModel
@@ -1153,27 +1379,10 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     mxMatrix(name='MANIFESTMEANS', free=MANIFESTMEANS$free, values=MANIFESTMEANS$values, 
       labels=MANIFESTMEANS$labels, nrow=nrow(MANIFESTMEANS$labels), ncol=ncol(MANIFESTMEANS$labels)), 
     
-    mxMatrix(name='MANIFESTVARlogchol', free=MANIFESTVAR$free, values=MANIFESTVAR$values, 
-      labels=MANIFESTVAR$labels, nrow=n.manifest, ncol=n.manifest),
-    mxAlgebra(name='MANIFESTVARcholdiag', exp(diag2vec(MANIFESTVARlogchol))),
-    mxAlgebra(name='MANIFESTVARchol', MANIFESTVARlogchol + vec2diag(MANIFESTVARcholdiag) - vec2diag(diag2vec(MANIFESTVARlogchol))),
-    mxAlgebra(name='MANIFESTVAR', t(MANIFESTVARchol) %*% MANIFESTVARchol),
-    
     mxMatrix(name = "T0MEANS", free=T0MEANS$free, labels=T0MEANS$labels, #T0MEANS matrix
       values=T0MEANS$values, nrow=n.latent, ncol=1), 
     
-    mxMatrix(name = "T0VARlogchol", values=T0VAR$values, labels=T0VAR$labels, ncol=n.latent, nrow=n.latent, free=T0VAR$free), 
-    mxAlgebra(name='T0VARcholdiag', exp(diag2vec(T0VARlogchol))),
-    mxAlgebra(name='T0VARchol', T0VARlogchol + vec2diag(T0VARcholdiag) - vec2diag(diag2vec(T0VARlogchol))),
-    mxAlgebra(name='T0VAR', t(T0VARchol) %*% T0VARchol),
-    
-    mxMatrix(name = "DIFFUSIONlogchol",type = "Full", labels = DIFFUSION$labels, values = DIFFUSION$values, #DIFFUSION matrix of dynamic innovations
-     free = DIFFUSION$free, nrow = n.latent, ncol = n.latent),     
-    mxAlgebra(name='DIFFUSIONcholdiag', exp(diag2vec(DIFFUSIONlogchol))),
-    mxAlgebra(name='DIFFUSIONchol', DIFFUSIONlogchol + vec2diag(DIFFUSIONcholdiag) - vec2diag(diag2vec(DIFFUSIONlogchol)) + II %x% .0001),
-    mxAlgebra(name='DIFFUSION', t(DIFFUSIONchol) %*% DIFFUSIONchol),
-    
-    DRIFT$mxmatrix,
+    DRIFT$mxmatrix, MANIFESTVAR$mxmatrix, DIFFUSION$mxmatrix, T0VAR$mxmatrix,
     
     mxMatrix(type = "Full", labels = CINT$labels, values = CINT$values, 
       free = CINT$free, nrow=nrow(CINT$values), ncol=ncol(CINT$values), name = "CINT"),  #continuous intercept matrix
@@ -1269,6 +1478,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
 #               }
 #     }
     
+    if(discreteTime==FALSE && transformedParams==TRUE){
     model <- OpenMx::mxModel(model, 
       #       mxAlgebra(name = "traitloadings", (invDRIFT %*% (discreteDRIFT - II))), #trait loading matrix
       mxMatrix( name = "TRAITVARlogchol", type = "Full", labels = TRAITVAR$labels, values = TRAITVAR$values, 
@@ -1276,19 +1486,28 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
       mxAlgebra(name='TRAITVARcholdiag', exp(diag2vec(TRAITVARlogchol))),
       mxAlgebra(name='TRAITVARchol', TRAITVARlogchol + vec2diag(TRAITVARcholdiag) - vec2diag(diag2vec(TRAITVARlogchol))),
       mxAlgebra(name='TRAITVAR', t(TRAITVARchol) %*% TRAITVARchol)
-      
-#       mxMatrix(name="T0TRAITEFFECT", labels=T0TRAITEFFECT$labels, #T0TRAITEFFECT matrix
-#         values=T0TRAITEFFECT$values, free=T0TRAITEFFECT$free, 
-#         nrow=n.latent, ncol=n.latent), 
-      # traitalgs #include trait RAM algebras     
+      #       mxMatrix(name="T0TRAITEFFECT", labels=T0TRAITEFFECT$labels, #T0TRAITEFFECT matrix
+      #         values=T0TRAITEFFECT$values, free=T0TRAITEFFECT$free, 
+      #         nrow=n.latent, ncol=n.latent), 
     )
+    }
     
+    if(discreteTime==TRUE | transformedParams==FALSE){
+      model <- OpenMx::mxModel(model, 
+        #       mxAlgebra(name = "traitloadings", (invDRIFT %*% (discreteDRIFT - II))), #trait loading matrix
+        mxMatrix( name = "TRAITVAR", type = "Full", labels = TRAITVAR$labels, values = TRAITVAR$values, 
+          free = TRAITVAR$free)
+      )
+    }
+
     # if('T0TRAITEFFECT' %in% stationary & asymptotes==FALSE) model<-OpenMx::mxModel(model, T0TRAITEFFECTalg)
     
   }
   
   ###Manifest Trait variance 
+  
   if(manifestTraitvarExtension==TRUE){
+    if(discreteTime==FALSE && transformedParams==TRUE){
     model <- OpenMx::mxModel(model, 
       mxMatrix(type = "Full", 
         labels = MANIFESTTRAITVAR$labels, 
@@ -1299,35 +1518,45 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
       mxAlgebra(name='MANIFESTTRAITVARchol', MANIFESTTRAITVARlogchol + vec2diag(MANIFESTTRAITVARcholdiag) - vec2diag(diag2vec(MANIFESTTRAITVARlogchol))),
       mxAlgebra(name='MANIFESTTRAITVAR', t(MANIFESTTRAITVARchol) %*% MANIFESTTRAITVARchol)
     )
+    }
     
+    if(discreteTime==TRUE | transformedParams==FALSE){
+      model <- OpenMx::mxModel(model, 
+        mxMatrix(type = "Full", 
+          labels = MANIFESTTRAITVAR$labels, 
+          values = MANIFESTTRAITVAR$values,  
+          free = MANIFESTTRAITVAR$free,
+          name = "MANIFESTTRAITVAR")
+      )
+    }
   }
   
   
   
   
-  if(useOptimizer==TRUE) model <- OpenMx::mxModel(model,
-    mxComputeSequence(list(
-      #  		    mxComputeGradientDescent(verbose=1),  # default is forward
-      mxComputeGradientDescent(verbose=verbose,
-        #gradientAlgo="central", nudgeZeroStarts=FALSE, #tolerance=.001,  gradientIterations = 1,
-        maxMajorIter=3000),
-      mxComputeNumericDeriv(), mxComputeStandardError(),   mxComputeReportDeriv())))
+#   if(useOptimizer==TRUE) model <- OpenMx::mxModel(model,
+#     mxComputeSequence(list(
+#       #  		    mxComputeGradientDescent(verbose=1),  # default is forward
+#       mxComputeGradientDescent(verbose=verbose,
+#         #gradientAlgo="central", nudgeZeroStarts=FALSE, #tolerance=.001,  gradientIterations = 1,
+#         maxMajorIter=3000),
+#       mxComputeNumericDeriv(), mxComputeStandardError(),   mxComputeReportDeriv())))
   
   
   #model options
   originaloptimizer<- OpenMx::mxOption(NULL, "Default optimizer")
   
   if(optimizer=='NPSOL') {
-    message("Setting NPSOL optimizer for OpenMx temporarily") 
+    # message("Setting NPSOL optimizer for OpenMx temporarily") 
     OpenMx::mxOption(NULL, "Default optimizer", "NPSOL")
     # OpenMx::mxOption(model, "Function precision", 1e-12) #1e-14
   }
   if(optimizer=='CSOLNP') {
-    message("Setting CSOLNP optimizer for OpenMx temporarily") 
+    # message("Setting CSOLNP optimizer for OpenMx temporarily") 
     OpenMx::mxOption(NULL, "Default optimizer", "CSOLNP")
   }
   if(optimizer=='SLSQP') {
-    message("Setting SLSQP optimizer for OpenMx temporarily") 
+    # message("Setting SLSQP optimizer for OpenMx temporarily") 
     OpenMx::mxOption(NULL, "Default optimizer", "SLSQP")
   }
   
@@ -1376,14 +1605,28 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
       
       if(objective!='Kalman' & objective != 'Kalmanmx'){
         
+        if(discreteTime==FALSE && transformedParams==TRUE){
         model <- OpenMx::mxModel(model, 
           mxMatrix(type = "Full", 
             labels = TDPREDVAR$labels, values = TDPREDVAR$values, free = TDPREDVAR$free, 
             name = "TDPREDVARlogchol"), 
           mxAlgebra(name='TDPREDVARcholdiag', exp(diag2vec(TDPREDVARlogchol))),
           mxAlgebra(name='TDPREDVARchol', TDPREDVARlogchol + vec2diag(TDPREDVARcholdiag) - vec2diag(diag2vec(TDPREDVARlogchol))),          
-          mxAlgebra(name='TDPREDVAR', t(TDPREDVARchol) %*% TDPREDVARchol),
-          
+          mxAlgebra(name='TDPREDVAR', t(TDPREDVARchol) %*% TDPREDVARchol)
+        )
+        }
+        
+        
+        if(discreteTime==TRUE | transformedParams==FALSE){
+          model <- OpenMx::mxModel(model, 
+            mxMatrix(type = "Full", 
+              labels = TDPREDVAR$labels, values = TDPREDVAR$values, free = TDPREDVAR$free, 
+              name = "TDPREDVAR")
+          )
+        }
+        
+
+        model <- OpenMx::mxModel(model, 
           mxMatrix(name='TDPREDMEANS', type='Full', labels=TDPREDMEANS$labels, free=TDPREDMEANS$free,
             values=TDPREDMEANS$values,ncol=ncol(TDPREDMEANS$labels),nrow=nrow(TDPREDMEANS$labels)),
           
@@ -1419,12 +1662,22 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
           
       }
       
+      if(discreteTime==FALSE && transformedParams==TRUE){
       model <- OpenMx::mxModel(model, 
         mxMatrix(type = "Full", labels = TIPREDVAR$labels, values = TIPREDVAR$values, free = TIPREDVAR$free, name = "TIPREDVARlogchol"),
         mxAlgebra(name='TIPREDVARcholdiag', exp(diag2vec(TIPREDVARlogchol))),
         mxAlgebra(name='TIPREDVARchol', TIPREDVARlogchol + vec2diag(TIPREDVARcholdiag) - vec2diag(diag2vec(TIPREDVARlogchol))),
-        mxAlgebra(name='TIPREDVAR', t(TIPREDVARchol) %*% TIPREDVARchol),
+        mxAlgebra(name='TIPREDVAR', t(TIPREDVARchol) %*% TIPREDVARchol)
+      )
+      }
         
+      if(discreteTime==TRUE | transformedParams==FALSE){
+        model <- OpenMx::mxModel(model, 
+          mxMatrix(type = "Full", labels = TIPREDVAR$labels, values = TIPREDVAR$values, free = TIPREDVAR$free, name = "TIPREDVAR")
+        )
+      }
+      
+      model <- OpenMx::mxModel(model, 
         mxMatrix(type = "Full", labels = TIPREDEFFECT$labels, values = TIPREDEFFECT$values, free = TIPREDEFFECT$free, name = "TIPREDEFFECT"), 
         mxMatrix(name='T0TIPREDEFFECT', values = T0TIPREDEFFECT$values, nrow=nrow(T0TIPREDEFFECT$values), ncol=ncol(T0TIPREDEFFECT$values), 
           free=T0TIPREDEFFECT$free, labels=T0TIPREDEFFECT$labels), 
@@ -1432,7 +1685,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
         mxMatrix(name='TIPREDMEANS', type='Full', labels=TIPREDMEANS$labels, free=TIPREDMEANS$free,
           values=TIPREDMEANS$values,ncol=ncol(TIPREDMEANS$labels),nrow=nrow(TIPREDMEANS$labels)),
         
-        TIPREDEFFECTalgs
+        discreteTIPREDEFFECTalgs
       )
       if(n.TDpred > 0 ) model<-OpenMx::mxModel(model, 
         mxMatrix(name='TDTIPREDCOV', type='Full', labels=TDTIPREDCOV$labels, free=TDTIPREDCOV$free,
@@ -1525,7 +1778,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     Amanifestvalues <- A$values[manifeststart:manifestExtent, latents]
     Smanifestvalues<-S$values[manifeststart:manifestExtent, manifeststart:manifestExtent]
     Smanifestlabels<-S$labels[manifeststart:manifestExtent, manifeststart:manifestExtent]
-    Smanifestfree<-S$free[manifeststart:manifestExtent, manifeststart:manifestExtent]
+    Smanifestfree<-FALSE
     
     Amanifestcovvalues <- A$values[manifeststart:manifestExtent, latents] #need this to incorporate predictor and manifest covariance
     if(n.TDpred+n.TIpred > 0) {
@@ -1537,8 +1790,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
         (n.manifest*Tpoints+1):(n.manifest*Tpoints+n.TIpred+n.TDpred*(Tpoints-1))]  <-0
       Smanifestlabels[(n.manifest*Tpoints+1):(n.manifest*Tpoints+n.TIpred+n.TDpred*(Tpoints-1)),
         (n.manifest*Tpoints+1):(n.manifest*Tpoints+n.TIpred+n.TDpred*(Tpoints-1))]  <-NA
-      Smanifestfree[(n.manifest*Tpoints+1):(n.manifest*Tpoints+n.TIpred+n.TDpred*(Tpoints-1)),
-        (n.manifest*Tpoints+1):(n.manifest*Tpoints+n.TIpred+n.TDpred*(Tpoints-1))]  <-F
+      Smanifestfree  <-FALSE
     }
     
     #base model components
@@ -1546,39 +1798,39 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
       
       mxMatrix(name='Alatent', values=A$values[latents, latents], 
         labels=A$labels[latents, latents], 
-        free=A$free[latents, latents], 
+        free=FALSE, 
         nrow=latentExtent, ncol=latentExtent), 
       
       mxMatrix(name='Slatent', values=S$values[latents, latents], 
         labels=S$labels[latents, latents], 
-        free=S$free[latents, latents], 
+        free=FALSE, 
         nrow=latentExtent, ncol=latentExtent), 
       
       mxMatrix(name='Mlatent', values=M$values[latents, 1], 
         labels=M$labels[latents, 1], 
-        free=M$free[latents, 1], 
+        free=FALSE, 
         nrow=1, ncol=latentExtent), 
       
       mxMatrix(name='Smanifest', labels=Smanifestlabels, #includes predictors!!
         values=Smanifestvalues, 
-        free=Smanifestfree, 
+        free=FALSE, 
         nrow=n.manifest*Tpoints+n.TDpred*(Tpoints-1)+n.TIpred, ncol=n.manifest*Tpoints+n.TDpred*(Tpoints-1)+n.TIpred), 
       #           nrow=n.manifest*Tpoints, ncol=n.manifest*Tpoints), 
       
       mxMatrix(name='Mmanifest', labels=M$labels[manifeststart:manifestExtent], 
-        values=M$values[manifeststart:manifestExtent], free=M$free[manifeststart:manifestExtent], 
+        values=M$values[manifeststart:manifestExtent], free=FALSE, 
         nrow=1, ncol=n.manifest*Tpoints+n.TDpred*(Tpoints-1)+n.TIpred), 
       #           nrow=1, ncol=n.manifest*Tpoints), 
       
       mxMatrix(name='Amanifest', values=Amanifestvalues, 
         labels=A$labels[manifeststart:manifestExtent, latents], 
-        free=A$free[manifeststart:manifestExtent, latents], 
+        free=FALSE, 
         nrow=n.manifest*Tpoints+n.TDpred*(Tpoints-1)+n.TIpred, ncol=latentExtent), 
       #           nrow=n.manifest*Tpoints, ncol=latentExtent), 
       
       mxMatrix(name='Amanifestcov', values=Amanifestcovvalues, 
         labels=A$labels[manifeststart:manifestExtent, latents], 
-        free=A$free[manifeststart:manifestExtent, latents], 
+        free=FALSE, 
         nrow=n.manifest*Tpoints+n.TDpred*(Tpoints-1)+n.TIpred, ncol=latentExtent), 
       
       mxMatrix(name='Ilatent', type='Iden', nrow=latentExtent, ncol=latentExtent), 
@@ -1596,7 +1848,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     
     model <- OpenMx::mxModel(model, 
       fullSlatent, fullSmanifest, fullMlatent, 
-      mxAlgebra(Amanifestcov %*% invIminusAlatent %*% fullSlatent %*% t(invIminusAlatent) %*% t(Amanifestcov) +Smanifest, name = "expCov"), 
+      mxAlgebra(Amanifestcov %&% (invIminusAlatent %&% fullSlatent) +Smanifest, name = "expCov"), 
       mxAlgebra(t(Amanifest %*% (invIminusAlatent %*% t(fullMlatent))) + Mmanifest, name = "expMean")) 
       
       #         mxMatrix(type = "Iden", nrow = nrow(A$labels, ncol = ncol(A$labels, name = "bigI"), 
@@ -1627,6 +1879,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     manifests <- c(paste0(manifestNames,'_T',rep(0:(Tpoints-1),each=n.manifest)), 
       if(n.TDpred > 0) {paste0(TDpredNames,'_T',rep(0:(Tpoints-2), times=n.TDpred))}, 
       if(n.TIpred > 0) {paste0(TIpredNames) } )
+    
     covData<-matrix(Matrix::nearPD(stats::cov(datawide[,manifests],use='pairwise.complete.obs'))[["mat"]],nrow=length(manifests),
       dimnames = list(manifests,manifests))
     
@@ -1641,7 +1894,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     
     if(n.subjects > 1){
       
-      Qd<-OpenMx::mxMatrix(name='Qd',labels=paste0('discreteDIFFUSION[',1:(n.latent^2),',1]'),nrow=n.latent,ncol=n.latent,free=F)
+      discreteDIFFUSIONmatrix<-OpenMx::mxMatrix(name='discreteDIFFUSIONmatrix',labels=paste0('discreteDIFFUSION_T1[',1:(n.latent^2),',1]'),nrow=n.latent,ncol=n.latent,free=F)
       
       D<-OpenMx::mxMatrix(name='D', values=MANIFESTMEANS$values, labels=MANIFESTMEANS$labels, 
         nrow=n.manifest, ncol=1, free=MANIFESTMEANS$free)
@@ -1649,41 +1902,41 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
       u<-OpenMx::mxMatrix(name='u', values=1, nrow=1, ncol=1, free=F)
      
       model<-OpenMx::mxModel(model, 
-        D, u,  Qd,
-        mxAlgebra(name='intercept', (1-firstObsDummy) %x% intd1 + firstObsDummy %x% T0MEANS),
+        D, u,  discreteDIFFUSIONmatrix,
+        mxAlgebra(name='intercept', (1-firstObsDummy) %x% discreteCINT_T1 + firstObsDummy %x% T0MEANS),
         
         mxAlgebra(name='discreteDRIFT',  (1-firstObsDummy) %x% discreteDRIFT_T1),
         
-        mxAlgebra(name='discreteDIFFUSION',  (1-firstObsDummy) %x% Qd1 + firstObsDummy %x% cvectorize(T0VAR)),
+        mxAlgebra(name='discreteDIFFUSIONwithdummy',  (1-firstObsDummy) %x% discreteDIFFUSIONmatrix + firstObsDummy %x% (T0VAR)),
      
         mxMatrix(name='firstObsDummy', free=FALSE, labels='data.firstObsDummy', nrow=1, ncol=1),
         
         mxExpectationStateSpace(A='discreteDRIFT', B='intercept', C='LAMBDA', 
-          D="D", Q='Qd', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u"), 
+          D="D", Q='discreteDIFFUSIONwithdummy', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u"), 
         
         mxFitFunctionML(vector=FALSE)
         
       )
       
       #free intercepts
-     randIntercepts<- OpenMx::mxMatrix(type = "Full", 
-        labels = paste0('s',rep(unique(datawide[,'id']),each=n.latent),'_', CINT$labels), 
-        values = CINT$values, 
-        free = CINT$free, nrow=n.latent, ncol=n.subjects, name = "randIntercepts")
-      
-        model<-OpenMx::mxModel(model,'CINT',remove=T)
-       model<-OpenMx::mxModel(model,
-         randIntercepts,
-         # mxAlgebra(name='tCINTmatrix',t(CINTmatrix)),
-         mxAlgebra(name='CINTalg',randIntercepts[,data.id]),
-         mxMatrix(name='CINT',labels=paste0('CINTalg[',1:n.latent,',1]'),nrow=n.latent,ncol=1,type='Full')
-       )
+#      randIntercepts<- OpenMx::mxMatrix(type = "Full", 
+#         labels = paste0('s',rep(unique(datawide[,'id']),each=n.latent),'_', CINT$labels), 
+#         values = CINT$values, 
+#         free = CINT$free, nrow=n.latent, ncol=n.subjects, name = "randIntercepts")
+#       
+#         model<-OpenMx::mxModel(model,'CINT',remove=T)
+#        model<-OpenMx::mxModel(model,
+#          randIntercepts,
+#          # mxAlgebra(name='tCINTmatrix',t(CINTmatrix)),
+#          mxAlgebra(name='CINTalg',randIntercepts[,data.id]),
+#          mxMatrix(name='CINT',labels=paste0('CINTalg[',1:n.latent,',1]'),nrow=n.latent,ncol=1,type='Full')
+#        )
     } #end multi subject kalman
     
      
     
     if(n.subjects==1){ 
-    Qd<-OpenMx::mxMatrix(name='Qd',labels=paste0('Qd1[',1:(n.latent^2),',1]'),nrow=n.latent,ncol=n.latent,free=F)
+    discreteDIFFUSIONmatrix<-OpenMx::mxMatrix(name='discreteDIFFUSIONmatrix',labels=paste0('discreteDIFFUSION_T1[',1:(n.latent^2),',1]'),nrow=n.latent,ncol=n.latent,free=F)
       
       D<-OpenMx::mxMatrix(name='D', values=MANIFESTMEANS$values, labels=MANIFESTMEANS$labels, 
         nrow=n.manifest, ncol=1, free=MANIFESTMEANS$free)
@@ -1691,21 +1944,21 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
       u<-OpenMx::mxMatrix(name='u', values=1, nrow=1, ncol=1, free=F)
     
     model<-OpenMx::mxModel(model, 
-      D, u,  Qd,
-      mxExpectationStateSpace(A='discreteDRIFT_T1', B='intd1', C='LAMBDA', 
-        D="D", Q='Qd', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u"), 
+      D, u,  discreteDIFFUSIONmatrix,
+      mxExpectationStateSpace(A='discreteDRIFT_T1', B='discreteCINT_T1', C='LAMBDA', 
+        D="D", Q='discreteDIFFUSIONmatrix', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u"), 
       
       mxFitFunctionML(vector=FALSE)
     )
     
     if(n.TDpred>0){
-      intd1labels<-matrix(paste0('intd1[', 1:n.latent, ',','1]'), nrow=n.latent)
-      TDPREDEFFECT_T1labels<-matrix(paste0('TDPREDEFFECT_T1[', 1:n.latent, ',', rep(1:n.TDpred, each=n.latent), ']'), nrow=n.latent)
+      discreteCINT_T1labels<-matrix(paste0('discreteCINT_T1[', 1:n.latent, ',','1]'), nrow=n.latent)
+      discreteTDPREDEFFECT_T1labels<-matrix(paste0('discreteTDPREDEFFECT_T1[', 1:n.latent, ',', rep(1:n.TDpred, each=n.latent), ']'), nrow=n.latent)
       TDPREDEFFECT$ref<-paste0('data.', TDpredNames)
       
       model<-OpenMx::mxModel(model, 
         mxMatrix(name='B', free=FALSE , nrow=n.latent, ncol=n.TDpred+1, 
-          labels=cbind(intd1labels, TDPREDEFFECT_T1labels)), 
+          labels=cbind(discreteCINT_T1labels, discreteTDPREDEFFECT_T1labels)), 
         
         mxMatrix(name='D', nrow=n.manifest, ncol=1+n.TDpred, 
           free=c(MANIFESTMEANS$free, rep(FALSE, n.TDpred*n.manifest)), 
@@ -1716,7 +1969,7 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
           values=c(1, rep(0, n.TDpred)), 
           labels=c(NA, TDPREDEFFECT$ref)),         
         
-        mxExpectationStateSpace(A='discreteDRIFT_T1', B='B', C='LAMBDA', D="D", Q='Qd', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u")
+        mxExpectationStateSpace(A='discreteDRIFT_T1', B='B', C='LAMBDA', D="D", Q='discreteDIFFUSIONmatrix', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u")
       )
     }
     }
@@ -1748,25 +2001,39 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
   if(carefulFit==TRUE) {
     originalmodel<-model
     
-#     if(transformedParams==TRUE) model$DRIFTlog$free[row(DRIFT$free)!=col(DRIFT$free)] <- FALSE #fix off diagonal DRIFT params
+#     if(transformedParams==TRUE) model$negDRIFTlog$free[row(DRIFT$free)!=col(DRIFT$free)] <- FALSE #fix off diagonal DRIFT params
 #     if(transformedParams==FALSE) model$DRIFT$free[row(DRIFT$free)!=col(DRIFT$free)] <- FALSE
     
-    if(traitExtension==TRUE) penalties <- OpenMx::mxAlgebra(name='penalties', 
-      sum(T0VAR*T0VAR) + sum(DRIFT*DRIFT) + sum(DIFFUSION*DIFFUSION) + sum(MANIFESTVAR*MANIFESTVAR) +
-        sum(TRAITVAR * TRAITVAR))
-    
-    if(manifestTraitvarExtension==TRUE & traitExtension==FALSE) penalties <- OpenMx::mxAlgebra(name='penalties', 
-      sum(T0VAR*T0VAR) + sum(DRIFT*DRIFT) + sum(DIFFUSION*DIFFUSION) + sum(MANIFESTVAR*MANIFESTVAR) +
-        sum(MANIFESTTRAITVAR * MANIFESTTRAITVAR) )
-    
-    if(traitExtension==FALSE & manifestTraitvarExtension==FALSE) penalties <- OpenMx::mxAlgebra(name='penalties', 
-      sum(T0VAR*T0VAR) + sum(DRIFT*DRIFT) + sum(DIFFUSION*DIFFUSION) + sum(MANIFESTVAR*MANIFESTVAR) )
+#     if(traitExtension==TRUE) penalties <- OpenMx::mxAlgebra(name='penalties', 
+#       sum(T0VAR*T0VAR) + # - sum(diag2vec(T0VAR) * diag2vec(T0VAR)) + 
+#         sum(DRIFT*DRIFT) + #  - sum(diag2vec(DRIFT) * diag2vec(DRIFT)) + 
+#         sum(DIFFUSION*DIFFUSION) + #  - sum(diag2vec(DIFFUSION) * diag2vec(DIFFUSION)) +
+#         sum(MANIFESTVAR*MANIFESTVAR) + #  - sum(diag2vec(MANIFESTVAR) * diag2vec(MANIFESTVAR)) +
+#         sum(TRAITVAR * TRAITVAR) #  - sum(diag2vec(TRAITVAR) * diag2vec(TRAITVAR))
+#         )
+#     
+#     if(manifestTraitvarExtension==TRUE & traitExtension==FALSE) penalties <- OpenMx::mxAlgebra(name='penalties', 
+#       sum(T0VAR*T0VAR) + #  - sum(diag2vec(T0VAR) * diag2vec(T0VAR)) + 
+#         sum(DRIFT*DRIFT) + #  - sum(diag2vec(DRIFT) * diag2vec(DRIFT)) + 
+#         sum(DIFFUSION*DIFFUSION) + #  - sum(diag2vec(DIFFUSION) * diag2vec(DIFFUSION)) +
+#       sum(MANIFESTVAR*MANIFESTVAR) + #  - sum(diag2vec(MANIFESTVAR) * diag2vec(MANIFESTVAR)) +
+#       sum(MANIFESTTRAITVAR * MANIFESTTRAITVAR) #  - sum(diag2vec(TRAITVAR) * diag2vec(TRAITVAR))
+#         )
+#     
+#     if(traitExtension==FALSE & manifestTraitvarExtension==FALSE) 
+      
+      penalties <- OpenMx::mxAlgebra(name='penalties', 
+      sum(T0VAR*T0VAR) + #  - sum(diag2vec(T0VAR) * diag2vec(T0VAR)) + 
+        sum(DRIFT*DRIFT) + #  - sum(diag2vec(DRIFT) * diag2vec(DRIFT)) + 
+        sum(DIFFUSION*DIFFUSION) + #  - sum(diag2vec(DIFFUSION) * diag2vec(DIFFUSION)) +
+      sum(MANIFESTVAR*MANIFESTVAR) #  - sum(diag2vec(MANIFESTVAR) * diag2vec(MANIFESTVAR))
+        )
  
     penaltyLL <- OpenMx::mxAlgebra(sum(ctsem.fitfunction)+ctsem.penalties*FIMLpenaltyweight, name='penaltyLL')
     
     if(simpleDynamics==TRUE){
       penaltyLL <- OpenMx::mxAlgebra(sum(ctsem.fitfunction)+ctsem.penalties*FIMLpenaltyweight + ctsem.simpleDynPenalty, name='penaltyLL')
-     penalties<- list(penalties, OpenMx::mxAlgebra(name='simpleDynPenalty', sum(abs(ieigenval(DRIFT)))*100) )
+     penalties<- list(penalties, OpenMx::mxAlgebra(name='simpleDynPenalty', sum(abs(ieigenval(DRIFT)))*1) )
     }
     
     modelwithpenalties <- OpenMx::mxModel(model, 
@@ -1777,11 +2044,8 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     model<-OpenMx::mxModel('ctsemCarefulFit', 
       modelwithpenalties, penaltyLL,
       #             mxMatrix(type='Full', name='FIMLpenaltyweight', nrow=1, ncol=1, values=FIMLpenaltyweight, free=F), 
-      mxMatrix(name='FIMLpenaltyweight', values=.001,free=F,nrow=1,ncol=1,type='Full' ), 
-      mxFitFunctionAlgebra('penaltyLL'),
-      mxComputeGradientDescent(gradientAlgo="central", 
-        nudgeZeroStarts=FALSE,   gradientIterations = 1, tolerance=1e-16,verbose=verbose,
-        maxMajorIter=5000)      
+      mxMatrix(name='FIMLpenaltyweight', values=100,free=F,nrow=1,ncol=1,type='Full' ), 
+      mxFitFunctionAlgebra('penaltyLL')
     )
  
   }
@@ -1859,15 +2123,21 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     model<- OpenMx::mxOption(model, 'Checkpoint Count', 1)    
   }
   
+  model<-mxOption(model,'RAM Inverse Optimization', 'No')
+  
   ###fit model
- 
-  if(!is.null(omxStartValues)) model<-omxSetParameters(model,labels=names(omxStartValues),values=omxStartValues,strict=FALSE)
+  if(!is.null(omxStartValues)) model<-omxSetParameters(model,
+    labels=names(omxStartValues)[names(omxStartValues) %in% names(omxGetParameters(model))],
+    values=omxStartValues[names(omxStartValues) %in% names(omxGetParameters(model))],strict=FALSE)
   
   if(carefulFit==TRUE) {
     carefulFit<-FALSE
-       
+
     mxobj<-try(suppressWarnings(OpenMx::mxRun(model))) #fit with the penalised likelihood
     #         mxobj<-OpenMx::mxRun(model) #fit with the penalised likelihood
+    
+    # browser()
+    # message(paste0('carefulFit penalisation:  ', mxEval(ctsem.penalties, mxobj,compute=T),'\n'))
     newstarts <- try(OpenMx::omxGetParameters(mxobj)) #get the params
     if(showInits==TRUE) {
       message('Generated start values from carefulFit=TRUE')
@@ -1883,15 +2153,15 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
     #     setobjective() #and set it
   }
   
-  if(nofit == TRUE) return(model) #if we're not fitting the model, just return the unfitted openmx model
+  if(nofit == TRUE) mxobj <- model #if we're not fitting the model, just return the unfitted openmx model
   
   if(nofit == FALSE){ #but otherwise...  
     
-    if(!is.null(confidenceintervals))  {
-      #     engine<-ifelse(npsol==TRUE, 'NPSOL', 'CSOLNP')
-      #     mxOption(NULL, "Default optimizer", "NPSOL")
-      model <- OpenMx::mxModel(model, 
-        mxCI(confidenceintervals, interval = 0.95, type = "both"))
+#     if(!is.null(confidenceintervals))  {
+#       #     engine<-ifelse(npsol==TRUE, 'NPSOL', 'CSOLNP')
+#       #     mxOption(NULL, "Default optimizer", "NPSOL")
+#       model <- OpenMx::mxModel(model, 
+#         mxCI(confidenceintervals, interval = 0.95, type = "both"))
 #       ,
 #         mxComputeSequence(list(model$compute,
 #         mxComputeConfidenceInterval(constraintType=ifelse(optimizer=='NPSOL','none','ineq'),
@@ -1906,27 +2176,16 @@ ctFit  <- function(datawide, ctmodelobj, confidenceintervals = NULL,
       # #         MxComputeReportDeriv()        
       #       )))
       
-    }
+    # }
     
-    #     if(retryattempts > 0){ 
-    # if(!is.null(startValues)) model<-omxSetParameters(model,values=startValues,labels=names(startValues), strict=FALSE)
-    
-    if(useOptimizer==TRUE) mxobj <- OpenMx::mxTryHard(model, initialTolerance=1e-16,
+
+    if(useOptimizer==TRUE) mxobj <- mxTryHard(model, initialTolerance=1e-16,
       initialGradientIterations=1,
       showInits=showInits, checkHess=TRUE, greenOK=FALSE, 
-      #         intervals = ifelse(!is.null(confidenceintervals), TRUE, FALSE), 
-      #         confidenceintervals=confidenceintervals, 
       iterationSummary=iterationSummary, bestInitsOutput=FALSE, verbose=verbose,
-      extraTries=retryattempts, loc=1, scale=2, paste=FALSE)
+      extraTries=retryattempts, loc=1, scale=0.1, paste=FALSE)
     
     if(useOptimizer==FALSE) mxobj <- OpenMx::mxRun(model,useOptimizer=useOptimizer)
-    
-    #     }
-    
-    #     if(retryattempts < 1 ) {
-    #       mxobj <- OpenMx::mxRun(model, useOptimizer = useOptimizer, 
-    #         intervals = ifelse(!is.null(confidenceintervals), TRUE, FALSE))
-    #     }   
   }
   
   

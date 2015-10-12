@@ -13,6 +13,7 @@ ctLabel<-function(matrixname, n.latent, n.manifest, n.TDpred, n.TIpred, Tpoints,
   if(matrixname=="TRAITVAR") out <- indexMatrix(dimension=n.latent,starttext="traitvar_",lowerTriangular=TRUE,sep="_",namesvector=latentNames)
   if(matrixname=="T0TRAITEFFECT") out <- indexMatrix(dimension=n.latent,starttext="T0effect_",symmetrical=FALSE,sep="_",namesvector=latentNames,endtext='Trait')
   if(matrixname=="MANIFESTTRAITVAR") out <- indexMatrix(dimension=n.manifest,starttext="manifesttraitvar_",lowerTriangular=TRUE,sep="_",namesvector=manifestNames)
+  if(matrixname=="MANIFESTMEANS") out <- matrix(paste0("manifestmeans_",manifestNames[1:n.manifest]),ncol=1)
   
   if(matrixname=="TDPREDEFFECT") out <- matrix(paste0("TDeffect_",latentNames[1:n.latent],"_",rep(TDpredNames[1:n.TDpred],each=n.latent)),nrow=n.latent,ncol=n.TDpred)
   

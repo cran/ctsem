@@ -4,7 +4,7 @@
 \alias{ctGenerate}
 \title{Simulate continuous time data}
 \usage{
-ctGenerate(ctmodelobj, n.subjects = 1000, burnin = 300, dT = 1,
+ctGenerate(ctmodelobj, n.subjects = 1000, burnin = 0, dT = 1,
   asymptotes = FALSE)
 }
 \arguments{
@@ -30,23 +30,25 @@ TRAITTDPREDCOV and TIPREDCOV matrices are not accurately accounted for, at prese
 #generate data for 2 process model, each process measured by noisy indicator,
 #stable individual differences in process levels.
 
- generatingModel<-ctModel(Tpoints=6,n.latent=2,n.TDpred=0,n.TIpred=0,n.manifest=2,
- MANIFESTVAR=diag(.2,2),
+generatingModel<-ctModel(Tpoints=8,n.latent=2,n.TDpred=0,n.TIpred=0,n.manifest=2,
+ MANIFESTVAR=diag(.1,2),
  LAMBDA=diag(1,2),
- DRIFT=matrix(c(-.2,-.15,0,-.1),nrow=2),
- TRAITVAR=matrix(c(10,-3,0,14.2),nrow=2),
- DIFFUSION=matrix(c(10,2,0,4),2),
+ DRIFT=matrix(c(-.2,-.05,-.1,-.1),nrow=2),
+ TRAITVAR=matrix(c(.5,.2,0,.8),nrow=2),
+ DIFFUSION=matrix(c(1,.2,0,4),2),
  CINT=matrix(c(1,0),nrow=2),
  T0MEANS=matrix(0,ncol=1,nrow=2),
  T0VAR=diag(1,2))
 
- data<-ctGenerate(generatingModel,n.subjects=30,burnin=500)
+data<-ctGenerate(generatingModel,n.subjects=150,burnin=500)
 
- model<-ctModel(Tpoints=6, TRAITVAR='auto', n.latent=2,
+ctIndplot(data,n.manifest=2,Tpoints=4,n.subjects=10)
+
+model<-ctModel(Tpoints=8, TRAITVAR='auto', n.latent=2,
  n.manifest=2, LAMBDA=diag(2))
 
- checkf<-ctFit(data,model)
- summary(checkf)
+checkf<-ctFit(data,model,stationary=c('T0VAR','T0MEANS'))
+summary(checkf,verbose=TRUE)
 
 
 #### with 2 process from 4 indicators, latent trait, TDpred and TIpred

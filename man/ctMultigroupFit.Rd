@@ -5,8 +5,8 @@
 \title{Fits a multiple group continuous time model.}
 \usage{
 ctMultigroupFit(datawide, groupings, ctmodelobj, fixedmodel = NA,
-  freemodel = NA, carefulFit = FALSE, retryattempts = 5,
-  showInits = TRUE, confidenceintervals = NULL, ...)
+  freemodel = NA, carefulFit = FALSE, omxStartValues = NULL,
+  retryattempts = 5, showInits = FALSE, ...)
 }
 \arguments{
 \item{datawide}{Wide format data, as used in \code{\link{ctFit}}.  See \code{\link{ctLongToWide}} to
@@ -31,12 +31,13 @@ to encourage parameters to remain closer to 0, then
 fits the specified model normally, using these estimates as starting values.
 Can help with optimization in some cases, though results in user specified inits being ignored for the final fit.}
 
+\item{omxStartValues}{A named vector containing the raw (potentially log transformed) OpenMx starting values for free parameters, as captured by
+OpenMx function \code{omxGetParameters(ctmodelobj$mxobj)}. These values will take precedence
+over any starting values already specified using ctModel.}
+
 \item{retryattempts}{Number of fit retries to make.}
 
 \item{showInits}{Displays start values prior to optimization}
-
-\item{confidenceintervals}{Character vector of parameter labels to estimate confidence intervals for.
-Unlike with \code{\link{ctFit}}, entire matrices cannot be specified.}
 
 \item{...}{additional arguments to pass to \code{\link{ctFit}}.}
 }
@@ -48,7 +49,8 @@ Fits a single continuous time structural equation models to multiple groups (whe
 by default, all parameters are free across groups.  Can also be used to easily estimate seperate models for each group.
 }
 \details{
-Additional \code{\link{ctFit}} parameters may be specified as required.
+Additional \code{\link{ctFit}} parameters may be specified as required. Confidence intervals for any matrices and or parameters
+may be estimated afer fitting using \code{\link{ctCI}}.
 }
 \examples{
 \dontrun{

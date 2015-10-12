@@ -43,7 +43,8 @@ without the _Tx time point suffix.  Defaults to Y1, Y2, etc.}
 "auto" freely estimates all parameters.}
 
 \item{MANIFESTMEANS}{n.manifest*1 matrix of manifest means.
-"auto" fixes all parameters to 0, but some may need to be freed (by specifying character labels) when a process has multiple indicators.}
+"auto" fixes all parameters to 0, but some may need to be freed (by specifying character labels) when a process has multiple indicators.
+'free' frees all parameters - identification problems may result if CINT is also free (default).}
 
 \item{MANIFESTVAR}{lower triangular n.manifest*n.manifest cholesky matrix of variance / covariance
 between manifests at each measurement occasion (i.e. measurement error / residual).

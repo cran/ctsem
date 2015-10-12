@@ -16,23 +16,25 @@
 #' #generate data for 2 process model, each process measured by noisy indicator, 
 #' #stable individual differences in process levels.
 #' 
-#'  generatingModel<-ctModel(Tpoints=6,n.latent=2,n.TDpred=0,n.TIpred=0,n.manifest=2,
-#'  MANIFESTVAR=diag(.2,2),
-#'  LAMBDA=diag(1,2), 
-#'  DRIFT=matrix(c(-.2,-.15,0,-.1),nrow=2),
-#'  TRAITVAR=matrix(c(10,-3,0,14.2),nrow=2),
-#'  DIFFUSION=matrix(c(10,2,0,4),2),
+#'generatingModel<-ctModel(Tpoints=8,n.latent=2,n.TDpred=0,n.TIpred=0,n.manifest=2,
+#'  MANIFESTVAR=diag(.1,2),
+#'  LAMBDA=diag(1,2),
+#'  DRIFT=matrix(c(-.2,-.05,-.1,-.1),nrow=2),
+#'  TRAITVAR=matrix(c(.5,.2,0,.8),nrow=2),
+#'  DIFFUSION=matrix(c(1,.2,0,4),2),
 #'  CINT=matrix(c(1,0),nrow=2),
 #'  T0MEANS=matrix(0,ncol=1,nrow=2),
 #'  T0VAR=diag(1,2))
-#'  
-#'  data<-ctGenerate(generatingModel,n.subjects=30,burnin=500)
-#'  
-#'  model<-ctModel(Tpoints=6, TRAITVAR='auto', n.latent=2, 
+#'
+#'data<-ctGenerate(generatingModel,n.subjects=150,burnin=500)
+#'
+#'ctIndplot(data,n.manifest=2,Tpoints=4,n.subjects=10)
+#'
+#'model<-ctModel(Tpoints=8, TRAITVAR='auto', n.latent=2,
 #'  n.manifest=2, LAMBDA=diag(2))
 #'
-#'  checkf<-ctFit(data,model)
-#'  summary(checkf)
+#'checkf<-ctFit(data,model,stationary=c('T0VAR','T0MEANS'))
+#'summary(checkf,verbose=TRUE)
 #'  
 #'  
 #'#### with 2 process from 4 indicators, latent trait, TDpred and TIpred 
@@ -95,7 +97,7 @@
 #'  
 #' @export
 
-ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=300,dT=1,asymptotes=FALSE){
+ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dT=1,asymptotes=FALSE){
   
   ###read in model
   for(i in 1:length(ctmodelobj)){ #this loop reads in the specified continuous time model
@@ -117,7 +119,7 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=300,dT=1,asymptotes=FALSE
   }
   
   #lower triangular transform
-  for(tempmatname in c('T0VAR','MANIFESTVAR','TRAITVAR','MANIFESTTRAITVAR','TDPREDVAR','TIPREDVAR')){
+  for(tempmatname in c('T0VAR','MANIFESTVAR', 'DIFFUSION', 'TRAITVAR','MANIFESTTRAITVAR','TDPREDVAR','TIPREDVAR')){
 
     tryCatch(assign(tempmatname,get(tempmatname) %*% t(get(tempmatname))), error=function(e) {
       assign(tempmatname,NULL)})

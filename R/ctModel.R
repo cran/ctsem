@@ -30,6 +30,7 @@
 #' 
 #' @param MANIFESTMEANS n.manifest*1 matrix of manifest means.  
 #' "auto" fixes all parameters to 0, but some may need to be freed (by specifying character labels) when a process has multiple indicators.
+#' 'free' frees all parameters - identification problems may result if CINT is also free (default).
 #' 
 #' @param MANIFESTVAR lower triangular n.manifest*n.manifest cholesky matrix of variance / covariance 
 #' between manifests at each measurement occasion (i.e. measurement error / residual).  
@@ -244,6 +245,9 @@ ctModel<-function(n.manifest, n.latent, Tpoints, LAMBDA,
   
   
   if(MANIFESTMEANS[1]=="auto") MANIFESTMEANS<- matrix(0,nrow=n.manifest)
+  if(MANIFESTMEANS[1]=="free") MANIFESTMEANS<- ctLabel(TDpredNames=TDpredNames,TIpredNames=TIpredNames,
+    manifestNames=manifestNames,latentNames=latentNames,matrixname="MANIFESTMEANS",n.latent=n.latent,
+    n.manifest=n.manifest,n.TDpred=n.TDpred,n.TIpred=n.TIpred,Tpoints=Tpoints)
   if(ncol(MANIFESTMEANS)>1) stop("Specified MANIFESTMEANS matrix has more than one column")
   if(nrow(MANIFESTMEANS)!=n.manifest) stop ("Specified MANIFESTMEANS matrix rows not equal to n.manifest")
   
