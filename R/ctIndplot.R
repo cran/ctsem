@@ -35,15 +35,21 @@ ctIndplot<-function(datawide,n.subjects,n.manifest,Tpoints,colourby="subject",
   ymin<-min(datawide[1:nrow(datawide),cseq(vars,n.manifest*Tpoints,n.manifest)],na.rm=T)
   ymax<-max(datawide[1:nrow(datawide),cseq(vars,n.manifest*Tpoints,n.manifest)],na.rm=T)
   
-  graphics::plot(0:0,ylim=c(ymin,ymax),type="l",xlim=c(start,Tpoints+start-1),
+  # browser()
+  individuals<-sample(1:nrow(datawide),n.subjects)
+  times<-matrix(unlist(lapply(1:(Tpoints-1),function(x){
+    apply(datawide[individuals,,drop=FALSE][,paste0('dT',1:x),drop=FALSE],1,sum,na.rm=T)
+  })),ncol=(Tpoints-1))
+  
+  graphics::plot(0:0,ylim=c(ymin,ymax),type="l",xlim=c(start,max(times)),
     ylab=ylab,xlab=xlab,...)
   
-  individuals<-sample(1:nrow(datawide),n.subjects)
+ 
   message(c('Plotting rows ',paste0(individuals,", ")))
   for(i in 1:n.subjects){
 
     for(j in 1:length(vars)){
-      graphics::points(start:(Tpoints+start-1),
+      graphics::points(c(0,times[i,]),
         datawide[individuals[i],seq(vars[j],n.manifest*Tpoints,n.manifest)],
         col=ifelse(colourby=="variable",colourvector[j],colourvector[i]),lwd=1,type="b",pch=j,lty=1) 
     }}

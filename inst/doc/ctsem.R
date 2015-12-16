@@ -62,7 +62,7 @@ example1fit <- ctFit(datawide = ctExample1, ctmodelobj = example1model)
 summary(example1fit, verbose = TRUE)["discreteDRIFTstd"]
 
 ## ----expm,eval=FALSE----------------------------------------------------------
-#  expm(summary(example1fit)$DRIFT * desiredinterval)
+#  expm(summary(example1fit)$DRIFT * 2.5)
 
 ## ----example1testing, cache = TRUE, echo = TRUE-------------------------------
 testmodel <- example1model
@@ -287,96 +287,82 @@ summary(discretefit)$omxsummary$CI
 example1traitfit <- ctCI(traitfit, confidenceintervals = 'DRIFT')
 summary(example1traitfit)$omxsummary$CI
 
-## ----packagecomparison, cache=TRUE, fig.keep='none'---------------------------
-  if (!requireNamespace("PSM", quietly = TRUE)) {
-    stop("PSM package needed for this function to work. Please install it.",
-      call. = FALSE)
-  }
-  if (!requireNamespace("cts", quietly = TRUE)) {
-    stop("cts package needed for this function to work. Please install it.",
-      call. = FALSE)
-  }
-  if (!requireNamespace("yuima", quietly = TRUE)) {
-    stop("yuima package needed for this function to work. Please install it.",
-      call. = FALSE)
-  }
-output <- matrix(NA, 10, 7)
-colnames(output) <- c('True', 'ctsem', 'cts', 'PSM', 'yuima', 'arima', 'OpenMx')
-for(i in 1:nrow(output)){
-generatingModel <- ctModel(n.latent = 1, n.manifest = 1, Tpoints = 500,
-  LAMBDA = diag(1), DRIFT = matrix(-.3, nrow = 1),
-  CINT = matrix(3, 1, 1),
-  MANIFESTVAR = diag(0, 1),
-  DIFFUSION = t(chol(diag(5, 1))))
-
-output[i, 1] <- generatingModel$DRIFT #true value
-
-ctsemData <- ctGenerate(generatingModel, n.subjects=1, burnin=300)
-longData <- ctWideToLong(ctsemData, Tpoints=500, n.manifest=1)
-longData <- ctDeintervalise(longData)
-
-### ctsem package
-ctsemModel <- ctModel(n.latent=1, n.manifest = 1, Tpoints = 500,
-  MANIFESTVAR = diag(0, 1),
-  LAMBDA = diag(1))
-ctsemFit <- ctFit(ctsemData, ctsemModel, stationary = c('T0VAR'))
-output[i,2] <- mxEval(DRIFT, ctsemFit$mxobj)
-
-### CTS package
-ctsData <- longData[, c('AbsTime', 'Y1')]
-library(cts)
-ctsFit <- car(ctsData, order = 1, scale = 1)
-output[i, 3] <- -1 * (1 + ctsFit$phi) / (1 - ctsFit$phi) 
-
-### PSM package
-psmFit <- ctPSMfit(ctsemData, omxStartValues = 
-    omxGetParameters(ctsemFit$mxobj), ctsemModel)
-output[i, 4] <- -exp(psmFit$PSMfit$opt$par[2])
-
-### yuima package (not plotted - potential issues due to dT=1)
-library(yuima)
-mod <- setModel(drift="drift * x + cint", diffusion = "diffusion")
-ou <- setYuima(model = mod, data = setData(longData[,'Y1'], delta = 1))
-mlout <- qmle(ou,start = list(drift = -.3, diffusion = 1, cint = 1))
-output[i, 5] <- mlout@coef[2]
-
-### arima (from stats package, discrete time analysis only)
-arfit <- arima(longData[, 'Y1'], order = c(1, 0, 0))
-log(arfit$coef[1]) #transform ar1 parameter to drift parameter
-output[i, 6]<-log(arfit$coef[1])
-
-### OpenMx state space continuous time function (specified via ctsem here)
-ctsemModel <- ctModel(n.latent=1, n.manifest = 1, Tpoints = 500,
-  MANIFESTVAR = diag(0, 1), T0VAR=diag(1), LAMBDA = diag(1))
-mxFit <- ctFit(ctsemData, ctsemModel, objective='Kalmanmx', 
-  carefulFit = FALSE)
-output[i,7] <- mxEval(DRIFT, ctsemFit$mxobj)
-
-} #end for loop
-
-### plot output
-plot(density(output[1:i, 2]), xlim = c(-.4, -.1), lty = 2, lwd = 1, 
-  ylab='Density',
-  main = 'Density of drift parameter estimates (true value -0.3)')
-points(density(output[1:i, 3]), col='red', type='l', lty=3, lwd=1)
-points(density(output[1:i, 4]), col='green', type='l', lty=2, lwd=1)
-points(density(output[1:i, 5]), col='blue', type='l', lwd=1, lty=3)
-points(density(output[1:i, 6]), col='purple', type='l', lwd=1, lty=2)
-points(density(output[1:i, 7]), col='yellow', type='l', lwd=1, lty=5)
-legend('topleft', bty='n', 
-  text.col = c('black','red','green','blue', 'yellow'),
-  legend = c('ctsem', 'cts', 'PSM', 'arima', 'OpenMx'))
-
-## ----echo=FALSE---------------------------------------------------------------
-plot(density(output[1:i, 2]), xlim = c(-.4, -.1), lty = 2, lwd = 1, 
-  ylab='Density',
-  main = 'Density of estimates of drift parameter (true value -0.3)')
-points(density(output[1:i, 3]), col='red', type='l', lty=3, lwd=1)
-points(density(output[1:i, 4]), col='green', type='l', lty=2, lwd=1)
-points(density(output[1:i, 5]), col='blue', type='l', lwd=1, lty=3)
-points(density(output[1:i, 6]), col='purple', type='l', lwd=1, lty=2)
-points(density(output[1:i, 7]), col='yellow', type='l', lwd=1, lty=5)
-legend('topleft', bty='n', 
-  text.col = c('black','red','green','blue', 'yellow'),
-  legend = c('ctsem', 'cts', 'PSM', 'arima', 'OpenMx'))
+## ----packagecomparison, eval=FALSE, cache=TRUE, fig.keep='none'---------------
+#    if (!requireNamespace("PSM", quietly = TRUE)) {
+#      stop("PSM package needed for this function to work. Please install it.",
+#        call. = FALSE)
+#    }
+#    if (!requireNamespace("cts", quietly = TRUE)) {
+#      stop("cts package needed for this function to work. Please install it.",
+#        call. = FALSE)
+#    }
+#    if (!requireNamespace("yuima", quietly = TRUE)) {
+#      stop("yuima package needed for this function to work. Please install it.",
+#        call. = FALSE)
+#    }
+#  output <- matrix(NA, 10, 7)
+#  colnames(output) <- c('True', 'ctsem', 'cts', 'PSM', 'yuima', 'arima', 'OpenMx')
+#  for(i in 1:nrow(output)){
+#  generatingModel <- ctModel(n.latent = 1, n.manifest = 1, Tpoints = 500,
+#    LAMBDA = diag(1), DRIFT = matrix(-.3, nrow = 1),
+#    CINT = matrix(3, 1, 1),
+#    MANIFESTVAR = diag(0, 1),
+#    DIFFUSION = t(chol(diag(5, 1))))
+#  
+#  output[i, 1] <- generatingModel$DRIFT #true value
+#  
+#  ctsemData <- ctGenerate(generatingModel, n.subjects=1, burnin=300)
+#  longData <- ctWideToLong(ctsemData, Tpoints=500, n.manifest=1)
+#  longData <- ctDeintervalise(longData)
+#  
+#  ### ctsem package
+#  ctsemModel <- ctModel(n.latent=1, n.manifest = 1, Tpoints = 500,
+#    MANIFESTVAR = diag(0, 1),
+#    LAMBDA = diag(1))
+#  ctsemFit <- ctFit(ctsemData, ctsemModel, stationary = c('T0VAR'))
+#  output[i,2] <- mxEval(DRIFT, ctsemFit$mxobj)
+#  
+#  ### CTS package
+#  ctsData <- longData[, c('AbsTime', 'Y1')]
+#  library(cts)
+#  ctsFit <- car(ctsData, order = 1, scale = 1)
+#  output[i, 3] <- -1 * (1 + ctsFit$phi) / (1 - ctsFit$phi)
+#  
+#  ### PSM package
+#  psmFit <- ctPSMfit(ctsemData, omxStartValues =
+#      omxGetParameters(ctsemFit$mxobj), ctsemModel)
+#  output[i, 4] <- -exp(psmFit$PSMfit$opt$par[2])
+#  
+#  ### yuima package (not plotted - potential issues due to dT=1)
+#  library(yuima)
+#  mod <- setModel(drift="drift * x + cint", diffusion = "diffusion")
+#  ou <- setYuima(model = mod, data = setData(longData[,'Y1'], delta = 1))
+#  mlout <- qmle(ou,start = list(drift = -.3, diffusion = 1, cint = 1))
+#  output[i, 5] <- mlout@coef[2]
+#  
+#  ### arima (from stats package, discrete time analysis only)
+#  arfit <- arima(longData[, 'Y1'], order = c(1, 0, 0))
+#  log(arfit$coef[1]) #transform ar1 parameter to drift parameter
+#  output[i, 6]<-log(arfit$coef[1])
+#  
+#  ### OpenMx state space continuous time function (specified via ctsem here)
+#  ctsemModel <- ctModel(n.latent=1, n.manifest = 1, Tpoints = 500,
+#    MANIFESTVAR = diag(0, 1), T0VAR=diag(1), LAMBDA = diag(1))
+#  mxFit <- ctFit(ctsemData, ctsemModel, objective='Kalmanmx',
+#    carefulFit = FALSE)
+#  output[i,7] <- mxEval(DRIFT, ctsemFit$mxobj)
+#  
+#  } #end for loop
+#  
+#  ### plot output
+#  plot(density(output[1:i, 2]), xlim = c(-.4, -.1), lty = 2, lwd = 1,
+#    ylab='Density',
+#    main = 'Density of estimates of drift parameter (true value -0.3)')
+#  points(density(output[1:i, 3]), col='red', type='l', lty=3, lwd=1)
+#  points(density(output[1:i, 4]), col='green', type='l', lty=2, lwd=1)
+#  points(density(output[1:i, 6]), col='blue', type='l', lwd=1, lty=3)
+#  points(density(output[1:i, 7]), col='yellow', type='l', lwd=1, lty=5)
+#  legend('topleft', bty='n',
+#    text.col = c('black','red','green','blue', 'yellow'),
+#    legend = c('ctsem', 'cts', 'PSM', 'arima', 'OpenMx'))
 

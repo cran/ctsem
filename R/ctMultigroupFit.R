@@ -428,7 +428,7 @@ ctMultigroupFit<-function(datawide,groupings,ctmodelobj,fixedmodel=NA,freemodel=
       fullmodel<-OpenMx::mxTryHard(fullmodel,initialTolerance=1e-16,
       showInits=showInits,
       bestInitsOutput=FALSE,
-      extraTries=retryattempts,loc=1,scale=.2,paste=FALSE,...) 
+      extraTries=retryattempts,loc=1,scale=.2,paste=FALSE) 
     
       fullmodel<-list(mxobj=fullmodel, ctfitargs=ctfitargs, ctmodelobj=ctmodelobj, groups=unique(groupings))
       class(fullmodel)<-'ctsemMultigroupFit'

@@ -3,7 +3,7 @@ library(testthat)
 
 context("intervalise")
 
-test_that("time calc", {
+test_that("intervals", {
   data('longexample')
   
   #Then convert to wide format

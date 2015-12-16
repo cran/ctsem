@@ -6,10 +6,12 @@
 #' @param ctmodelobj A ctsem model specified using \code{\link{ctModel}}. As predictors (covariates) are 
 #' not implemented currently, ensure the model contains none of these or the fit may fail.
 #' @param omxStartValues Named vector of start values, equivalent to this argument for \code{\link{ctFit}}.
-#' @param ... Additional parameters to pass to PSM.estimate
-#'
+#' @param ... Additional parameters to pass to PSM.#'
 #' @return PSM fit data
-#' @examples 
+#' @examples
+#' ## Examples set to 'dontrun' because they take longer than 5s. 
+#' 
+#' \dontrun{
 #' generatingModel <- ctModel(n.latent = 1, n.manifest = 1, Tpoints = 10,
 #' LAMBDA = diag(1), DRIFT = matrix(-.3, nrow = 1),
 #' MANIFESTVAR = diag(1),
@@ -26,7 +28,7 @@
 #' ### fit with PSM
 #' psmFit <- ctPSMfit(dat, omxStartValues = 
 #'     omxGetParameters(ctsemFit$mxobj), ctsemModel)
-#' 
+#' }
 #' @export
 
 ctPSMfit<-function(datawide,ctmodelobj,omxStartValues=NULL, ...){
@@ -42,7 +44,7 @@ ctPSMfit<-function(datawide,ctmodelobj,omxStartValues=NULL, ...){
       n.manifest=ctmodelobj$n.manifest, manifestNames=ctmodelobj$manifestNames)
     
     long<-suppressMessages(ctDeintervalise(long))
-    colnames(long)[ncol(long)] <-'Time'
+    colnames(long)[which(colnames(long)=='AbsTime')] <-'Time'
     out<-list(Time=long[,'Time'], Y=t(long[,ctmodelobj$manifestNames]))
     out$U=matrix(1,nrow=1,ncol=ncol(out$Y))
     return(out)

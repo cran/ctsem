@@ -25,10 +25,10 @@ indexMatrix<-function(dimension,symmetrical=FALSE,upper=FALSE,lowerTriangular=FA
 #' for an individual in the input data structure.
 #' @param n.TDpred number of time dependent predictors in the data structure.
 #' @param n.TIpred number of time independent predictors in the data structure.
-#'  @param manifestNames vector of character strings giving column names of manifest indicator variables
-#'  @param TDpredNames vector of character strings giving column names of time dependent predictor variables
-#'  @param TIpredNames vector of character strings giving column names of time independent predictor variables
-#'  @export
+#' @param manifestNames vector of character strings giving column names of manifest indicator variables
+#' @param TDpredNames vector of character strings giving column names of time dependent predictor variables
+#' @param TIpredNames vector of character strings giving column names of time independent predictor variables
+#' @export
 
 ctWideNames<-function(n.manifest,Tpoints,n.TDpred=0,n.TIpred=0,manifestNames='auto',TDpredNames='auto',TIpredNames='auto'){
   
