@@ -1,10 +1,10 @@
-02a6c8238426739b5aca579d1b6e4787 *DESCRIPTION
+475dbf2bf507b30b15de0c5b7a086645 *DESCRIPTION
 4b8bf25a716a3569a29a0dd8c5dad42a *NAMESPACE
 902203095f6e98c3a017f1b46beae0d8 *R/ctCI.R
 f54c85efde20bc0a74b91bcfbc3e6849 *R/ctDataHelp.R
 a4185a9eac42f386f6f47059eb07c422 *R/ctDeintervalise.R
 2b2358f1f539bc06eef82ec5a2253f10 *R/ctFit.R
-dac41fb208071bf7512b7213473fbbee *R/ctGenerate.R
+84ba9844aaecb803d2ddff46695f6a41 *R/ctGenerate.R
 ebdbee747d9261039294980d2d7b29e7 *R/ctIndplot.R
 7bf4d92ca70244ca16bce14875fa0ea3 *R/ctIntervalise.R
 e4261ec84d537f560206e0378a720ebc *R/ctLabel.R
@@ -17,7 +17,7 @@ a842bf978aff32bfef1142ec95bd1852 *R/ctWideToLong.R
 318cef35abe6f584c16e363772ff84a7 *R/ctsemUtils.R
 4cab5ae91d1b119aebf79f88c7e15486 *R/plot.ctsemFit.R
 dab663373ff0e3df1153b2d2b8a1a89d *R/summary.ctsemFit.R
-b35ba888f4cf03eefcded8f891852549 *build/vignette.rds
+b0b9bb0c3a342d239251e0dd260f9c0a *build/vignette.rds
 45415bc80ce3061eb0a776503954f7f4 *data/AnomAuth.rda
 2af6558679ffaebd9d750015ae0db9f2 *data/Oscillating.rda
 538348bd54d535a5f30d8c1b62cd584a *data/ctExample1.rda
@@ -28,9 +28,9 @@ de0099071f1404a907fb8fadc12f539e *data/ctExample4.rda
 4202af467538d49480c03817b12b6f56 *data/datastructure.rda
 f8c88a66d363778ac0006d53b043b8fe *data/longexample.rda
 f1317ed56eb2344b76f433a5cf83911b *inst/CITATION
-3e9a7c30b54cf9e9864e583af2e68ec2 *inst/doc/ctsem.R
-ac9bd2b3142ef3d367f02775ef151e0b *inst/doc/ctsem.pdf
-cfe3d7d48b59382d9bd2b9b47f53cedc *inst/doc/ctsem.rnw
+3ed8f37120d526260eaefe73edaee120 *inst/doc/ctsem.R
+6e44edba775569a8b57f3ebc76864a5b *inst/doc/ctsem.pdf
+adb4fafaf54716f2bfc6cf2f08286125 *inst/doc/ctsem.rnw
 542bf9390e679f42b694de60152a9246 *inst/tests/test-intervalise.R
 e92754f0d7e9398d654ec80176d4efb3 *inst/tests/test-knownFits.R
 3f4fca6f255905e5443dcdd9e9f87d03 *inst/tests/test-objectiveEquiv.R
@@ -46,7 +46,7 @@ fae7c8bfa7e0d33bca2112d6d813a19b *man/ctDeintervalise.Rd
 1a536e7c130b116e625fbfed872ff3f6 *man/ctExample3.Rd
 e37eadcc60d1c8a9355554f58661e491 *man/ctExample4.Rd
 f21f2cb153788ae5da0144dce29d3bc9 *man/ctFit.Rd
-b3a412658243013674632d6df9e0df33 *man/ctGenerate.Rd
+82b199b71e8811d17f8b43cd852e59bd *man/ctGenerate.Rd
 36ebe5e35f64e89a32caa8c0a685587e *man/ctIndplot.Rd
 d4bcf0124f50a8a63e52a7666d065364 *man/ctIntervalise.Rd
 1d35acbc81c8ccec9f3b48d445e0c6db *man/ctLongToWide.Rd
@@ -63,8 +63,9 @@ b77ff66ecc4d8a06cf5a3468a8d01315 *man/plot.ctsemMultigroupFit.Rd
 93f46888eb9028890b49878635eee3a1 *man/summary.ctsemFit.Rd
 b714fcd0ee25ea1c51950c8510e15fe3 *man/summary.ctsemMultigroupFit.Rd
 53110c404a428528f20e68323565d91f *tests/dotest.R
-cfe3d7d48b59382d9bd2b9b47f53cedc *vignettes/ctsem.rnw
+2a89b8f363aed76451f400aef1fcf338 *vignettes/ctsem-blx.bib
+adb4fafaf54716f2bfc6cf2f08286125 *vignettes/ctsem.rnw
 09f39539dddfbe416fce99418ad03d59 *vignettes/pathdiagramdiscretecomparison.png
 d3bc0abcc1b3930b63f61ecc427370c5 *vignettes/pathdiagramtwoprocessbasic.pdf
 3e4e424cb1e81e321bad75d24a6f6886 *vignettes/pathdiagramtwoprocessfull2.pdf
-ff9b858499a6f0304ca38aab64e2a03b *vignettes/references.bib
+500c76b634d3f1e5fe8bc2712f9693ed *vignettes/references.bib

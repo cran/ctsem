@@ -7,7 +7,6 @@ opts_chunk$set(fig.path = 'figures/plots-', warning = FALSE, fig.align = 'center
 options(replace.assign = TRUE, width = 80, prompt = "R> ", scipen = 12, digits = 3)
 
 
-
 # setwd('C:\\Users\\driver\\Dropbox\\MPIB\\CT-SEM\\manual') #set this working directory!
 Sys.setenv(TEXINPUTS = getwd(),
   BIBINPUTS = getwd(),

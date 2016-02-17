@@ -1,7 +1,7 @@
 #' Simulate continuous time data
 #' 
-#' This function generates data according to the specified ctsem model object, 
-#' which must contain fixed values for parameters. Not all T0 matrices are included at present,
+#' This function generates data according to the specified ctsem model object. 
+#' Not all T0 matrices are included at present,
 #' safest to use a high burnin (where 'high' is sufficient for the process to forget starting values)
 #' 
 #' 
@@ -131,7 +131,7 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dT=1,asymptotes=FALSE){
   traiteffect<-matrix(0,nrow=n.subjects,ncol=n.latent) #create traiteffect matrix with 0 effect
   trait<-matrix(0,nrow=n.subjects,ncol=n.latent)
   if(!is.null(TRAITVAR[1])) { #if traits are specified
- trait <- MASS::mvrnorm(n=n.subjects,mu=rep(0,n.latent),Sigma=TRAITVAR,tol=1) #generate trait effects    
+ trait <- MASS::mvrnorm(n=n.subjects,mu=rep(0,n.latent),Sigma=TRAITVAR %*% t(TRAITVAR),tol=1) #generate trait effects    
     traiteffect<- trait %*% t(LAMBDA)
  }
   
@@ -218,11 +218,11 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dT=1,asymptotes=FALSE){
   
   #   
   if(is.null(MANIFESTTRAITVAR[1])) MANIFESTTRAITVAR <- diag(0,n.manifest) #generate 0 matrix if needed
-  manifesttraiteffects<-MASS::mvrnorm(n.subjects,mu=rep(0,n.manifest),Sigma=MANIFESTTRAITVAR)
+  manifesttraiteffects<-MASS::mvrnorm(n.subjects,mu=rep(0,n.manifest),Sigma= MANIFESTTRAITVAR %*% t(MANIFESTTRAITVAR))
 
   for(i in 1:Tpoints){
     manifests[,((i-1)*n.manifest+1):(i*n.manifest)] <- (latents[,((i-1)*n.latent+1):(i*n.latent)] + trait) %*% t(LAMBDA) + 
-      MASS::mvrnorm(n.subjects,mu=MANIFESTMEANS,Sigma=MANIFESTVAR) + # manifest means and error variance
+      MASS::mvrnorm(n.subjects,mu=MANIFESTMEANS,Sigma=MANIFESTVAR %*% t(MANIFESTVAR)) + # manifest means and error variance
       manifesttraiteffects # manifest traits
   }  
 

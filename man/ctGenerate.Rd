@@ -19,8 +19,8 @@ ctGenerate(ctmodelobj, n.subjects = 1000, burnin = 0, dT = 1,
 \item{asymptotes}{Are the parameters provided asymptotic paramters, or the regular continuous time parameters?}
 }
 \description{
-This function generates data according to the specified ctsem model object, 
-which must contain fixed values for parameters. Not all T0 matrices are included at present,
+This function generates data according to the specified ctsem model object. 
+Not all T0 matrices are included at present,
 safest to use a high burnin (where 'high' is sufficient for the process to forget starting values)
 }
 \details{
