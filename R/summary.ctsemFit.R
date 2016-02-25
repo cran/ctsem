@@ -97,7 +97,7 @@ output$ctparameters<-ctParameters
 
 
 omxSummary<-function(object,verbose=FALSE){
-  omxsummary<-methods::getMethod("summary","MxModel")(object$mxobj) #get openmx summary
+  omxsummary<-utils::getS3method("summary","MxModel")(object$mxobj) #get openmx summary
   
   output<-list()
   if(verbose==TRUE) output<-c(omxsummary['parameters'])

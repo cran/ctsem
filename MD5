@@ -1,5 +1,5 @@
-475dbf2bf507b30b15de0c5b7a086645 *DESCRIPTION
-4b8bf25a716a3569a29a0dd8c5dad42a *NAMESPACE
+fffb8c51ee0c87ac791717cdcbd2ecc6 *DESCRIPTION
+858455297fc2788ae24e5ffdb36fc1d9 *NAMESPACE
 902203095f6e98c3a017f1b46beae0d8 *R/ctCI.R
 f54c85efde20bc0a74b91bcfbc3e6849 *R/ctDataHelp.R
 a4185a9eac42f386f6f47059eb07c422 *R/ctDeintervalise.R
@@ -15,8 +15,8 @@ c67e7fbb19f1c20819d889b8b45f1555 *R/ctModel.R
 a842bf978aff32bfef1142ec95bd1852 *R/ctWideToLong.R
 42be4d9980fb42fdaacac4d4221e9b86 *R/ctsem.R
 318cef35abe6f584c16e363772ff84a7 *R/ctsemUtils.R
-4cab5ae91d1b119aebf79f88c7e15486 *R/plot.ctsemFit.R
-dab663373ff0e3df1153b2d2b8a1a89d *R/summary.ctsemFit.R
+77925d163a6309bcab7353bfff2c2456 *R/plot.ctsemFit.R
+0623ff5c76bb7d3375aa8ffb65609718 *R/summary.ctsemFit.R
 b0b9bb0c3a342d239251e0dd260f9c0a *build/vignette.rds
 45415bc80ce3061eb0a776503954f7f4 *data/AnomAuth.rda
 2af6558679ffaebd9d750015ae0db9f2 *data/Oscillating.rda
@@ -29,7 +29,7 @@ de0099071f1404a907fb8fadc12f539e *data/ctExample4.rda
 f8c88a66d363778ac0006d53b043b8fe *data/longexample.rda
 f1317ed56eb2344b76f433a5cf83911b *inst/CITATION
 3ed8f37120d526260eaefe73edaee120 *inst/doc/ctsem.R
-6e44edba775569a8b57f3ebc76864a5b *inst/doc/ctsem.pdf
+827bc395901d97e46bd68da2beda00c7 *inst/doc/ctsem.pdf
 adb4fafaf54716f2bfc6cf2f08286125 *inst/doc/ctsem.rnw
 542bf9390e679f42b694de60152a9246 *inst/tests/test-intervalise.R
 e92754f0d7e9398d654ec80176d4efb3 *inst/tests/test-knownFits.R
@@ -60,10 +60,12 @@ f19c8bc8bdbd579d183932c5ad9ff46c *man/ctMultigroupFit.Rd
 fbe5a36fb4312189323a4819c26e3fc0 *man/longexample.Rd
 d20351a3d719a5649700c02c2c2f3a1a *man/plot.ctsemFit.Rd
 b77ff66ecc4d8a06cf5a3468a8d01315 *man/plot.ctsemMultigroupFit.Rd
+cdfa6eb42878426cbd8bc67695d1f3eb *man/plotSingle.Rd
 93f46888eb9028890b49878635eee3a1 *man/summary.ctsemFit.Rd
 b714fcd0ee25ea1c51950c8510e15fe3 *man/summary.ctsemMultigroupFit.Rd
 53110c404a428528f20e68323565d91f *tests/dotest.R
 2a89b8f363aed76451f400aef1fcf338 *vignettes/ctsem-blx.bib
+6b5e8564e843b39ce53161cbdb9ae143 *vignettes/ctsem-concordance.tex
 adb4fafaf54716f2bfc6cf2f08286125 *vignettes/ctsem.rnw
 09f39539dddfbe416fce99418ad03d59 *vignettes/pathdiagramdiscretecomparison.png
 d3bc0abcc1b3930b63f61ecc427370c5 *vignettes/pathdiagramtwoprocessbasic.pdf

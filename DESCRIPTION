@@ -1,8 +1,8 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 1.1.5.1
-Date: 2016-2-16
+Version: 1.1.5.2
+Date: 2016-2-25
 Authors@R: c(person("Manuel", "Voelkle", role = c("aut","cph"), comment =
     "Original development of continuous time model specification within OpenMx,
     advisor for further development"),person("Han", "Oud", role =
@@ -35,7 +35,7 @@ Description: An easily accessible continuous (and discrete) time dynamic
     can be assessed simultaneously, but without the classic problems of random
     effects models assuming no covariance between unit level effects and predictors.
 License: GPL-3
-Depends: R (>= 3.0.0), OpenMx (>= 2.3.1)
+Depends: R (>= 3.0.0), OpenMx (>= 2.5.0)
 URL: http://ctsem.r-forge.r-project.org/
 Imports: MASS, Matrix, stats, utils,graphics,methods, grDevices
 LazyData: Yes
@@ -43,7 +43,7 @@ Suggests: knitr, testthat, PSM, cts, yuima
 VignetteBuilder: knitr
 RoxygenNote: 5.0.1
 NeedsCompilation: no
-Packaged: 2016-02-16 23:07:53 UTC; driver
+Packaged: 2016-02-25 20:33:16 UTC; driver
 Author: Manuel Voelkle [aut, cph] (Original development of continuous time
     model specification within OpenMx, advisor for further development),
   Han Oud [aut, cph] (Original development of continuous time model
@@ -53,4 +53,4 @@ Author: Manuel Voelkle [aut, cph] (Original development of continuous time
     documentation and maintenance)
 Maintainer: Charles Driver <driver@mpib-berlin.mpg.de>
 Repository: CRAN
-Date/Publication: 2016-02-17 09:00:42
+Date/Publication: 2016-02-25 23:41:17
