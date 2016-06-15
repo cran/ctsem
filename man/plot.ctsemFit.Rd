@@ -51,7 +51,8 @@ alternate characterisation of autoregressive and cross regressive plots.}
 Nothing. Side-effect: plots graphs.
 }
 \description{
-Ouputs mean trajectories, autoregression, and crossregression plots.
+Ouputs mean trajectories, autoregression, and crossregression plots. 
+For more customization possibilities, see \code{\link{ctPlot}}.
 }
 \examples{
 ## Examples set to 'dontrun' because they take longer than 5s.

@@ -577,7 +577,7 @@ tdpredmodel <- ctModel(n.manifest = 2, n.latent = 2, n.TDpred = 1,
   Tpoints = 8, manifestNames = c("LeisureTime", "Happiness"), 
   TDpredNames = "MoneyInt", latentNames = c("LeisureTime", "Happiness"),
   T0TDPREDCOV = matrix(0, nrow = 2, ncol=7),
-  TRAITTDPREDCOV = matrix(0, nrow = 2, ncol=7), 
+  TRAITTDPREDCOV = matrix(0, nrow = 2, ncol=7),
   LAMBDA = diag(2), TRAITVAR = "auto")
 tdpredfit <- ctFit(datawide = ctExample2, ctmodelobj = tdpredmodel)
 
@@ -599,7 +599,7 @@ summary(tdpredfit, verbose = TRUE)["discreteTDPREDEFFECT"]
 The matrices reported from \code{summary(tdpredfit, verbose = TRUE)} will now include those related to the time dependent predictor, and the parameters section will include all the additional free parameters estimated, including many variance and covariance related parameters, and the effect parameters TDpred\_LeisureTime\_MoneyInt and TDpred\_Happiness\_MoneyInt.  Looking at the summary matrices, TDPREDEFFECT shows us the initial impact, and discreteTDPREDEFFECT shows the impact remaining after 1 unit of time.  From the matrices, we can see that the monetary intervention relates directly to subsequent increases in leisure time, with also an additional direct effect on happiness. Standardised estimates are not provided because we assume no model for the variance of time dependent predictors.
 
 \subsubsection{Adding a level change predictor}\nopagebreak
-To test the longer term changes introduced via the monetary intervention, we must model the impact of the predictor via an intermediate latent process: We fix the intercepts (T0MEANS and CINT) and random variance (T0VAR, DIFFUSION, and TRAITVAR) of this additional process to 0; set changes to persist indefinitely via a diagonal DRIFT value of 0; fix the impact of the predictor on the new process to 1 (to identify the effect); fix the impact of the two original latent processes on the new process to 0 (via the off-diagonals in the third row of DRIFT); and estimate the impact of the additional process on our original two processes of interest (via the off-diagonals in the third column of DRIFT). Alternatively, one could also estimate the time course of predictor effects by freeing the DRIFT diagonal of the additional process. 
+To test the longer term changes introduced via the monetary intervention, we must model the impact of the predictor via an intermediate latent process: We fix the intercepts (T0MEANS and CINT) and random variance (T0VAR, DIFFUSION, and TRAITVAR) of this additional process to 0; set changes to persist indefinitely via a diagonal DRIFT value of 0; fix the impact of the predictor on the new process to 1 (to identify the effect); fix the impact of the two original latent processes on the new process to very close to 0 (via the off-diagonals in the third row of DRIFT, exactly 0 causes computational problems); and estimate the impact of the additional process on our original two processes of interest (via the off-diagonals in the third column of DRIFT). Alternatively, one could also estimate the time course of predictor effects by freeing the DRIFT diagonal of the additional process. 
 
 <<example2TDpredlevel, include = TRUE, eval = TRUE, echo = TRUE, cache = TRUE>>=
 data("ctExample2")
@@ -620,7 +620,7 @@ tdpredlevelmodel$T0VAR[, 3] <- 0
 tdpredlevelmodel$CINT[3] <- 0
 tdpredlevelmodel$T0MEANS[3] <- 0
 tdpredlevelmodel$TDPREDEFFECT[3, ] <- 1
-tdpredlevelmodel$DRIFT[3, ] <- 0
+tdpredlevelmodel$DRIFT[3, ] <- -.000001
 
 tdpredlevelfit <- ctFit(datawide = ctExample2, 
   ctmodelobj = tdpredlevelmodel)

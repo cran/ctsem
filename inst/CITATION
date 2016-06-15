@@ -11,13 +11,13 @@ citHeader("To cite package 'ctsem' in publications use:")
 #authors <- eval(parse(text=desc[["Authors@R"]]))
      
 citEntry(entry="article",
-	title = paste("Continuous time structural equation modelling with {R} package ctsem"),
+	title = paste("Continuous time structural equation modelling with R package ctsem"),
               author = c(
 		  person(c("Charles", "C."), "Driver"),
 		  person(c("Johan", "H.L"), "Oud"),
 		  person(c("Manuel", "C."), "Voelkle")),
               journal = "Journal of Statistical Software",
-              year = "manuscript submitted",
+              year = "in press",
               textVersion = paste("Charles C. Driver,", "Johan H.L Oud,",
 		  "Manuel C. Voelkle.",
-		  "(manuscript submitted). Continuous time structural equation modelling with {R} package ctsem. Journal of Statistical Software."))
+		  "Continuous time structural equation modelling with R package ctsem. Journal of Statistical Software."))

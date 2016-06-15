@@ -79,6 +79,9 @@
 
 ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dT=1,asymptotes=FALSE){
   
+  
+  simulTDpredeffect<- FALSE
+  
   ###read in model
   for(i in 1:length(ctmodelobj)){ #this loop reads in the specified continuous time model
     assign(names(ctmodelobj[i]),ctmodelobj[[i]])
@@ -98,18 +101,18 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dT=1,asymptotes=FALSE){
     }
   }
   
-  #lower triangular transform
-  for(tempmatname in c('T0VAR','MANIFESTVAR', 'DIFFUSION', 'TRAITVAR','MANIFESTTRAITVAR','TDPREDVAR','TIPREDVAR')){
-
-    tryCatch(assign(tempmatname,get(tempmatname) %*% t(get(tempmatname))), error=function(e) {
-      assign(tempmatname,NULL)})
-  }
-  
+  # #lower triangular transform
+  # for(tempmatname in c('T0VAR','MANIFESTVAR', 'DIFFUSION', 'TRAITVAR','MANIFESTTRAITVAR','TDPREDVAR','TIPREDVAR')){
+  # 
+  #   tryCatch(assign(tempmatname,get(tempmatname) %*% t(get(tempmatname))), error=function(e) {
+  #     assign(tempmatname,NULL)})
+  # }
+  # 
   
   #set up extra matrices
   DRIFTHATCH <- DRIFT %x% diag(n.latent) + diag(n.latent) %x% DRIFT #generate drifthatch
   if(asymptotes==FALSE) dynresidualcov <- matrix(solve(DRIFTHATCH) %*% ((OpenMx::expm(DRIFTHATCH %x% dT)) - #generate dynamic error cov from continuous value
-                                                  diag(1,n.latent^2)) %*% OpenMx::rvectorize(DIFFUSION),nrow=n.latent)
+                                                  diag(1,n.latent^2)) %*% OpenMx::rvectorize(DIFFUSION %*% t(DIFFUSION)),nrow=n.latent)
   if(asymptotes==TRUE) dynresidualcov <- matrix((diag(n.latent^2) - OpenMx::expm(DRIFT %x% dT) %x% OpenMx::expm(DRIFT %x% dT)) %*% c(DIFFUSION),nrow=n.latent)
   
   
@@ -140,9 +143,10 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dT=1,asymptotes=FALSE){
   TDpreds<-matrix(NA,nrow=n.subjects,ncol=n.TDpred*(Tpoints-1))
   TDpredeffects <- matrix(0,nrow=n.subjects,ncol=n.latent*(Tpoints-1)) #create 0 TDpredeffects in case no TDpreds
   if (n.TDpred>0) { #but if TDpreds exist
-    TDpredparam <- OpenMx::expm(DRIFT %x% dT) %*%  TDPREDEFFECT #calculate effect size
+    if(simulTDpredeffect==FALSE) TDpredparam <- OpenMx::expm(DRIFT %x% dT) %*%  TDPREDEFFECT #calculate effect size
+    if(simulTDpredeffect==TRUE) TDpredparam <-TDPREDEFFECT #calculate effect size
     TDpreds <- MASS::mvrnorm(n=n.subjects,mu=TDPREDMEANS, #generate TDpred variables from TDPREDMEANS and TDPREDVAR
-                       Sigma=TDPREDVAR ,tol=1)
+                       Sigma=TDPREDVAR %*% t(TDPREDVAR) ,tol=1)
     
     TDpreds <- TDpreds + trait %*% TRAITTDPREDCOV
     
@@ -163,7 +167,7 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dT=1,asymptotes=FALSE){
     TIpreds <- matrix(
       MASS::mvrnorm(n=n.subjects,
               mu=TIPREDMEANS, #generate TIpreds
-              Sigma=TIPREDVAR, tol=1)
+              Sigma=TIPREDVAR %*% t(TIPREDVAR), tol=1)
       ,nrow=n.subjects)
       #     TIpredeffects<-matrix(TIpreds*rep(TIpredparam,n.subjects*n.latent),nrow=n.subjects,ncol=n.TIpred) #generate effects on the latents
       TIpredeffects<-matrix(TIpreds %*% t(TIPREDEFFECTdiscrete),nrow=n.subjects,ncol=n.latent) #generate effects on the latents
@@ -177,7 +181,7 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dT=1,asymptotes=FALSE){
   
   
   Tpoints<-Tpoints+burnin #add burnin to Tpoints (after we checked if extra burnin was needed for T0 cov, and after predictor generation)
-  T0VAReffect<-MASS::mvrnorm(n=n.subjects,mu=rep(0,n.latent),Sigma=(T0VAR),tol=1) #create effect of non-trait variance at T0
+  T0VAReffect<-MASS::mvrnorm(n=n.subjects,mu=rep(0,n.latent),Sigma=(T0VAR %*% T0VAR),tol=1) #create effect of non-trait variance at T0
   
   
   

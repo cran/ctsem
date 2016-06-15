@@ -36,9 +36,14 @@ test_that("time calc", {
   data<-ctGenerate(generatingModel,n.subjects=50,burnin=500)
   data[1:(ceiling(nrow(data/2))),'dT1']<-2
   data[1:(ceiling(nrow(data/2))),'dT3']<-3
+  
+  model<-ctModel(Tpoints=Tpoints,n.latent=n.latent,
+    n.TDpred=n.TDpred,n.TIpred=n.TIpred,n.manifest=n.manifest,
+    LAMBDA=matrix(c(1,'l1','l2',0,0,0,0,1),nrow=n.manifest,ncol=n.latent),
+    MANIFESTTRAITVAR='auto')
 
-fit1<-ctFit(data,generatingModel)
-fit2<-ctFit(data,generatingModel,objective='mxFIML',omxStartValues=omxGetParameters(fit1$mxobj),carefulFit=F)
+fit1<-ctFit(data,generatingModel,retryattempts=0,carefulFit=F)
+fit2<-ctFit(data,generatingModel,objective='mxFIML',omxStartValues=omxGetParameters(fit1$mxobj),carefulFit=F,retryattempts=0)
   
 
   expect_equal(fit1$mxobj$output$Minus2LogLikelihood,fit2$mxobj$output$Minus2LogLikelihood)

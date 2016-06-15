@@ -30,10 +30,14 @@ test_that("time calc", {
     n.latent=2,n.manifest=2, 
     MANIFESTVAR=diag(0,2),
     TRAITVAR='auto',
+    CINT=matrix(0,nrow=2),
+    T0MEANS=matrix(0,nrow=2),
+    MANIFESTMEANS=matrix(c('m1','m2'),nrow=2),
+    timeVarying='MANIFESTMEANS',
     Tpoints=5)
   
-  AnomAuthfit1<-ctFit(AnomAuth, AnomAuthmodel,asymptotes=FALSE,carefulFit=F,objective='mxFIML')
-  AnomAuthfit2<-ctFit(AnomAuth, AnomAuthmodel,asymptotes=TRUE)
+  AnomAuthfit1<-ctFit(AnomAuth, AnomAuthmodel,asymptotes=FALSE, objective='mxFIML',verbose=2,retryattempts=1)
+  AnomAuthfit2<-ctFit(AnomAuth, AnomAuthmodel,asymptotes=TRUE, verbose=2,retryattempts=1)
   
   
   expect_equal(AnomAuthfit2$mxobj$output$Minus2LogLikelihood,AnomAuthfit1$mxobj$output$Minus2LogLikelihood)

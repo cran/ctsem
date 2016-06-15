@@ -9,17 +9,17 @@
 #' @method summary ctsemMultigroupFit
 #' @export
 summary.ctsemMultigroupFit<-function(object,group='show chooser',...){
- 
+  
   
   if(group=='show chooser')  {
     message(paste0(1:length(object$groups), '  ', object$groups, '\n'))
     
     selection<-as.numeric(readline(
-    'Enter the number of the group you wish to display the summary matrices for (OpenMx summary portion is same across groups):  '))
+      'Enter the number of the group you wish to display the summary matrices for (OpenMx summary portion is same across groups):  '))
     
     selection<-object$groups[[selection]]
   }
-    
+  
   if(group != 'show chooser') selection <- group
   
   #create ctFit object containing only single group
@@ -79,25 +79,26 @@ summary.ctsemMultigroupFit<-function(object,group='show chooser',...){
 #' }
 #' @export
 summary.ctsemFit<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,...){
-
-
-output<-ctSummaryMatrices(object=object,ridging=ridging,timeInterval=timeInterval,verbose=verbose)
-ctParameters<-ctParamsSummary(object=object,ctSummaryMatrices=output)
-output$ctparameters<-ctParameters
-# if(object$ctfitargs$transformedParams==TRUE) 
+  
+  
+  output<-ctSummaryMatrices(object=object,ridging=ridging,timeInterval=timeInterval,verbose=verbose)
+  ctParameters<-ctParamsSummary(object=object,ctSummaryMatrices=output)
+  output$ctparameters<-ctParameters
+  # if(object$ctfitargs$transformedParams==TRUE) 
   output$ctparammessage<-'Note: Continuous time parameter estimates above are of the full variance-covariance matrices, not cholesky decompositions as used by ctModel.'
   if(object$ctfitargs$transformedParams==TRUE) output$ctparammessage<- c(output$ctparammessage, 'Note: Standard errors are approximated with delta method so are only rough approximations.')
   output$omxsummary<-omxSummary(object=object,verbose=verbose)
-   if(verbose==FALSE) output$message<-'For additional summary matrices and raw OpenMx parameter output, use argument verbose=TRUE' 
+  if(verbose==FALSE) output$message<-'For additional summary matrices and raw OpenMx parameter output, use argument verbose=TRUE' 
   return(output)
-
+  
 }
 
 
 
 
 omxSummary<-function(object,verbose=FALSE){
-  omxsummary<-utils::getS3method("summary","MxModel")(object$mxobj) #get openmx summary
+  if(unlist(utils::packageVersion('OpenMx'))[2] >= 5) omxsummary<-utils::getS3method("summary","MxModel")(object$mxobj) #get openmx summary
+  if(unlist(utils::packageVersion('OpenMx'))[2] < 5) omxsummary<-methods::getMethod("summary","MxModel")(object$mxobj) #get openmx summary
   
   output<-list()
   if(verbose==TRUE) output<-c(omxsummary['parameters'])
@@ -120,34 +121,34 @@ ctParamsSummary<-function(object,ctSummaryMatrices){
   newparvalues<-parvalues
   parsd<-c(object$mxobj$output$standardErrors)
   parmatrix<-rep(NA,length(parnames))
-#   mxparams<-summary(object$mxobj)$parameters
-#   sdmatrices<-list()
-#   valuematrices<-list()
-#   detransformedsdmatrices<-list()
-#   detransformedvaluematrices<-list()
-# 
-#   for(matrixi in c('DIFFUSIONlogchol', 'T0VARlogchol','MANIFESTVARlogchol','MANIFESTTRAITVARlogchol','TRAITVARlogchol','TIPREDVARlogchol','TDPREDVARlogchol')){
-#     valuematrices[[matrixi]]<-try(mxEvalByName(matrixi,object$mxobj,compute=T),silent=TRUE)
-#     sdmatrices[[matrixi]]<-valuematrices[[matrixi]]
-#     if(class(valuematrices[[matrixi]]) != 'try-error') {
-#       for(rowi in 1:nrow(mxparams)){
-#        if(mxparams$matrix[rowi] == matrixi) {
-#          sdmatrices[[matrixi]][mxparams[rowi,'row'],mxparams[rowi,'col']] <- mxparams[rowi,'Std.Error']
-#        }
-#       }
-#       detransformedvaluematrices[[matrixi]]<-valuematrices[[matrixi]]
-#       diag(detransformedvaluematrices[[matrixi]])<-exp(diag(detransformedvaluematrices[[matrixi]]))
-#       detransformedvaluematrices[[matrixi]]<-detransformedvaluematrices[[matrixi]] %*% t(detransformedvaluematrices[[matrixi]])
-#       
-#       
-#         gdt<-detransformedvaluematrices[[matrixi]] / solve(valuematrices[[matrixi]])
-#         
-#         
-#         detransformedsdmatrices[[matrixi]]<- gdt %*% valuematrices[[matrixi]] %*% sdmatrices[[matrixi]] %*% gdt %*% t(valuematrices[[matrixi]])
-#         sdmatrices[[matrixi]] %*% detransformedvaluematrices[[matrixi]]  %*% t(sdmatrices[[matrixi]])
-# 
-#     }
-#   }
+  #   mxparams<-summary(object$mxobj)$parameters
+  #   sdmatrices<-list()
+  #   valuematrices<-list()
+  #   detransformedsdmatrices<-list()
+  #   detransformedvaluematrices<-list()
+  # 
+  #   for(matrixi in c('DIFFUSIONlogchol', 'T0VARlogchol','MANIFESTVARlogchol','MANIFESTTRAITVARlogchol','TRAITVARlogchol','TIPREDVARlogchol','TDPREDVARlogchol')){
+  #     valuematrices[[matrixi]]<-try(mxEvalByName(matrixi,object$mxobj,compute=T),silent=TRUE)
+  #     sdmatrices[[matrixi]]<-valuematrices[[matrixi]]
+  #     if(class(valuematrices[[matrixi]]) != 'try-error') {
+  #       for(rowi in 1:nrow(mxparams)){
+  #        if(mxparams$matrix[rowi] == matrixi) {
+  #          sdmatrices[[matrixi]][mxparams[rowi,'row'],mxparams[rowi,'col']] <- mxparams[rowi,'Std.Error']
+  #        }
+  #       }
+  #       detransformedvaluematrices[[matrixi]]<-valuematrices[[matrixi]]
+  #       diag(detransformedvaluematrices[[matrixi]])<-exp(diag(detransformedvaluematrices[[matrixi]]))
+  #       detransformedvaluematrices[[matrixi]]<-detransformedvaluematrices[[matrixi]] %*% t(detransformedvaluematrices[[matrixi]])
+  #       
+  #       
+  #         gdt<-detransformedvaluematrices[[matrixi]] / solve(valuematrices[[matrixi]])
+  #         
+  #         
+  #         detransformedsdmatrices[[matrixi]]<- gdt %*% valuematrices[[matrixi]] %*% sdmatrices[[matrixi]] %*% gdt %*% t(valuematrices[[matrixi]])
+  #         sdmatrices[[matrixi]] %*% detransformedvaluematrices[[matrixi]]  %*% t(sdmatrices[[matrixi]])
+  # 
+  #     }
+  #   }
   # browser()
   
   for(parami in 1:length(parnames)){ #for every free param
@@ -156,16 +157,16 @@ ctParamsSummary<-function(object,ctSummaryMatrices){
         parmatrix[parami]<-matrixi
         newparvalues[parami]<-ctSummaryMatrices[[matrixi]][match(parnames[parami],object$ctmodelobj[[matrixi]])]
         # if(object$ctfitargs$transformedParams==TRUE) { #if we need to transform std errors
-          # if(matrixi=='DRIFT' && parnames[parami] %in% diag(object$ctmodelobj[[matrixi]])) { #if the paramater is a drift diagonal
-            # parvalues[parami]<- -exp(parvalues[parami])
-            parsd[parami]<- abs(((newparvalues[parami]) / parvalues[parami]) * parsd[parami]) #first order delta approximation of std error
-            
-#           }
-#           if(matrixi %in% c('DIFFUSION', 'T0VAR','MANIFESTVAR','MANIFESTTRAITVAR','TRAITVAR','TIPREDVAR','TDPREDVAR') && 
-#               parnames[parami] %in% diag(object$ctmodelobj[[matrixi]])) { #if the parameter is a logchol diagonal
-#             # parvalues[parami]<- exp(parvalues[parami])^2
-#             parsd[parami]<- (newparvalues[parami] - parvalues[parami]) / parvalues[parami] * parsd[parami]*2
-#           }
+        # if(matrixi=='DRIFT' && parnames[parami] %in% diag(object$ctmodelobj[[matrixi]])) { #if the paramater is a drift diagonal
+        # parvalues[parami]<- -exp(parvalues[parami])
+        parsd[parami]<- abs(((newparvalues[parami]) / parvalues[parami]) * parsd[parami]) #first order delta approximation of std error
+        
+        #           }
+        #           if(matrixi %in% c('DIFFUSION', 'T0VAR','MANIFESTVAR','MANIFESTTRAITVAR','TRAITVAR','TIPREDVAR','TDPREDVAR') && 
+        #               parnames[parami] %in% diag(object$ctmodelobj[[matrixi]])) { #if the parameter is a logchol diagonal
+        #             # parvalues[parami]<- exp(parvalues[parami])^2
+        #             parsd[parami]<- (newparvalues[parami] - parvalues[parami]) / parvalues[parami] * parsd[parami]*2
+        #           }
         # }
         parvalues[parami]<- newparvalues[parami]
       }
@@ -214,13 +215,13 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
     DRIFT<-tryCatch({ OpenMx::mxEval(DRIFT, mxobj,compute=TRUE)}, error=function(e) e )
     tryCatch({  dimnames(DRIFT)<-list(latentNames,latentNames)}, error=function(e) e )
     outlist<-c(outlist,'DRIFT')
-      
-    if(verbose==TRUE){
-    discreteDRIFT<-tryCatch({ OpenMx::expm(DRIFT * timeInterval)}, error=function(e) e )
-    tryCatch({  dimnames(discreteDRIFT)<-list(latentNames,latentNames)}, error=function(e) e )
-    outlist<-c(outlist,'discreteDRIFT')
     
-    outlist<-c(outlist,'discreteDRIFTstd')
+    if(verbose==TRUE){
+      discreteDRIFT<-tryCatch({ OpenMx::expm(DRIFT * timeInterval)}, error=function(e) e )
+      tryCatch({  dimnames(discreteDRIFT)<-list(latentNames,latentNames)}, error=function(e) e )
+      outlist<-c(outlist,'discreteDRIFT')
+      
+      outlist<-c(outlist,'discreteDRIFTstd')
     }
     
     DRIFTHATCH<-tryCatch({ (DRIFT %x% diag(n.latent)) + (diag(n.latent) %x% DRIFT)}, error=function(e) e )
@@ -230,10 +231,10 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
     outlist<-c(outlist,'MANIFESTVAR')
     
     if(verbose==TRUE){
-    MANIFESTVARdiag<-tryCatch({ diag(diag(MANIFESTVAR),n.manifest)+diag(ridging,n.manifest)}, error=function(e) e )
-    MANIFESTVARstd<-tryCatch({ suppressWarnings(solve(sqrt(MANIFESTVARdiag)) %&% MANIFESTVAR)}, error=function(e) e )
-    tryCatch({  dimnames(MANIFESTVARstd)<-list(latentNames,latentNames)}, error=function(e) e )
-    outlist<-c(outlist,'MANIFESTVARstd')
+      MANIFESTVARdiag<-tryCatch({ diag(diag(MANIFESTVAR),n.manifest)+diag(ridging,n.manifest)}, error=function(e) e )
+      MANIFESTVARstd<-tryCatch({ suppressWarnings(solve(sqrt(MANIFESTVARdiag)) %&% MANIFESTVAR)}, error=function(e) e )
+      tryCatch({  dimnames(MANIFESTVARstd)<-list(latentNames,latentNames)}, error=function(e) e )
+      outlist<-c(outlist,'MANIFESTVARstd')
     }
     
     CINT<-tryCatch({ mxobj$CINT$values}, error=function(e) e )
@@ -242,13 +243,13 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
     outlist<-c(outlist,'CINT')
     
     if(verbose==TRUE){
-    discreteCINT<-tryCatch({ solve(DRIFT) %*%(discreteDRIFT - diag(n.latent)) %*% CINT}, error=function(e) e )
-    tryCatch({  rownames(discreteCINT)<-latentNames}, error=function(e) e )
-    outlist<-c(outlist,'discreteCINT')
-    
-    asymCINT<-tryCatch({ -solve(DRIFT) %*% CINT}, error=function(e) e )
-    tryCatch({  rownames(asymCINT)<-latentNames}, error=function(e) e )
-    outlist<-c(outlist,'asymCINT')
+      discreteCINT<-tryCatch({ solve(DRIFT) %*%(discreteDRIFT - diag(n.latent)) %*% CINT}, error=function(e) e )
+      tryCatch({  rownames(discreteCINT)<-latentNames}, error=function(e) e )
+      outlist<-c(outlist,'discreteCINT')
+      
+      asymCINT<-tryCatch({ -solve(DRIFT) %*% CINT}, error=function(e) e )
+      tryCatch({  rownames(asymCINT)<-latentNames}, error=function(e) e )
+      outlist<-c(outlist,'asymCINT')
     }
     
     
@@ -259,24 +260,24 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
     outlist<-c(outlist,'DIFFUSION')
     
     if(verbose==TRUE){
-    discreteDIFFUSION<-tryCatch({ matrix(solve(DRIFTHATCH) %*% ((OpenMx::expm(DRIFTHATCH * timeInterval)) - 
-        (diag(n.latent) %x% diag(n.latent)) ) %*% OpenMx::rvectorize(DIFFUSION), nrow=n.latent) }, error=function(e) e )
-    tryCatch({  dimnames(discreteDIFFUSION)<-list(latentNames,latentNames)}, error=function(e) e )
-    outlist<-c(outlist,'discreteDIFFUSION')
-    
-    asymDIFFUSION<-tryCatch({ matrix(-solve(DRIFTHATCH) %*% OpenMx::cvectorize(DIFFUSION),nrow=n.latent)}, error=function(e) e )
-    tryCatch({  dimnames(asymDIFFUSION)<-list(latentNames,latentNames)}, error=function(e) e )
-    outlist<-c(outlist,'asymDIFFUSION')
-    
-    asymDIFFUSIONdiag<-tryCatch({ diag(diag(asymDIFFUSION),n.latent)+diag(ridging,n.latent)}, error=function(e) e )
-    asymDIFFUSIONstd<-tryCatch({ suppressWarnings(solve(sqrt(asymDIFFUSIONdiag)) %&% asymDIFFUSION)}, error=function(e) e )
-    tryCatch({  dimnames(asymDIFFUSIONstd)<-list(latentNames,latentNames)}, error=function(e) e )
-    outlist<-c(outlist,'asymDIFFUSIONstd')
-    
-    #std dev of affecting latent divided by std dev of affected latent
-    standardiser<-tryCatch({ suppressWarnings(rep(sqrt(diag(asymDIFFUSION)),each=n.latent) / rep(diag(sqrt(asymDIFFUSION)),times=n.latent))}, error=function(e) e )
-    discreteDRIFTstd<-tryCatch({ discreteDRIFT * standardiser    }, error=function(e) e )
-    tryCatch({  dimnames(discreteDRIFTstd)<-list(latentNames,latentNames)}, error=function(e) e )
+      discreteDIFFUSION<-tryCatch({ matrix(solve(DRIFTHATCH) %*% ((OpenMx::expm(DRIFTHATCH * timeInterval)) - 
+          (diag(n.latent) %x% diag(n.latent)) ) %*% OpenMx::rvectorize(DIFFUSION), nrow=n.latent) }, error=function(e) e )
+      tryCatch({  dimnames(discreteDIFFUSION)<-list(latentNames,latentNames)}, error=function(e) e )
+      outlist<-c(outlist,'discreteDIFFUSION')
+      
+      asymDIFFUSION<-tryCatch({ matrix(-solve(DRIFTHATCH) %*% OpenMx::cvectorize(DIFFUSION),nrow=n.latent)}, error=function(e) e )
+      tryCatch({  dimnames(asymDIFFUSION)<-list(latentNames,latentNames)}, error=function(e) e )
+      outlist<-c(outlist,'asymDIFFUSION')
+      
+      asymDIFFUSIONdiag<-tryCatch({ diag(diag(asymDIFFUSION),n.latent)+diag(ridging,n.latent)}, error=function(e) e )
+      asymDIFFUSIONstd<-tryCatch({ suppressWarnings(solve(sqrt(asymDIFFUSIONdiag)) %&% asymDIFFUSION)}, error=function(e) e )
+      tryCatch({  dimnames(asymDIFFUSIONstd)<-list(latentNames,latentNames)}, error=function(e) e )
+      outlist<-c(outlist,'asymDIFFUSIONstd')
+      
+      #std dev of affecting latent divided by std dev of affected latent
+      standardiser<-tryCatch({ suppressWarnings(rep(sqrt(diag(asymDIFFUSION)),each=n.latent) / rep(diag(sqrt(asymDIFFUSION)),times=n.latent))}, error=function(e) e )
+      discreteDRIFTstd<-tryCatch({ discreteDRIFT * standardiser    }, error=function(e) e )
+      tryCatch({  dimnames(discreteDRIFTstd)<-list(latentNames,latentNames)}, error=function(e) e )
     }
     #added to outlist above
     
@@ -301,10 +302,10 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
       #       outlist<-c(outlist,'T0TOTALVAR')
       
       if(verbose==TRUE){
-      T0VARdiag<-tryCatch({ diag(diag(T0VAR),n.latent)+diag(ridging,n.latent)}, error=function(e) e )
-      T0VARstd<-tryCatch({ suppressWarnings(solve(sqrt(T0VARdiag)) %&% T0VAR)}, error=function(e) e )
-      tryCatch({  dimnames(T0VARstd)<-list(latentNames,latentNames)}, error=function(e) e )
-      outlist<-c(outlist,'T0VARstd')
+        T0VARdiag<-tryCatch({ diag(diag(T0VAR),n.latent)+diag(ridging,n.latent)}, error=function(e) e )
+        T0VARstd<-tryCatch({ suppressWarnings(solve(sqrt(T0VARdiag)) %&% T0VAR)}, error=function(e) e )
+        tryCatch({  dimnames(T0VARstd)<-list(latentNames,latentNames)}, error=function(e) e )
+        outlist<-c(outlist,'T0VARstd')
       }
       
     } # end T0VAR matrices
@@ -334,10 +335,10 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
       # #       outlist<-c(outlist,'discreteTRAITVAR')
       #       
       if(verbose==TRUE){
-      TRAITVARdiag<-tryCatch({ diag(diag(TRAITVAR))}, error=function(e) e )
-      TRAITVARstd<-tryCatch({ suppressWarnings(solve(sqrt(TRAITVARdiag)) %&% TRAITVAR)}, error=function(e) e )
-      tryCatch({  dimnames(TRAITVARstd)<-list(latentNames,latentNames)}, error=function(e) e )
-      outlist<-c(outlist,'TRAITVARstd')
+        TRAITVARdiag<-tryCatch({ diag(diag(TRAITVAR))}, error=function(e) e )
+        TRAITVARstd<-tryCatch({ suppressWarnings(solve(sqrt(TRAITVARdiag)) %&% TRAITVAR)}, error=function(e) e )
+        tryCatch({  dimnames(TRAITVARstd)<-list(latentNames,latentNames)}, error=function(e) e )
+        outlist<-c(outlist,'TRAITVARstd')
       }
       #           asymTOTALVAR<-tryCatch({ asymDIFFUSION + asymTRAITVAR}, error=function(e) e )
       #       tryCatch({  dimnames(asymTOTALVAR)<-list(latentNames,latentNames)}, error=function(e) e )
@@ -387,10 +388,10 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
       outlist<-c(outlist,'MANIFESTTRAITVAR')
       
       if(verbose==TRUE){
-      MANIFESTTRAITVARdiag<-tryCatch({ diag(diag(MANIFESTTRAITVAR),n.manifest)+diag(ridging,n.manifest)}, error=function(e) e )
-      MANIFESTTRAITVARstd<-tryCatch({ suppressWarnings(solve(sqrt(MANIFESTTRAITVARdiag)) %&% MANIFESTTRAITVAR)}, error=function(e) e )
-      tryCatch({  dimnames(MANIFESTTRAITVARstd)<-list(manifestNames,manifestNames)}, error=function(e) e )
-      outlist<-c(outlist,'MANIFESTTRAITVARstd')
+        MANIFESTTRAITVARdiag<-tryCatch({ diag(diag(MANIFESTTRAITVAR),n.manifest)+diag(ridging,n.manifest)}, error=function(e) e )
+        MANIFESTTRAITVARstd<-tryCatch({ suppressWarnings(solve(sqrt(MANIFESTTRAITVARdiag)) %&% MANIFESTTRAITVAR)}, error=function(e) e )
+        tryCatch({  dimnames(MANIFESTTRAITVARstd)<-list(manifestNames,manifestNames)}, error=function(e) e )
+        outlist<-c(outlist,'MANIFESTTRAITVARstd')
       }
       
     }#end manifesttrait
@@ -413,33 +414,33 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
       outlist<-c(outlist,'TIPREDVAR')
       
       if(verbose==TRUE){
-      TIPREDVARdiag<-tryCatch({diag(diag(TIPREDVAR),n.TIpred)+diag(ridging,n.TIpred)}, error=function(e) e )
-      TIPREDVARstd<-tryCatch({suppressWarnings(solve(sqrt(TIPREDVARdiag)) %&% TIPREDVAR)}, error=function(e) e )
-      tryCatch({  dimnames(TIPREDVARstd)<-list(TIpredNames,TIpredNames)}, error=function(e) e )
-      outlist<-c(outlist,'TIPREDVARstd')
-      
-      discreteTIPREDEFFECT<-tryCatch({solve(DRIFT) %*%(discreteDRIFT - diag(n.latent)) %*% TIPREDEFFECT }, error=function(e) e )#disrete from continuous
-      tryCatch({  dimnames(discreteTIPREDEFFECT)<-list(latentNames,TIpredNames) }, error=function(e) e )
-      outlist<-c(outlist,'discreteTIPREDEFFECT')
-      
-      asymTIPREDEFFECT<-tryCatch({solve(diag(n.latent)-discreteDRIFT)  %*%  (discreteTIPREDEFFECT)}, error=function(e) e )
-      tryCatch({  dimnames(asymTIPREDEFFECT)<-list(latentNames,TIpredNames)}, error=function(e) e )
-      outlist<-c(outlist,'asymTIPREDEFFECT')
-      
-      #sqrt of affecting latent variance divided by sqrt of affected
-      standardiser<-tryCatch({suppressWarnings(rep(sqrt(diag(TIPREDVAR)),each=n.latent) / rep(diag(sqrt(asymDIFFUSION)),times=n.TIpred))}, error=function(e) e )
-      asymTIPREDEFFECTstd<-tryCatch({asymTIPREDEFFECT * standardiser}, error=function(e) e )
-      tryCatch({  dimnames(asymTIPREDEFFECTstd)<-list(latentNames,TIpredNames)}, error=function(e) e )
-      outlist<-c(outlist,'asymTIPREDEFFECTstd')
-      
-      addedTIPREDVAR <-tryCatch({asymTIPREDEFFECT %*% TIPREDVAR %*% t(asymTIPREDEFFECT) }, error=function(e) e )#valid?
-      tryCatch({  dimnames(addedTIPREDVAR)<-list(latentNames,latentNames)}, error=function(e) e )
-      outlist<-c(outlist,'addedTIPREDVAR')
-      
-      addedTIPREDVARdiag<-tryCatch({diag(diag(addedTIPREDVAR),n.latent)+diag(ridging,n.latent)}, error=function(e) e )
-      addedTIPREDVARstd<-tryCatch({suppressWarnings(solve(sqrt(addedTIPREDVARdiag)) %&% addedTIPREDVAR)}, error=function(e) e )
-      tryCatch({  dimnames(addedTIPREDVARstd)<-list(latentNames,latentNames)}, error=function(e) e )
-      outlist<-c(outlist,'addedTIPREDVARstd')
+        TIPREDVARdiag<-tryCatch({diag(diag(TIPREDVAR),n.TIpred)+diag(ridging,n.TIpred)}, error=function(e) e )
+        TIPREDVARstd<-tryCatch({suppressWarnings(solve(sqrt(TIPREDVARdiag)) %&% TIPREDVAR)}, error=function(e) e )
+        tryCatch({  dimnames(TIPREDVARstd)<-list(TIpredNames,TIpredNames)}, error=function(e) e )
+        outlist<-c(outlist,'TIPREDVARstd')
+        
+        discreteTIPREDEFFECT<-tryCatch({solve(DRIFT) %*%(discreteDRIFT - diag(n.latent)) %*% TIPREDEFFECT }, error=function(e) e )#disrete from continuous
+        tryCatch({  dimnames(discreteTIPREDEFFECT)<-list(latentNames,TIpredNames) }, error=function(e) e )
+        outlist<-c(outlist,'discreteTIPREDEFFECT')
+        
+        asymTIPREDEFFECT<-tryCatch({solve(diag(n.latent)-discreteDRIFT)  %*%  (discreteTIPREDEFFECT)}, error=function(e) e )
+        tryCatch({  dimnames(asymTIPREDEFFECT)<-list(latentNames,TIpredNames)}, error=function(e) e )
+        outlist<-c(outlist,'asymTIPREDEFFECT')
+        
+        #sqrt of affecting latent variance divided by sqrt of affected
+        standardiser<-tryCatch({suppressWarnings(rep(sqrt(diag(TIPREDVAR)),each=n.latent) / rep(diag(sqrt(asymDIFFUSION)),times=n.TIpred))}, error=function(e) e )
+        asymTIPREDEFFECTstd<-tryCatch({asymTIPREDEFFECT * standardiser}, error=function(e) e )
+        tryCatch({  dimnames(asymTIPREDEFFECTstd)<-list(latentNames,TIpredNames)}, error=function(e) e )
+        outlist<-c(outlist,'asymTIPREDEFFECTstd')
+        
+        addedTIPREDVAR <-tryCatch({asymTIPREDEFFECT %*% TIPREDVAR %*% t(asymTIPREDEFFECT) }, error=function(e) e )#valid?
+        tryCatch({  dimnames(addedTIPREDVAR)<-list(latentNames,latentNames)}, error=function(e) e )
+        outlist<-c(outlist,'addedTIPREDVAR')
+        
+        addedTIPREDVARdiag<-tryCatch({diag(diag(addedTIPREDVAR),n.latent)+diag(ridging,n.latent)}, error=function(e) e )
+        addedTIPREDVARstd<-tryCatch({suppressWarnings(solve(sqrt(addedTIPREDVARdiag)) %&% addedTIPREDVAR)}, error=function(e) e )
+        tryCatch({  dimnames(addedTIPREDVARstd)<-list(latentNames,latentNames)}, error=function(e) e )
+        outlist<-c(outlist,'addedTIPREDVARstd')
       }
       
       #            asymTOTALVAR<-tryCatch({asymTOTALVAR + addedTIPREDVAR}, error=function(e) e )
@@ -456,14 +457,14 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
         
         #sqrt of affecting latent variance divided by sqrt of affected
         if(verbose==TRUE){
-        standardiser<-tryCatch({suppressWarnings(rep(sqrt(diag(TIPREDVAR)),each=n.latent) / rep(diag(sqrt(T0VAR)),times=n.TIpred))}, error=function(e) e )
-        T0TIPREDEFFECTstd<-tryCatch({T0TIPREDEFFECT * standardiser}, error=function(e) e )
-        tryCatch({  dimnames(T0TIPREDEFFECTstd)<-list(latentNames,TIpredNames)}, error=function(e) e )
-        outlist<-c(outlist,'T0TIPREDEFFECTstd')
-        
-        addedT0TIPREDVAR<-tryCatch({T0TIPREDEFFECT %*% TIPREDVAR %*% t(T0TIPREDEFFECT)}, error=function(e) e )#is this valid?
-        tryCatch({  dimnames(addedT0TIPREDVAR)<-list(latentNames,latentNames)}, error=function(e) e )
-        outlist<-c(outlist,'addedT0TIPREDVAR')
+          standardiser<-tryCatch({suppressWarnings(rep(sqrt(diag(TIPREDVAR)),each=n.latent) / rep(diag(sqrt(T0VAR)),times=n.TIpred))}, error=function(e) e )
+          T0TIPREDEFFECTstd<-tryCatch({T0TIPREDEFFECT * standardiser}, error=function(e) e )
+          tryCatch({  dimnames(T0TIPREDEFFECTstd)<-list(latentNames,TIpredNames)}, error=function(e) e )
+          outlist<-c(outlist,'T0TIPREDEFFECTstd')
+          
+          addedT0TIPREDVAR<-tryCatch({T0TIPREDEFFECT %*% TIPREDVAR %*% t(T0TIPREDEFFECT)}, error=function(e) e )#is this valid?
+          tryCatch({  dimnames(addedT0TIPREDVAR)<-list(latentNames,latentNames)}, error=function(e) e )
+          outlist<-c(outlist,'addedT0TIPREDVAR')
         }
         #       
         #       T0TOTALVAR<-tryCatch({addedT0TIPREDVAR+T0TOTALVAR }, error=function(e) e )#update totalvar
@@ -488,9 +489,9 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
       outlist<-c(outlist,'TDPREDEFFECT')
       
       if(verbose==TRUE){
-      discreteTDPREDEFFECT<- OpenMx::expm(DRIFT * timeInterval) %*% TDPREDEFFECT
-      tryCatch({  dimnames(discreteTDPREDEFFECT)<-list(latentNames,TDpredNames)}, error=function(e) e )
-      outlist<-c(outlist,'discreteTDPREDEFFECT')
+        discreteTDPREDEFFECT<- OpenMx::expm(DRIFT * timeInterval) %*% TDPREDEFFECT
+        tryCatch({  dimnames(discreteTDPREDEFFECT)<-list(latentNames,TDpredNames)}, error=function(e) e )
+        outlist<-c(outlist,'discreteTDPREDEFFECT')
       }
       
       TDPREDVAR<-tryCatch({OpenMx::mxEval(TDPREDVAR,mxobj,compute=TRUE) }, error=function(e) e )
@@ -498,10 +499,10 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
       outlist<-c(outlist,'TDPREDVAR')
       
       if(verbose==TRUE){
-      TDPREDVARdiag<-tryCatch({diag((diag(TDPREDVAR))+diag(ridging,n.TDpred))}, error=function(e) e )
-      TDPREDVARstd<-tryCatch({suppressWarnings(solve(sqrt(TDPREDVARdiag)) %&% TDPREDVAR)}, error=function(e) e )
-      tryCatch({  dimnames(TDPREDVARstd)<-list(TDpredNames,TDpredNames)}, error=function(e) e )
-      outlist<-c(outlist,'TDPREDVARstd')
+        TDPREDVARdiag<-tryCatch({diag((diag(TDPREDVAR))+diag(ridging,n.TDpred))}, error=function(e) e )
+        TDPREDVARstd<-tryCatch({suppressWarnings(solve(sqrt(TDPREDVARdiag)) %&% TDPREDVAR)}, error=function(e) e )
+        tryCatch({  dimnames(TDPREDVARstd)<-list(TDpredNames,TDpredNames)}, error=function(e) e )
+        outlist<-c(outlist,'TDPREDVARstd')
       }
       
     } # end TIpred section

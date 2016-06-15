@@ -155,7 +155,7 @@ tdpredmodel <- ctModel(n.manifest = 2, n.latent = 2, n.TDpred = 1,
   Tpoints = 8, manifestNames = c("LeisureTime", "Happiness"), 
   TDpredNames = "MoneyInt", latentNames = c("LeisureTime", "Happiness"),
   T0TDPREDCOV = matrix(0, nrow = 2, ncol=7),
-  TRAITTDPREDCOV = matrix(0, nrow = 2, ncol=7), 
+  TRAITTDPREDCOV = matrix(0, nrow = 2, ncol=7),
   LAMBDA = diag(2), TRAITVAR = "auto")
 tdpredfit <- ctFit(datawide = ctExample2, ctmodelobj = tdpredmodel)
 
@@ -187,7 +187,7 @@ tdpredlevelmodel$T0VAR[, 3] <- 0
 tdpredlevelmodel$CINT[3] <- 0
 tdpredlevelmodel$T0MEANS[3] <- 0
 tdpredlevelmodel$TDPREDEFFECT[3, ] <- 1
-tdpredlevelmodel$DRIFT[3, ] <- 0
+tdpredlevelmodel$DRIFT[3, ] <- -.000001
 
 tdpredlevelfit <- ctFit(datawide = ctExample2, 
   ctmodelobj = tdpredlevelmodel)
