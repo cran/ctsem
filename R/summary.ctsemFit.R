@@ -34,7 +34,7 @@ summary.ctsemMultigroupFit<-function(object,group='show chooser',...){
   
   out$ctParameters<-ctParamsSummary(object=tempctobj,ctSummaryMatrices=out)
   out$ctparammessage<-'Note: Continuous time parameter estimates above are of the full variance-covariance matrices, not cholesky decompositions as used by ctModel.'
-  if(tempctobj$ctfitargs$transformedParams==TRUE) out$ctparammessage<- c(out$ctparammessage, 'Note: Standard errors are approximated with delta method so are only rough approximations.')
+  if(tempctobj$ctfitargs$transformedParams==TRUE) out$ctparammessage<- c(out$ctparammessage, 'Note: Some standard errors are approximated with delta method..')
   
   out$omxsummary<-omxSummary(tempctobj,verbose=TRUE)
   return(out)
@@ -97,8 +97,12 @@ summary.ctsemFit<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,...
 
 
 omxSummary<-function(object,verbose=FALSE){
-  if(unlist(utils::packageVersion('OpenMx'))[2] >= 5) omxsummary<-utils::getS3method("summary","MxModel")(object$mxobj) #get openmx summary
-  if(unlist(utils::packageVersion('OpenMx'))[2] < 5) omxsummary<-methods::getMethod("summary","MxModel")(object$mxobj) #get openmx summary
+  omxver<-unlist(utils::packageVersion('OpenMx'))
+  if(omxver[1] < 3 & omxver[2] < 5) {
+    omxsummary<-methods::getMethod("summary","MxModel")(object$mxobj) #get openmx summary
+  } else { 
+    omxsummary<-utils::getS3method("summary","MxModel")(object$mxobj) #get openmx summary
+  }
   
   output<-list()
   if(verbose==TRUE) output<-c(omxsummary['parameters'])
@@ -115,65 +119,25 @@ omxSummary<-function(object,verbose=FALSE){
 
 ctParamsSummary<-function(object,ctSummaryMatrices){
   
-  # out<-matrix(NA,ncol=4,nrow=length(names(omxGetParameters(object$mxobj))))
   parnames<-rownames(object$mxobj$output$standardErrors)
   parvalues<-c(object$mxobj$output$estimate)
   newparvalues<-parvalues
   parsd<-c(object$mxobj$output$standardErrors)
   parmatrix<-rep(NA,length(parnames))
-  #   mxparams<-summary(object$mxobj)$parameters
-  #   sdmatrices<-list()
-  #   valuematrices<-list()
-  #   detransformedsdmatrices<-list()
-  #   detransformedvaluematrices<-list()
-  # 
-  #   for(matrixi in c('DIFFUSIONlogchol', 'T0VARlogchol','MANIFESTVARlogchol','MANIFESTTRAITVARlogchol','TRAITVARlogchol','TIPREDVARlogchol','TDPREDVARlogchol')){
-  #     valuematrices[[matrixi]]<-try(mxEvalByName(matrixi,object$mxobj,compute=T),silent=TRUE)
-  #     sdmatrices[[matrixi]]<-valuematrices[[matrixi]]
-  #     if(class(valuematrices[[matrixi]]) != 'try-error') {
-  #       for(rowi in 1:nrow(mxparams)){
-  #        if(mxparams$matrix[rowi] == matrixi) {
-  #          sdmatrices[[matrixi]][mxparams[rowi,'row'],mxparams[rowi,'col']] <- mxparams[rowi,'Std.Error']
-  #        }
-  #       }
-  #       detransformedvaluematrices[[matrixi]]<-valuematrices[[matrixi]]
-  #       diag(detransformedvaluematrices[[matrixi]])<-exp(diag(detransformedvaluematrices[[matrixi]]))
-  #       detransformedvaluematrices[[matrixi]]<-detransformedvaluematrices[[matrixi]] %*% t(detransformedvaluematrices[[matrixi]])
-  #       
-  #       
-  #         gdt<-detransformedvaluematrices[[matrixi]] / solve(valuematrices[[matrixi]])
-  #         
-  #         
-  #         detransformedsdmatrices[[matrixi]]<- gdt %*% valuematrices[[matrixi]] %*% sdmatrices[[matrixi]] %*% gdt %*% t(valuematrices[[matrixi]])
-  #         sdmatrices[[matrixi]] %*% detransformedvaluematrices[[matrixi]]  %*% t(sdmatrices[[matrixi]])
-  # 
-  #     }
-  #   }
-  # browser()
+ 
   
   for(parami in 1:length(parnames)){ #for every free param
     for(matrixi in names(ctSummaryMatrices)[names(ctSummaryMatrices) %in% names(object$ctmodelobj)]){ #check every matrix that is in both ctmodelobj and output
       if(parnames[parami] %in% object$ctmodelobj[[matrixi]]) { #if the free param is in the ctmodelobj matrix
         parmatrix[parami]<-matrixi
         newparvalues[parami]<-ctSummaryMatrices[[matrixi]][match(parnames[parami],object$ctmodelobj[[matrixi]])]
-        # if(object$ctfitargs$transformedParams==TRUE) { #if we need to transform std errors
-        # if(matrixi=='DRIFT' && parnames[parami] %in% diag(object$ctmodelobj[[matrixi]])) { #if the paramater is a drift diagonal
-        # parvalues[parami]<- -exp(parvalues[parami])
         parsd[parami]<- abs(((newparvalues[parami]) / parvalues[parami]) * parsd[parami]) #first order delta approximation of std error
-        
-        #           }
-        #           if(matrixi %in% c('DIFFUSION', 'T0VAR','MANIFESTVAR','MANIFESTTRAITVAR','TRAITVAR','TIPREDVAR','TDPREDVAR') && 
-        #               parnames[parami] %in% diag(object$ctmodelobj[[matrixi]])) { #if the parameter is a logchol diagonal
-        #             # parvalues[parami]<- exp(parvalues[parami])^2
-        #             parsd[parami]<- (newparvalues[parami] - parvalues[parami]) / parvalues[parami] * parsd[parami]*2
-        #           }
-        # }
         parvalues[parami]<- newparvalues[parami]
       }
     }
   }
-  out<-data.frame(parnames,parvalues,parmatrix,parsd)
-  colnames(out)<-c('Continuous time free param', 'Value', 'Matrix', 'StdError')
+  out<-data.frame(parvalues,parmatrix,parsd)
+  colnames(out)<-c( 'Value', 'Matrix', 'StdError')
   out<-as.data.frame(out)
 }
 
@@ -325,15 +289,15 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
       tryCatch({  dimnames(TRAITVAR)<-list(latentNames,latentNames)}, error=function(e) e )
       outlist<-c(outlist,'TRAITVAR')
       
-      #         asymTRAITVAR<-tryCatch({ solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT))}, error=function(e) e )
-      #       tryCatch({  dimnames(asymTRAITVAR)<-list(latentNames,latentNames)}, error=function(e) e )
-      #       outlist<-c(outlist,'asymTRAITVAR')
-      #       
-      #       
-      # #       discreteTRAITVAR<-tryCatch({ (diag(n.latent)-OpenMx::expm(DRIFT * timeInterval)) %*% asymTRAITVAR %*% t((diag(n.latent)-OpenMx::expm(DRIFT * timeInterval)))}, error=function(e) e )
-      # #       tryCatch({  dimnames(discreteTRAITVAR)<-list(latentNames,latentNames)}, error=function(e) e )
-      # #       outlist<-c(outlist,'discreteTRAITVAR')
-      #       
+              asymTRAITVAR<-tryCatch({ solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT))}, error=function(e) e )
+            tryCatch({  dimnames(asymTRAITVAR)<-list(latentNames,latentNames)}, error=function(e) e )
+            outlist<-c(outlist,'asymTRAITVAR')
+
+
+      #       discreteTRAITVAR<-tryCatch({ (diag(n.latent)-OpenMx::expm(DRIFT * timeInterval)) %*% asymTRAITVAR %*% t((diag(n.latent)-OpenMx::expm(DRIFT * timeInterval)))}, error=function(e) e )
+      #       tryCatch({  dimnames(discreteTRAITVAR)<-list(latentNames,latentNames)}, error=function(e) e )
+      #       outlist<-c(outlist,'discreteTRAITVAR')
+
       if(verbose==TRUE){
         TRAITVARdiag<-tryCatch({ diag(diag(TRAITVAR))}, error=function(e) e )
         TRAITVARstd<-tryCatch({ suppressWarnings(solve(sqrt(TRAITVARdiag)) %&% TRAITVAR)}, error=function(e) e )

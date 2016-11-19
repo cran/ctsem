@@ -1,27 +1,3 @@
-utils::globalVariables(c("invDRIFT","II","DRIFTexp","vec2diag","diag2vec",
-"mxData","mxMatrix","mxAlgebra","MANIFESTVARbase","MANIFESTVARcholdiag",
-"MANIFESTVARchol","T0VARbase","T0VARcholdiag","T0VARchol","DIFFUSIONbase",
-"DIFFUSIONcholdiag","DIFFUSIONchol","invDRIFTHATCH","cvectorize","DRIFTHATCH",
-  "TRAITVARbase","TRAITVARcholdiag","TRAITVARchol","MANIFESTTRAITVARbase",
-  "MANIFESTTRAITVARcholdiag","MANIFESTTRAITVARchol","mxComputeSequence",
-  "mxComputeGradientDescent","mxComputeReportDeriv","TDPREDVARbase",
-  "TDPREDVARcholdiag","TDPREDVARchol","TIPREDVARbase","TIPREDVARcholdiag",
-  "TIPREDVARchol","mxExpectationRAM","mxFitFunctionML","Ilatent","Alatent",
-  "Amanifestcov","invIminusAlatent","Smanifest","Amanifest","Mmanifest",
-  "mxExpectationNormal","omxSelectRowsAndCols","expCov","existenceVector",
-  "omxSelectCols","expMean","log2pi","numVar_i","filteredExpCov","%&%",
-  "filteredDataRow","filteredExpMean","firstHalfCalc","secondHalfCalc",
-  "rowResults","mxFitFunctionRow","TdpredNames","discreteCINT_T1","discreteDRIFT_T1",
-  "discreteDIFFUSION_T1","mxExpectationStateSpace","mxExpectationSSCT","ctsem.fitfunction",
-  "ctsem.penalties","FIMLpenaltyweight","ctsem.simpleDynPenalty","ieigenval",
-  "mxFitFunctionAlgebra","mxCI","mxComputeConfidenceInterval","DRIFT",
-  "n.latent","DIFFUSION","TRAITVAR","n.TDpred","TDPREDEFFECT","TDPREDMEANS",
-  "TDPREDVAR","TRAITTDPREDCOV","n.TIpred","TIPREDEFFECT","TIPREDMEANS",
-  "TIPREDVAR","CINT","n.manifest","LAMBDA","MANIFESTMEANS","MANIFESTVAR",
-  "mxFitFunctionMultigroup", "asymDIFFUSION", 'data.id',
-  'filteredExpCovchol','filteredExpCovcholinv',
-  'A','M','testd'))
-
 #' Fit a ctsem object
 #' 
 #' This function fits continuous time SEM models specified via \code{\link{ctModel}}
@@ -40,7 +16,8 @@ utils::globalVariables(c("invDRIFT","II","DRIFTexp","vec2diag","diag2vec",
 #' one must consider how average level differences between subjects are accounted for.
 #' See \code{\link{ctMultigroupFit}} for the possibility to apply the Kalman filter over multiple subjects)
 #' @param stationary Character vector of T0 matrix names in which to constrain any free parameters to stationarity.  
-#' Defaults to c('T0TIPREDEFFECT'), constraining only the between subject difference effects. 
+#' Defaults to c('T0TRAITEFFECT','T0TIPREDEFFECT'), constraining only the between subject difference effects to be
+#' constant over time. 
 #' Can be set to NULL to force all T0 matrices to be estimated, can be 
 #' set to 'all' to constrain all T0 matrices to stationarity. 
 #' @param optimizer character string, defaults to the open-source 'SLSQP' optimizer that is distributed
@@ -151,7 +128,7 @@ utils::globalVariables(c("invDRIFT","II","DRIFTexp","vec2diag","diag2vec",
 
 ctFit  <- function(datawide, ctmodelobj, 
   objective='auto', 
-  stationary=c('T0TIPREDEFFECT'), 
+  stationary=c('T0TRAITEFFECT','T0TIPREDEFFECT'), 
   optimizer='SLSQP', 
   retryattempts=15, iterationSummary=FALSE, carefulFit=TRUE,  
   showInits=FALSE, asymptotes=FALSE,
@@ -165,7 +142,7 @@ ctFit  <- function(datawide, ctmodelobj,
  largeAlgebras<-TRUE
  if(nofit == TRUE) carefulFit <- FALSE
  
- if(all(stationary=='all')) stationary<-c('T0VAR','T0MEANS','T0TIPREDEFFECT')
+ if(all(stationary %in% 'all')) stationary<-c('T0VAR','T0MEANS','T0TIPREDEFFECT','T0TRAITEFFECT')
   
   n.latent<-ctmodelobj$n.latent
   n.manifest<-ctmodelobj$n.manifest
@@ -182,7 +159,8 @@ ctFit  <- function(datawide, ctmodelobj,
   missingManifest <- is.na(match(paste0(manifestNames, "_T0"), colnames(datawide)))
   if (any(missingManifest)) {
     stop(paste("Columns for", omxQuotes(manifestNames[missingManifest]),
-               "are missing from the data frame"))
+               "are missing from the data frame - e.g. ", paste0(
+                 omxQuotes(manifestNames[missingManifest]),"_T0")))
   }
   if (length(TDpredNames)) {
     missingTD <- is.na(match(paste0(TDpredNames, "_T0"), colnames(datawide)))
@@ -268,8 +246,8 @@ ctFit  <- function(datawide, ctmodelobj,
   
   if(nrow(datawide)==1){
     message('Single subject dataset or Kalman objective specified - ignoring any specified between subject 
-      variance matrices (TRAITVAR, MANIFESTTRAITVAR, TIPREDEFFECT, TIPREDVAR, TDTIPREDCOV, T0TIPREDEFFECT)')
-    if(objective != "Kalman" | objective != "Kalmanmx") message('Estimation could be much faster if objective="Kalman" was specified!')  
+      variance matrices (TRAITVAR, T0TRAITEFFECT,MANIFESTTRAITVAR, TIPREDEFFECT, TIPREDVAR, TDTIPREDCOV, T0TIPREDEFFECT)')
+    if(objective != "Kalman" & objective != "Kalmanmx") message('Estimation could be much faster if objective="Kalman" was specified!')  
     n.TIpred<-0
   }
   
@@ -284,10 +262,11 @@ ctFit  <- function(datawide, ctmodelobj,
   
   ###check which extensions (e.g. traits) need to be included 
   if(any(ctmodelobj$TRAITVAR!=0) & nrow(datawide) > 1 )   traitExtension <- TRUE
-  if(all(ctmodelobj$TRAITVAR==0) | nrow(datawide)==1 | objective=='Kalman')    traitExtension <- FALSE
+  if(all(ctmodelobj$TRAITVAR==0) | nrow(datawide)==1 | objective=='Kalman' | objective=='Kalmanmx')    traitExtension <- FALSE
+  
   
   if(any(ctmodelobj$MANIFESTTRAITVAR != 0)) manifestTraitvarExtension <- TRUE
-  if(all(ctmodelobj$MANIFESTTRAITVAR == 0)  | nrow(datawide)==1 | objective=='Kalman') manifestTraitvarExtension <- FALSE
+  if(all(ctmodelobj$MANIFESTTRAITVAR == 0)  | nrow(datawide)==1 | objective=='Kalman'| objective=='Kalmanmx') manifestTraitvarExtension <- FALSE
   
   ## if Kalman objective, rearrange data to long format and set Tpoints to 2 (so only single discrete algebras are generated)
   if(objective=='Kalman' | objective=='Kalmanmx') {
@@ -312,7 +291,7 @@ ctFit  <- function(datawide, ctmodelobj,
     
     if(objective == 'Kalmanmx') {
       datawide<-ctDeintervalise(datawide,dT='dT1')
-    colnames(datawide)[which(colnames(datawide)=='AbsTime')] <-'dT1'
+    colnames(datawide)[which(colnames(datawide)=='time')] <-'dT1'
     }
     
     if(n.TDpred >0){
@@ -376,17 +355,17 @@ ctFit  <- function(datawide, ctmodelobj,
     return(output)
   }
 
-  T0VAR <- processInputMatrix(ctmodelobj['T0VAR'], symmetric = FALSE, randomscale=0.01, diagadd = 1, chol=TRUE)
+  T0VAR <- processInputMatrix(ctmodelobj['T0VAR'], symmetric = FALSE, randomscale=0, diagadd = 1, chol=TRUE)
 
   T0MEANS <- processInputMatrix(ctmodelobj["T0MEANS"], symmetric = FALSE, randomscale=1, diagadd = 0)
   MANIFESTMEANS <- processInputMatrix(ctmodelobj["MANIFESTMEANS"], symmetric = FALSE, randomscale=1, diagadd = 0)
   LAMBDA <- processInputMatrix(ctmodelobj["LAMBDA"], symmetric = FALSE, randomscale=.1, addvalues=1, diagadd = 0)
-  MANIFESTVAR <- processInputMatrix(ctmodelobj["MANIFESTVAR"],  symmetric = FALSE, randomscale=.01, diagadd = 1)    
+  MANIFESTVAR <- processInputMatrix(ctmodelobj["MANIFESTVAR"],  symmetric = FALSE, randomscale=0, diagadd = 1)    
 
   DRIFT <- processInputMatrix(ctmodelobj["DRIFT"],  symmetric = FALSE,randomscale=0, 
     addvalues= ifelse(crossEffectNegStarts==TRUE,-.05,0), diagadd=ifelse(discreteTime==TRUE,.5,-.4))
 
-  DIFFUSION <- processInputMatrix(ctmodelobj["DIFFUSION"], symmetric = FALSE, randomscale=0.01, diagadd = 1)      
+  DIFFUSION <- processInputMatrix(ctmodelobj["DIFFUSION"], symmetric = FALSE, randomscale=0, diagadd = 1)      
 
   CINT <- processInputMatrix(ctmodelobj["CINT"], randomscale=.1)    
   
@@ -411,7 +390,8 @@ ctFit  <- function(datawide, ctmodelobj,
   
   
   if(traitExtension == TRUE){ #if needed, process and include traits in matrices
-    TRAITVAR <- processInputMatrix(ctmodelobj["TRAITVAR"],symmetric = FALSE, diagadd = 1, randomscale=.1,chol=TRUE)
+    TRAITVAR <- processInputMatrix(ctmodelobj["TRAITVAR"],symmetric = FALSE, diagadd = 1, randomscale=0,chol=TRUE)
+    T0TRAITEFFECT <- processInputMatrix(ctmodelobj["T0TRAITEFFECT"],symmetric = FALSE, diagadd = 1, randomscale=0,chol=FALSE)
     if(transformedParams==TRUE){
     diag(TRAITVAR$values) <- log(diag(TRAITVAR$values))
     diag(TRAITVAR$values)[diag(TRAITVAR$values)== -Inf] <- -999
@@ -420,7 +400,7 @@ ctFit  <- function(datawide, ctmodelobj,
   
   
   if(manifestTraitvarExtension == TRUE){
-    MANIFESTTRAITVAR <- processInputMatrix(ctmodelobj["MANIFESTTRAITVAR"],  symmetric = FALSE, randomscale=.01, diagadd = 1,chol=TRUE)
+    MANIFESTTRAITVAR <- processInputMatrix(ctmodelobj["MANIFESTTRAITVAR"],  symmetric = FALSE, randomscale=0, diagadd = 1,chol=TRUE)
     if(transformedParams==TRUE){
     diag(MANIFESTTRAITVAR$values) <- log(diag(MANIFESTTRAITVAR$values))
     diag(MANIFESTTRAITVAR$values)[diag(MANIFESTTRAITVAR$values)== -Inf] <- -999
@@ -429,13 +409,13 @@ ctFit  <- function(datawide, ctmodelobj,
   
   
   if(traitExtension == TRUE && !is.null(ctmodelobj$TRAITTDPREDCOV)) {
-    TRAITTDPREDCOV <- processInputMatrix(ctmodelobj["TRAITTDPREDCOV"], symmetric = FALSE, randomscale=0.01, diagadd = 0)
+    TRAITTDPREDCOV <- processInputMatrix(ctmodelobj["TRAITTDPREDCOV"], symmetric = FALSE, randomscale=0, diagadd = 0)
   }
   
   if (n.TDpred > 0){
     TDPREDMEANS <- processInputMatrix(ctmodelobj["TDPREDMEANS"], symmetric = FALSE, diagadd = 0)
-    TDPREDEFFECT <- processInputMatrix(ctmodelobj["TDPREDEFFECT"], symmetric = FALSE, diagadd = 0, randomscale=0.01)
-    T0TDPREDCOV <- processInputMatrix(ctmodelobj["T0TDPREDCOV"], symmetric = FALSE, diagadd = 0, randomscale=0.01) 
+    TDPREDEFFECT <- processInputMatrix(ctmodelobj["TDPREDEFFECT"], symmetric = FALSE, diagadd = 0, randomscale=0)
+    T0TDPREDCOV <- processInputMatrix(ctmodelobj["T0TDPREDCOV"], symmetric = FALSE, diagadd = 0, randomscale=0) 
 
     TDPREDVAR <- processInputMatrix(ctmodelobj["TDPREDVAR"], symmetric = FALSE, diagadd = 1, randomscale=0.01,chol=TRUE) 
     if(transformedParams==TRUE){
@@ -448,14 +428,14 @@ ctFit  <- function(datawide, ctmodelobj,
     TIPREDMEANS <- processInputMatrix(ctmodelobj["TIPREDMEANS"], symmetric = FALSE, diagadd = 0)
     TIPREDEFFECT <- processInputMatrix(ctmodelobj["TIPREDEFFECT"], symmetric = FALSE, diagadd = 0, randomscale=.01)
     T0TIPREDEFFECT <- processInputMatrix(ctmodelobj["T0TIPREDEFFECT"], symmetric = FALSE, diagadd = 0, randomscale=.01)
-    TIPREDVAR <- processInputMatrix(ctmodelobj["TIPREDVAR"], symmetric = FALSE, diagadd = 1, randomscale=0.01,chol=TRUE)    
+    TIPREDVAR <- processInputMatrix(ctmodelobj["TIPREDVAR"], symmetric = FALSE, diagadd = 1, randomscale=0,chol=TRUE)    
     if(transformedParams==TRUE){
     diag(TIPREDVAR$values) <- log(diag(TIPREDVAR$values))
     diag(TIPREDVAR$values)[diag(TIPREDVAR$values)== -Inf] <- -999
     }
   }
   
-  if(n.TIpred > 0 & n.TDpred > 0) TDTIPREDCOV <- processInputMatrix(ctmodelobj["TDTIPREDCOV"], symmetric = FALSE, randomscale=0.01)    
+  if(n.TIpred > 0 & n.TDpred > 0) TDTIPREDCOV <- processInputMatrix(ctmodelobj["TDTIPREDCOV"], symmetric = FALSE, randomscale=0)    
   
   #     
   #     returnAllLocals()
@@ -467,7 +447,7 @@ ctFit  <- function(datawide, ctmodelobj,
   
   
   ###section to define base RAM matrices
-  if(objective!='Kalman') { #configure matrices 
+  if(objective!='Kalman' & objective!='Kalmanmx') { #configure matrices 
     #   defineRAM <- function(){  
     
     #basic indexes to reuse, and modify if changed
@@ -477,7 +457,7 @@ ctFit  <- function(datawide, ctmodelobj,
     traitend <- latentend #because no traits yet
     latenttraitend <- traitend
     manifeststart <- n.latent * Tpoints+1
-    manifestend <- latentend+n.manifest * Tpoints
+    manifestend <- manifeststart-1 + n.manifest * Tpoints
     manifestExtent <-manifestend # includes *all* manifests - predictors also
     intervalstart <- manifestend+1
     intervalend <- manifestend+Tpoints - 1
@@ -601,14 +581,13 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
   }#close base matrices definition function
   
   #### end RAM matrix section
-  
-  
+
   
   
   
   
   ###section to append RAM matrices with process traits
-  if(objective!='Kalman' & traitExtension == TRUE){ #if needed, process and include traits in matrices
+  if(objective!='Kalman' & traitExtension == TRUE & objective!='Kalmanmx'){ #if needed, process and include traits in matrices
     #   traitMatrices <- function(){
     
     #update indices
@@ -619,6 +598,8 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
     latenttraitend <- traitend
     latentExtent <- traitend
     manifestExtent <- manifestend
+    intervalstart <- manifestend+1
+    intervalend <- manifestend+Tpoints - 1
     
     #function to insert n.latent rows and columns of single specified value into matrices 
     insertProcessTraitsToMatrix <- function(x, value){      
@@ -639,21 +620,29 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
     
     #trait loadings
     
-    #new trait loadings to manifest based on lambda
-    A$labels[manifeststart:manifestend, 
-      (latentend+1):(latentend+n.latent)] <- paste0('LAMBDA[',
-        rep(1:n.manifest,times=Tpoints*n.latent),',',
-        rep(1:n.latent,each=Tpoints*n.manifest),']')
-
-    A$values[manifeststart:manifestend, 
-      (latentend+1):(latentend+n.latent)] <- LAMBDA$values[cbind(
-        rep(1:n.manifest,times=Tpoints*n.latent),
-        rep(1:n.latent,each=Tpoints*n.manifest))]
+    # #new trait loadings to manifest based on lambda
+    # A$labels[manifeststart:manifestend, 
+    #   (latentend+1):(latentend+n.latent)] <- paste0('LAMBDA[',
+    #     rep(1:n.manifest,times=Tpoints*n.latent),',',
+    #     rep(1:n.latent,each=Tpoints*n.manifest),']')
+    # 
+    # A$values[manifeststart:manifestend, 
+    #   (latentend+1):(latentend+n.latent)] <- LAMBDA$values[cbind(
+    #     rep(1:n.manifest,times=Tpoints*n.latent),
+    #     rep(1:n.latent,each=Tpoints*n.manifest))]
     
+    #new trait loadings to latent
+    A$values[cbind(rep(1:latentend,each=n.latent), (latentend+1):(latentend+n.latent))] <- diag(n.latent)
+
     #trait variance
     S$values[(latentend+1):(latentend+n.latent), (latentend+1):(latentend+n.latent)] <- diag(1,n.latent)
     TRAITVAR$ref <- matrix(paste0("TRAITVAR[", indexMatrix(symmetrical = TRUE, dimension = n.latent, sep = ","), "]"), nrow = n.latent)
     S$labels[(latentend+1):(latentend+n.latent), (latentend+1):(latentend+n.latent)] <- TRAITVAR$ref    
+    
+    #T0 trait effect
+    A$values[1:n.latent, (latentend+1):(latentend+n.latent)] <- diag(1,n.latent)
+    T0TRAITEFFECT$ref <- matrix(paste0("T0TRAITEFFECT[", indexMatrix(symmetrical = FALSE, dimension = n.latent, sep = ","), "]"), nrow = n.latent)
+    A$labels[1:n.latent, (latentend+1):(latentend+n.latent)] <- T0TRAITEFFECT$ref 
     
     #M matrices
     M$values <- matrix(c(M$values[1:(n.latent * Tpoints), ], 
@@ -682,8 +671,8 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
   
   
   ###section to append matrices with manifest trait latents
-  if( objective!='Kalman' & manifestTraitvarExtension == TRUE){
-    
+  if( objective!='Kalman' & manifestTraitvarExtension == TRUE & objective!='Kalmanmx'){
+   
     #update indices
     manifeststart <- manifeststart+n.manifest #adding n.manifest latent variables to matrix indices, retaining trait indices notation rather than splitting to process and manifest
     manifestend <- manifestend+n.manifest
@@ -692,6 +681,8 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
     if(traitExtension == TRUE) traitend <- traitend + n.manifest
     if(traitExtension == FALSE) traitend <- latentend + n.manifest
     manifesttraitstart <- traitend - n.manifest + 1
+    intervalstart <- manifestend+1
+    intervalend <- manifestend+Tpoints - 1
     
     #function to insert n.manifest rows and columns of single specified value into matrices 
     insertManifestTraitsToMatrix <- function(x, value){      
@@ -750,7 +741,7 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
   
   
   ####TDpred random matrix section
-  if(n.TDpred > 0 & objective!='Kalman') {
+  if(n.TDpred > 0 & objective!='Kalman' & objective!='Kalmanmx') {
     
     
     #function to insert rows and columns of single specified value into matrices
@@ -1632,23 +1623,23 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
   ###Trait variance 
   if(traitExtension==TRUE){
     
-#     if('T0TRAITEFFECT' %in% stationary){
-#       
-#       if(asymptotes==FALSE){
-#       T0TRAITEFFECT$labels[T0TRAITEFFECT$free==TRUE] <-
-#         paste0('T0TRAITEFFECTalg[', 1:n.latent, ',', rep(1:n.latent, each=n.latent), ']')[T0TRAITEFFECT$free==TRUE]
-#       
-#       T0TRAITEFFECT$free <-FALSE
-#       T0TRAITEFFECTalg<- OpenMx::mxAlgebra(name='T0TRAITEFFECTalg', -invDRIFT)     
-#       if(discreteTime==TRUE) T0TRAITEFFECTalg<- OpenMx::mxAlgebra(name='T0TRAITEFFECTalg', solve(II - DRIFT)) 
-#       }
-#       
-#       if(asymptotes==TRUE){
-#         T0TRAITEFFECT$labels[T0TRAITEFFECT$free==TRUE] <- NA
-#         T0TRAITEFFECT$values[T0TRAITEFFECT$free==TRUE] <- diag(n.latent)[T0TRAITEFFECT$free==TRUE]        
-#         T0TRAITEFFECT$free <-FALSE
-#               }
-#     }
+    if('T0TRAITEFFECT' %in% stationary){
+
+      if(asymptotes==FALSE){
+      T0TRAITEFFECT$labels[T0TRAITEFFECT$free==TRUE] <-
+        paste0('T0TRAITEFFECTalg[', 1:n.latent, ',', rep(1:n.latent, each=n.latent), ']')[T0TRAITEFFECT$free==TRUE]
+
+      T0TRAITEFFECT$free <-FALSE
+      T0TRAITEFFECTalg<- OpenMx::mxAlgebra(name='T0TRAITEFFECTalg', -invDRIFT)
+      if(discreteTime==TRUE) T0TRAITEFFECTalg<- OpenMx::mxAlgebra(name='T0TRAITEFFECTalg', solve(II - DRIFT))
+      }
+
+      if(asymptotes==TRUE){
+        T0TRAITEFFECT$labels[T0TRAITEFFECT$free==TRUE] <- NA
+        T0TRAITEFFECT$values[T0TRAITEFFECT$free==TRUE] <- diag(n.latent)[T0TRAITEFFECT$free==TRUE]
+        T0TRAITEFFECT$free <-FALSE
+              }
+    }
     
     if(discreteTime==FALSE && transformedParams==TRUE){
     model <- OpenMx::mxModel(model, 
@@ -1657,19 +1648,27 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
       OpenMx::mxAlgebra(name='TRAITVARchol', vec2diag(exp(diag2vec(TRAITVARbase))) + #inverse log link for diagonal
           TRAITVARbase - #plus the base matrix
           vec2diag(diag2vec(TRAITVARbase))), #minus the diagonal of the base matrix   
-        OpenMx::mxAlgebra(name='TRAITVAR', TRAITVARchol %*% t(TRAITVARchol))
+        OpenMx::mxAlgebra(name='TRAITVAR', TRAITVARchol %*% t(TRAITVARchol)),
+      
+      OpenMx::mxMatrix(name = "T0TRAITEFFECT", values=T0TRAITEFFECT$values, labels=T0TRAITEFFECT$labels, 
+        ncol=n.latent, nrow=n.latent, free=T0TRAITEFFECT$free, type='Full')
+      
       )
     }
     
     if(discreteTime==TRUE | transformedParams==FALSE){
       TRAITVAR <- dechol('TRAITVAR')
+      
       model <- OpenMx::mxModel(model, 
         mxMatrix( name = "TRAITVAR", type = "Full", labels = TRAITVAR$labels, values = TRAITVAR$values, 
-          free = TRAITVAR$free)
+          free = TRAITVAR$free),
+       
+          mxMatrix( name = "T0TRAITEFFECT", type = "Full", labels = T0TRAITEFFECT$labels, values = T0TRAITEFFECT$values, 
+            free = T0TRAITEFFECT$free)
       )
     }
 
-    # if('T0TRAITEFFECT' %in% stationary & asymptotes==FALSE) model<-OpenMx::mxModel(model, T0TRAITEFFECTalg)
+    if('T0TRAITEFFECT' %in% stationary & asymptotes==FALSE) model<-OpenMx::mxModel(model, T0TRAITEFFECTalg)
     
   }
   
@@ -1713,20 +1712,7 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
   
   #model options
   originaloptimizer<- OpenMx::mxOption(NULL, "Default optimizer")
-  
-  if(optimizer=='NPSOL') {
-    # message("Setting NPSOL optimizer for OpenMx temporarily") 
-    OpenMx::mxOption(NULL, "Default optimizer", "NPSOL")
-    # OpenMx::mxOption(model, "Function precision", 1e-12) #1e-14
-  }
-  if(optimizer=='CSOLNP') {
-    # message("Setting CSOLNP optimizer for OpenMx temporarily") 
-    OpenMx::mxOption(NULL, "Default optimizer", "CSOLNP")
-  }
-  if(optimizer=='SLSQP') {
-    # message("Setting SLSQP optimizer for OpenMx temporarily") 
-    OpenMx::mxOption(NULL, "Default optimizer", "SLSQP")
-  }
+  OpenMx::mxOption(NULL, "Default optimizer", optimizer)
   
   #     model <- mxOption(model, "Standard Errors", "No")
   #     model <- mxOption(model, "Calculate Hessian", "No")
@@ -2073,7 +2059,6 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
   if(objective=='Kalman'){ 
     
     if(n.subjects > 1){
-      
       discreteDIFFUSIONmatrix<-OpenMx::mxMatrix(name='discreteDIFFUSIONmatrix',
         labels=paste0('discreteDIFFUSION_T1[',1:n.latent,',', rep(1:n.latent,each=n.latent),']'),
         nrow=n.latent,ncol=n.latent,free=F)
@@ -2165,17 +2150,28 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
   
   
   if(objective=='Kalmanmx'){ 
+    
+    if(n.TDpred > 0) Bmat<-mxMatrix(name='B',values=cbind(CINT$values,TDPREDEFFECT$values),
+      labels=cbind(CINT$labels,TDPREDEFFECT$labels),free=cbind(CINT$free,TDPREDEFFECT$free),
+      nrow=n.latent,ncol=1+n.TDpred)
+    
+    if(n.TDpred == 0) Bmat<-mxMatrix(name='B',values=cbind(CINT$values),
+      labels=cbind(CINT$labels),free=cbind(CINT$free),
+      nrow=n.latent,ncol=1)
   
     model<-OpenMx::mxModel(model,
       
-      mxMatrix(name='D', values=MANIFESTMEANS$values, labels=MANIFESTMEANS$labels, 
-        nrow=n.manifest, ncol=1, free=MANIFESTMEANS$free), 
+      mxMatrix(name='D', values=cbind(MANIFESTMEANS$values,matrix(0,nrow=n.manifest,ncol=n.TDpred)), 
+        labels=cbind(MANIFESTMEANS$labels,matrix(NA,nrow=n.manifest,ncol=n.TDpred)),
+        nrow=n.manifest, ncol=1+n.TDpred, free=cbind(MANIFESTMEANS$free,matrix(FALSE,nrow=n.manifest,ncol=n.TDpred))), 
       
-      mxMatrix(name='u', values=1, nrow=1, ncol=1, free=F), 
+      mxMatrix(name='u',values=c(1,n.TDpred),labels=c(NA,if(n.TDpred > 0) paste0('data.',TDpredNames)),nrow=1+n.TDpred,ncol=1),
+      
+      Bmat,
       
       mxMatrix('Full', 1, 1, name='time', labels='data.dT1'),
       
-      mxExpectationSSCT(A='DRIFT', B='CINT', C='LAMBDA', 
+      mxExpectationSSCT(A='DRIFT', B='B', C='LAMBDA', 
         D="D", Q='DIFFUSION', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u", t='time'), 
       
       mxFitFunctionML(vector=FALSE)
@@ -2190,25 +2186,23 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
 #     if(transformedParams==TRUE) model$negDRIFTlog$free[row(DRIFT$free)!=col(DRIFT$free)] <- FALSE #fix off diagonal DRIFT params
 #     if(transformedParams==FALSE) model$DRIFT$free[row(DRIFT$free)!=col(DRIFT$free)] <- FALSE
     
-#     if(traitExtension==TRUE) penalties <- OpenMx::mxAlgebra(name='penalties', 
-#       sum(T0VAR*T0VAR) + # - sum(diag2vec(T0VAR) * diag2vec(T0VAR)) + 
-#         sum(DRIFT*DRIFT) + #  - sum(diag2vec(DRIFT) * diag2vec(DRIFT)) + 
-#         sum(DIFFUSION*DIFFUSION) + #  - sum(diag2vec(DIFFUSION) * diag2vec(DIFFUSION)) +
-#         sum(MANIFESTVAR*MANIFESTVAR) + #  - sum(diag2vec(MANIFESTVAR) * diag2vec(MANIFESTVAR)) +
-#         sum(TRAITVAR * TRAITVAR) #  - sum(diag2vec(TRAITVAR) * diag2vec(TRAITVAR))
-#         )
-#     
-#     if(manifestTraitvarExtension==TRUE & traitExtension==FALSE) penalties <- OpenMx::mxAlgebra(name='penalties', 
-#       sum(T0VAR*T0VAR) + #  - sum(diag2vec(T0VAR) * diag2vec(T0VAR)) + 
-#         sum(DRIFT*DRIFT) + #  - sum(diag2vec(DRIFT) * diag2vec(DRIFT)) + 
-#         sum(DIFFUSION*DIFFUSION) + #  - sum(diag2vec(DIFFUSION) * diag2vec(DIFFUSION)) +
-#       sum(MANIFESTVAR*MANIFESTVAR) + #  - sum(diag2vec(MANIFESTVAR) * diag2vec(MANIFESTVAR)) +
-#       sum(MANIFESTTRAITVAR * MANIFESTTRAITVAR) #  - sum(diag2vec(TRAITVAR) * diag2vec(TRAITVAR))
-#         )
-#     
-#     if(traitExtension==FALSE & manifestTraitvarExtension==FALSE) 
-      
-      penalties <- OpenMx::mxAlgebra(name='penalties', 
+    if(traitExtension==TRUE) penalties <- OpenMx::mxAlgebra(name='penalties',
+      sum(T0VAR*T0VAR) + # - sum(diag2vec(T0VAR) * diag2vec(T0VAR)) +
+        sum(DRIFT*DRIFT) + #  - sum(diag2vec(DRIFT) * diag2vec(DRIFT)) +
+        sum(DIFFUSION*DIFFUSION) + #  - sum(diag2vec(DIFFUSION) * diag2vec(DIFFUSION)) +
+        sum(MANIFESTVAR*MANIFESTVAR) + #  - sum(diag2vec(MANIFESTVAR) * diag2vec(MANIFESTVAR)) +
+        sum(TRAITVAR * TRAITVAR) #  - sum(diag2vec(TRAITVAR) * diag2vec(TRAITVAR))
+        )
+
+    if(manifestTraitvarExtension==TRUE) penalties <- OpenMx::mxAlgebra(name='penalties',
+      sum(T0VAR*T0VAR) + #  - sum(diag2vec(T0VAR) * diag2vec(T0VAR)) +
+        sum(DRIFT*DRIFT) + #  - sum(diag2vec(DRIFT) * diag2vec(DRIFT)) +
+        sum(DIFFUSION*DIFFUSION) + #  - sum(diag2vec(DIFFUSION) * diag2vec(DIFFUSION)) +
+      sum(MANIFESTVAR*MANIFESTVAR) + #  - sum(diag2vec(MANIFESTVAR) * diag2vec(MANIFESTVAR)) +
+      sum(MANIFESTTRAITVAR * MANIFESTTRAITVAR) #  - sum(diag2vec(TRAITVAR) * diag2vec(TRAITVAR))
+        )
+
+    if(traitExtension==FALSE & manifestTraitvarExtension==FALSE)  penalties <- OpenMx::mxAlgebra(name='penalties', 
       sum(T0VAR*T0VAR) + #  - sum(diag2vec(T0VAR) * diag2vec(T0VAR)) + 
         sum(DRIFT*DRIFT) + #  - sum(diag2vec(DRIFT) * diag2vec(DRIFT)) + 
         sum(DIFFUSION*DIFFUSION) + #  - sum(diag2vec(DIFFUSION) * diag2vec(DIFFUSION)) +
@@ -2230,7 +2224,7 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
     model<-OpenMx::mxModel('ctsemCarefulFit', 
       modelwithpenalties, penaltyLL,
       #             mxMatrix(type='Full', name='FIMLpenaltyweight', nrow=1, ncol=1, values=FIMLpenaltyweight, free=F), 
-      mxMatrix(name='FIMLpenaltyweight', values=100,free=F,nrow=1,ncol=1,type='Full' ), 
+      mxMatrix(name='FIMLpenaltyweight', values=10,free=F,nrow=1,ncol=1,type='Full' ), 
       mxFitFunctionAlgebra('penaltyLL')
     )
  
@@ -2303,7 +2297,7 @@ if('MANIFESTMEANS' %in% ctmodelobj$timeVarying) paste0('_T',rep(0:(Tpoints-1),ea
     message(paste(names(newstarts), ": ", newstarts, "\n"))
   }
   
-  if(plotOptimization==T){
+  if(plotOptimization==TRUE){
     model<- OpenMx::mxOption(model, 'Always Checkpoint', 'Yes')
     model<- OpenMx::mxOption(model, 'Checkpoint Units', 'iterations')
     model<- OpenMx::mxOption(model, 'Checkpoint Count', 1)    

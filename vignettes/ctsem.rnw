@@ -243,8 +243,9 @@ To see exactly how the various matrices are transformed into a RAM SEM, one may 
 <<eval=FALSE>>=
 data('datastructure')
 datastructure
-semModel<-ctModel(n.latent=2,n.manifest=3, TRAITVAR='auto', n.TIpred=2, 
-  n.TDpred=1, Tpoints=3, LAMBDA=matrix(c(1,'lambda21', 0, 0,1,0),nrow=3))
+semModel<-ctModel(n.latent=2, n.manifest=3, TRAITVAR='auto', 
+  n.TIpred=2, n.TDpred=1, Tpoints=3, 
+  LAMBDA=matrix(c(1,'lambda21', 0, 0,1,0),nrow=3))
 semFit<-ctFit(datastructure, semModel, nofit=T)
 semFit$mxobj$A$labels
 semFit$mxobj$S$labels
@@ -462,13 +463,14 @@ A visual depiction of the relationships between the processes over time is given
 \subsection{Unobserved heterogeneity}\nopagebreak
 \subsubsection{Traits at the latent level} \label{sec:heterogeneity} \nopagebreak
 When modelling panel data, the continuous intercept parameter $\boldsymbol{\kappa}$ reflects the expected value for continuous time intercept $\boldsymbol{\xi}$, which determines the average level of a process. In panel data, however, it is common that \textit{individuals} exhibit stable differences in the level. Within \pkg{ctsem} we call such stable differences \textit{traits}, but they may also be thought of more abstractly as \textit{unit level} or \textit{between subject} differences, or \textit{unobserved heterogeneity}. Fitting a model that fails to account for it will result in parameter estimates that will not reflect the processes of individual subjects, but will mix between and within-person information \citep{balestra1966pooling, oud2000continuous, halaby2004panel}. 
-To avoid this bias, individual differences can be incorporated in two different ways. One way is to control for observed covariates as will be discussed in Section \ref{sec:tipreds}. However as covariates are likely to be insufficient, one may also estimate the latent trait variance by estimating the variance and covariance $\boldsymbol{\phi}_{\xi}$ of the intercept parameters $\boldsymbol{\xi}$ across individuals.\footnote{Note that this is a substantially different approach to achieve unbiased effect estimates than the \textit{fixed effects} approach \citep[see for example][]{mundlak1978pooling}, as our SEM specification, while a \textit{random effects} model which have at times been associated with bias for within effects, allows unbiased estimation of \textit{within} and \textit{between} effects at the same time. For further details on the estimation of unobserved heterogeneity in an SEM context, see \citet{bollen2010general}, and in the continuous time case \citet{voelkle2015accounting}.} In \pkg{ctsem}, freely estimated latent trait variances and covariances may be added with the argument \code{TRAITVAR = "auto"} to the \code{ctModel} command. If the user is interested in a specific variance-covariance structure, it is of course also possible to specify the n.latent $\times$ n.latent lower-triangular matrix of free or fixed parameters by hand. To illustrate the inclusion of trait variance, we fit the same model on simulated leisure time and happiness introduced above, but also model the traits.
+To avoid this bias, individual differences can be incorporated in two different ways. One way is to control for observed covariates as will be discussed in Section \ref{sec:tipreds}. However as covariates are likely to be insufficient, one may also estimate the latent trait variance by estimating the variance and covariance $\boldsymbol{\phi}_{\xi}$ of the intercept parameters $\boldsymbol{\xi}$ across individuals.\footnote{Note that this is a substantially different approach to achieve unbiased effect estimates than the \textit{fixed effects} approach \citep[see for example][]{mundlak1978pooling}, as our SEM specification, while a \textit{random effects} model which have at times been associated with bias for within effects, allows unbiased estimation of \textit{within} and \textit{between} effects at the same time. For further details on the estimation of unobserved heterogeneity in an SEM context, see \citet{bollen2010general}, and in the continuous time case \citet{voelkle2015accounting}.} In \pkg{ctsem}, freely estimated latent trait variances and covariances may be added with the argument \code{TRAITVAR = "auto"} to the \code{ctModel} command. If the user is interested in a specific variance-covariance structure, it is of course also possible to specify the n.latent $\times$ n.latent lower-triangular matrix of free or fixed parameters by hand. To illustrate the inclusion of trait variance, we fit the same model on simulated leisure time and happiness introduced above, but also model the traits. Note: This example has been changed to MANIFESTTRAITVAR instead of TRAITVAR, due to changes in the fitting routine -- with MANIFESTTRAITVAR it is typically easier to achieve a reliable fit. There are no substantive differences in this case but can be if multiple indicators are used.
 
 <<example2fit, cache = TRUE>>=
+
 data("ctExample1")
 traitmodel <- ctModel(n.manifest = 2, n.latent = 2, Tpoints = 6, 
   LAMBDA = diag(2), manifestNames = c("LeisureTime", "Happiness"), 
-  latentNames = c("LeisureTime", "Happiness"), TRAITVAR = "auto")
+  latentNames = c("LeisureTime", "Happiness"), MANIFESTTRAITVAR = "auto")
 traitfit <- ctFit(datawide = ctExample1, ctmodelobj = traitmodel)
 @
 
@@ -533,14 +535,21 @@ The matrices output from \code{summary, verbose = TRUE} will now include matrice
 \begin{figure}[!h]
 <<tdpreddemo, echo = FALSE, eval = TRUE, fig.height = 3>>=
 Tpoints = 20
-testm <- ctModel(Tpoints = Tpoints, n.latent = 1, n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
-  DIFFUSION = diag(.1, 1), TDPREDEFFECT = diag(1, 1), TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
-  T0VAR = diag(100, 1), TDPREDMEANS = matrix(c(0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ncol = 1, nrow = (Tpoints-1)))
+testm <- ctModel(Tpoints = Tpoints, n.latent = 1, 
+  n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
+  DIFFUSION = diag(.1, 1), TDPREDEFFECT = diag(1, 1), 
+  TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
+  T0VAR = diag(100, 1), 
+  TDPREDMEANS = matrix(c(0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ncol = 1, nrow = (Tpoints-1)))
 testd <- ctGenerate(testm, n.subjects = 100, burnin = 300)
 
-testm <- ctModel(Tpoints = Tpoints, n.latent = 1, n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
-  DIFFUSION = diag(.0, 1), TDPREDEFFECT = diag(1, 1), TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
-  T0VAR = diag(1, 1), TDPREDMEANS = matrix(c(0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ncol = 1, nrow = (Tpoints-1)))
+testm <- ctModel(Tpoints = Tpoints, n.latent = 1, n.TDpred = 1, 
+  n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
+  DIFFUSION = diag(.001, 1), TDPREDEFFECT = diag(1, 1), 
+  TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), 
+  T0MEANS = matrix(0, ncol = 1, nrow = 1),
+  T0VAR = diag(1, 1), 
+  TDPREDMEANS = matrix(c(0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ncol = 1, nrow = (Tpoints-1)))
 testdpure <- ctGenerate(testm, n.subjects = 1, burnin = 300)
 
 par(mfrow = c(1, 2), cex = .7)
@@ -551,14 +560,20 @@ for(i in 1:5){
 }
 
 Tpoints = 20
-testm <- ctModel(Tpoints = Tpoints, n.latent = 1, n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
-  DIFFUSION = diag(.15, 1), TDPREDEFFECT = diag(1.6, 1), TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
-  T0VAR = diag(100, 1), TDPREDMEANS = matrix(c(0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), ncol = 1, nrow = (19)))
+testm <- ctModel(Tpoints = Tpoints, n.latent = 1, 
+  n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
+  DIFFUSION = diag(.15, 1), TDPREDEFFECT = diag(1.6, 1), 
+  TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
+  T0VAR = diag(100, 1), 
+  TDPREDMEANS = matrix(c(0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), ncol = 1, nrow = (19)))
 testd <- ctGenerate(testm, n.subjects = 100, burnin = 300)
 
-testm <- ctModel(Tpoints = Tpoints, n.latent = 1, n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
-  DIFFUSION = diag(.0, 1), TDPREDEFFECT = diag(1.6, 1), TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
-  T0VAR = diag(1, 1), TDPREDMEANS = matrix(c(0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), ncol = 1, nrow = (19)))
+testm <- ctModel(Tpoints = Tpoints, n.latent = 1, 
+  n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
+  DIFFUSION = diag(.001, 1), TDPREDEFFECT = diag(1.6, 1), 
+  TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
+  T0VAR = diag(1, 1), 
+  TDPREDMEANS = matrix(c(0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), ncol = 1, nrow = (19)))
 testdpure <- ctGenerate(testm, n.subjects = 1, burnin = 300)
 
 plot(0:(Tpoints-1), testdpure[, 1:Tpoints], type = 'l', ylim = c(min(testd[, 1:Tpoints]), max(testd[, 1:Tpoints])), ylab = 'Dependent variable', xlab = 'Time', lwd = 3, main = 'Level predictor')
@@ -603,7 +618,8 @@ To test the longer term changes introduced via the monetary intervention, we mus
 
 <<example2TDpredlevel, include = TRUE, eval = TRUE, echo = TRUE, cache = TRUE>>=
 data("ctExample2")
-tdpredlevelmodel <- ctModel(n.manifest = 2, n.latent = 3, n.TDpred = 1, 
+tdpredlevelmodel <- ctModel(n.manifest = 2, n.latent = 3, 
+  n.TDpred = 1, 
   Tpoints = 8, manifestNames = c("LeisureTime", "Happiness"), 
   TDpredNames = "MoneyInt", 
   latentNames = c("LeisureTime", "Happiness", "MoneyIntLatent"),
@@ -653,7 +669,7 @@ data("ctExample4")
 
 basemodel <- ctModel(n.latent = 1, n.manifest = 3, Tpoints = 20,
   LAMBDA = matrix(c(1, "lambda2", "lambda3"), nrow = 3, ncol = 1),
-  TRAITVAR="auto", MANIFESTMEANS = matrix(c(0, "manifestmean2", 
+  MANIFESTMEANS = matrix(c(0, "manifestmean2", 
     "manifestmean3"), nrow = 3, ncol = 1))
 
 freemodel <- basemodel
@@ -661,7 +677,7 @@ freemodel$LAMBDA[3, 1] <- "groupfree"
 groups <- paste0("g", rep(1:2, each = 10))
 
 multif <- ctMultigroupFit(datawide = ctExample4, groupings = groups,
-  ctmodelobj = basemodel, freemodel = freemodel)
+  objective='Kalman',ctmodelobj = basemodel, freemodel = freemodel)
 @
 
 <<multigroupOutput, echo = FALSE>>=
@@ -710,11 +726,11 @@ Continuous time models of this variety are theoretically plausible, as changes t
 genm <- ctModel(Tpoints = 200, n.latent = 2, n.manifest = 1, 
   LAMBDA = matrix(c(1, 0), nrow = 1, ncol = 2),
   DIFFUSION = matrix(c(0, 0, 0, 1), 2),
-  MANIFESTVAR = diag(.6,1),
+  MANIFESTVAR = t(chol(diag(.6,1))),
   DRIFT = matrix(c(0, -.1, 1, -.2), nrow = 2),   
   CINT = matrix(c(1, 0), nrow = 2))
 
-data <- ctGenerate(genm, n.subjects = 1, burnin = 200, dT = 1)
+data <- ctGenerate(genm, n.subjects = 1, burnin = 200)
 
 ctIndplot(data, n.subjects = 1 , n.manifest = 1, Tpoints = 200)
 
@@ -724,7 +740,7 @@ model <- ctModel(Tpoints = 200, n.latent = 2, n.manifest = 1,
   DRIFT = matrix(c(0, "regulation", 1, "diffusionAR"), nrow = 2),   
   CINT = matrix(c("processCINT", 0), nrow = 2))
 
-fit <- ctFit(data, model, stationary = c("T0VAR"), carefulFit = FALSE)
+fit <- ctFit(data, model, stationary = c("T0VAR"))
 @
 
 In the above, we focus on a model for a single subject, and specify with LAMBDA that a single manifest variable measures only the first latent process. With DIFFUSION we specify that only the 2nd process, our unobserved diffusion process, experiences standard random innovations. With DRIFT, we specify that the 2nd process has a freely estimated autoregression term, that the diffusion process directly impacts the first process with a 1:1 relationship, and that as the level of the main process increases, the level of the diffusion process decreases -- providing necessary regulation. With CINT we specify that only the main process has a freely estimated continuous intercept (necessary for identification in this case). 
@@ -800,7 +816,7 @@ To highlight the problems associated with treating all time intervals in a datas
 data("ctExample1")
 traitmodel <- ctModel(n.manifest = 2, n.latent = 2, Tpoints = 6, 
   LAMBDA = diag(2), manifestNames = c("LeisureTime", "Happiness"), 
-  latentNames = c("LeisureTime", "Happiness"), TRAITVAR = "auto")
+  latentNames = c("LeisureTime", "Happiness"), MANIFESTTRAITVAR = "auto")
 traitfit <- ctFit(datawide = ctExample1, ctmodelobj = traitmodel)
 
 discrete <- ctExample1
@@ -811,7 +827,7 @@ discretefit <- ctCI(discretefit, confidenceintervals = 'DRIFT')
 summary(discretefit)$omxsummary$CI
 @
 
-The 95\% confidence intervals for DRIFT[1,2] now do not include 0 and the point estimate is lower, which could lead one to accept the hypothesis that earlier increases in happiness lead to later decreases in leisure time. This is however not the case, the true parameter for DRIFT[1,2] is 0. If we fit confidence intervals for the already fitted correct model (from Section \ref{sec:heterogeneity}, that accounts for different time intervals, the true value of 0 is within the 95\% confidence region.
+The 95\% confidence intervals for drift\_LeisureTime\_Happiness now do not include 0 and the point estimate is lower, which could lead one to accept the hypothesis that earlier increases in happiness lead to later decreases in leisure time. This is however not the case, the true parameter is 0. If we fit confidence intervals for the already fitted correct model (from Section \ref{sec:heterogeneity}, that accounts for different time intervals, the true value of 0 is within the 95\% confidence region.
 
 <<traitfitconfidenceintervals,cache=TRUE >>=
 example1traitfit <- ctCI(traitfit, confidenceintervals = 'DRIFT')
@@ -838,7 +854,8 @@ The following script loops over a sequence in which data is generated from a ver
 output <- matrix(NA, 10, 7)
 colnames(output) <- c('True', 'ctsem', 'cts', 'PSM', 'yuima', 'arima', 'OpenMx')
 for(i in 1:nrow(output)){
-generatingModel <- ctModel(n.latent = 1, n.manifest = 1, Tpoints = 500,
+generatingModel <- ctModel(n.latent = 1, n.manifest = 1, 
+  Tpoints = 500,
   LAMBDA = diag(1), DRIFT = matrix(-.3, nrow = 1),
   CINT = matrix(3, 1, 1),
   MANIFESTVAR = diag(0, 1),
@@ -851,14 +868,15 @@ longData <- ctWideToLong(ctsemData, Tpoints=500, n.manifest=1)
 longData <- ctDeintervalise(longData)
 
 ### ctsem package
-ctsemModel <- ctModel(n.latent=1, n.manifest = 1, Tpoints = 500,
+ctsemModel <- ctModel(n.latent=1, n.manifest = 1, 
+  Tpoints = 500,
   MANIFESTVAR = diag(0, 1),
   LAMBDA = diag(1))
 ctsemFit <- ctFit(ctsemData, ctsemModel, stationary = c('T0VAR'))
 output[i,2] <- mxEval(DRIFT, ctsemFit$mxobj)
 
 ### CTS package
-ctsData <- longData[, c('AbsTime', 'Y1')]
+ctsData <- longData[, c('time', 'Y1')]
 library(cts)
 ctsFit <- car(ctsData, order = 1, scale = 1)
 output[i, 3] <- -1 * (1 + ctsFit$phi) / (1 - ctsFit$phi) 
@@ -881,7 +899,8 @@ log(arfit$coef[1]) #transform ar1 parameter to drift parameter
 output[i, 6]<-log(arfit$coef[1])
 
 ### OpenMx state space continuous time function (specified via ctsem here)
-ctsemModel <- ctModel(n.latent=1, n.manifest = 1, Tpoints = 500,
+ctsemModel <- ctModel(n.latent=1, n.manifest = 1, 
+  Tpoints = 500,
   MANIFESTVAR = diag(0, 1), T0VAR=diag(1), LAMBDA = diag(1))
 mxFit <- ctFit(ctsemData, ctsemModel, objective='Kalmanmx', 
   carefulFit = FALSE)

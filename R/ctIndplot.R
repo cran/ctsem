@@ -26,7 +26,7 @@ ctIndplot<-function(datawide,n.subjects,n.manifest,Tpoints,colourby="subject",
 
   
   
-  if(vars[1]=='all') vars<-1:n.manifest
+  if(length(vars)==1 && vars=='all') vars<-1:n.manifest
   
   if(colourby=="variable") colourvector <- grDevices::rainbow(length(vars),alpha=opacity)
   if(colourby=="subject") colourvector <- grDevices::rainbow(n.subjects,alpha=opacity)
@@ -51,13 +51,13 @@ ctIndplot<-function(datawide,n.subjects,n.manifest,Tpoints,colourby="subject",
     for(j in 1:length(vars)){
       graphics::points(c(0,times[i,]),
         datawide[individuals[i],seq(vars[j],n.manifest*Tpoints,n.manifest)],
-        col=ifelse(colourby=="variable",colourvector[j],colourvector[i]),lwd=1,type="b",pch=j,lty=1) 
+        col=ifelse(colourby=="variable",colourvector[j],colourvector[i]),type="b",pch=j,lty=1,...) 
     }}
   
   if(is.null(varnames)) varnames <- paste0("Y",1:n.manifest) #set varnames for legend
   
   if(colourby=="variable") {
-    graphics::legend(legendposition,varnames,pch=j,text.col=colourvector,bty="n")
+    graphics::legend(legendposition,varnames,pch=vars,col=colourvector,text.col=colourvector,bty="n")
   }
   if(colourby=="subject") {
     graphics::legend(legendposition,varnames,pch=vars,bty="n")

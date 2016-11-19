@@ -1,56 +1,35 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 1.1.6
-Date: 2016-6-12
-Authors@R: c(person("Manuel", "Voelkle", role = c("aut","cph"), comment =
-    "Original development of continuous time model specification within OpenMx,
-    advisor for further development"),person("Han", "Oud", role =
-    c("aut","cph"), comment = "Original development of continuous time model
-    specification within OpenMx"),person("Charles", "Driver", role =
-    c("aut","cre","cph"), comment = "Further development of continuous time
-    model specification within OpenMx, package development, documentation and
-    maintenance",email="driver@mpib-berlin.mpg.de"))
-Description: An easily accessible continuous (and discrete) time dynamic
-    modelling package for panel and time series data, reliant upon the OpenMx.
-    package (http://openmx.psyc.virginia.edu/) for computation. Most dynamic
-    modelling approaches to longitudinal data rely on the assumption that time
-    intervals between observations are consistent. When this assumption is
-    adhered to, the data gathering process is necessarily limited to a specific
-    schedule, and when broken, the resulting parameter estimates may be biased
-    and reduced in power. Continuous time models are conceptually similar to
-    vector autoregressive models (thus also the latent change models popularised
-    in a structural equation modelling context), however by explicitly including
-    the length of time between observations, continuous time models are freed
-    from the assumption that measurement intervals are consistent. This allows:
-    data to be gathered irregularly; the elimination of noise and bias due to
-    varying measurement intervals; parsimonious structures for complex dynamics.
-    The application of such a model in this SEM framework allows full-information
-    maximum-likelihood estimates for both N = 1 and N > 1 cases, multiple measured
-    indicators per latent process, and the flexibility to incorporate additional
-    elements, including individual heterogeneity in the latent process and
-    manifest intercepts, and time dependent and independent exogenous covariates.
-    Furthermore, due to the SEM implementation we are able to estimate a random
-    effects model where the impact of time dependent and time independent predictors
-    can be assessed simultaneously, but without the classic problems of random
-    effects models assuming no covariance between unit level effects and predictors.
+Version: 2.0.0
+Date: 2016-11-17
+Authors@R: c(person("Charles", "Driver", role =
+    c("aut","cre","cph"),email="driver@mpib-berlin.mpg.de"),
+    person("Manuel", "Voelkle", role = c("aut","cph")),
+    person("Han", "Oud", role = c("aut","cph") ))
+Description: A multivariate continuous (and discrete) time dynamic modelling 
+    package for panel and time series data, using linear stochastic differential 
+    equations. Contains a faster frequentist set of functions using OpenMx for 
+    single subject and mixed-effects (random intercepts only) structural 
+    equation models, or a hierarchical Bayesian implementation using Stan that 
+    allows for random effects over all model parameters. Allows for modelling of 
+    multiple noisy measurements of multiple stochastic processes, time varying 
+    input / event covariates, and time invariant covariates used to predict the 
+    parameters.
 License: GPL-3
-Depends: R (>= 3.0.0), OpenMx (>= 2.3.0)
-URL: http://ctsem.r-forge.r-project.org/
-Imports: MASS, Matrix, stats, utils,graphics,methods, grDevices
+Depends: R (>= 3.0.0), OpenMx (>= 2.3.0),
+URL: https://github.com/cdriveraus/ctsem
+Imports: rstan, plyr, Matrix, stats, utils, graphics, methods,
+        grDevices, parallel
 LazyData: Yes
-Suggests: knitr, testthat, PSM, cts, yuima
+Suggests: knitr, testthat, PSM, cts, yuima, shinystan
 VignetteBuilder: knitr
 RoxygenNote: 5.0.1
 NeedsCompilation: no
-Packaged: 2016-06-14 19:51:13 UTC; driver
-Author: Manuel Voelkle [aut, cph] (Original development of continuous time
-    model specification within OpenMx, advisor for further development),
-  Han Oud [aut, cph] (Original development of continuous time model
-    specification within OpenMx),
-  Charles Driver [aut, cre, cph] (Further development of continuous time
-    model specification within OpenMx, package development,
-    documentation and maintenance)
+Packaged: 2016-11-19 10:29:32 UTC; driver
+Author: Charles Driver [aut, cre, cph],
+  Manuel Voelkle [aut, cph],
+  Han Oud [aut, cph]
 Maintainer: Charles Driver <driver@mpib-berlin.mpg.de>
 Repository: CRAN
-Date/Publication: 2016-06-15 18:15:34
+Date/Publication: 2016-11-19 14:30:35

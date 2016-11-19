@@ -15,8 +15,9 @@ Sys.setenv(TEXINPUTS = getwd(),
 ## ----eval=FALSE---------------------------------------------------------------
 #  data('datastructure')
 #  datastructure
-#  semModel<-ctModel(n.latent=2,n.manifest=3, TRAITVAR='auto', n.TIpred=2,
-#    n.TDpred=1, Tpoints=3, LAMBDA=matrix(c(1,'lambda21', 0, 0,1,0),nrow=3))
+#  semModel<-ctModel(n.latent=2, n.manifest=3, TRAITVAR='auto',
+#    n.TIpred=2, n.TDpred=1, Tpoints=3,
+#    LAMBDA=matrix(c(1,'lambda21', 0, 0,1,0),nrow=3))
 #  semFit<-ctFit(datastructure, semModel, nofit=T)
 #  semFit$mxobj$A$labels
 #  semFit$mxobj$S$labels
@@ -76,10 +77,11 @@ example1cifit <- ctCI(example1fit, confidenceintervals = "DRIFT")
 summary(example1cifit)$omxsummary$CI
 
 ## ----example2fit, cache = TRUE------------------------------------------------
+
 data("ctExample1")
 traitmodel <- ctModel(n.manifest = 2, n.latent = 2, Tpoints = 6, 
   LAMBDA = diag(2), manifestNames = c("LeisureTime", "Happiness"), 
-  latentNames = c("LeisureTime", "Happiness"), TRAITVAR = "auto")
+  latentNames = c("LeisureTime", "Happiness"), MANIFESTTRAITVAR = "auto")
 traitfit <- ctFit(datawide = ctExample1, ctmodelobj = traitmodel)
 
 ## ----traitparamplot, include = TRUE, cache = FALSE, echo = FALSE, results = 'hide', fig.height = 4----
@@ -116,14 +118,21 @@ summary(tipredfit, verbose = TRUE)["addedTIPREDVAR"]
 
 ## ----tdpreddemo, echo = FALSE, eval = TRUE, fig.height = 3--------------------
 Tpoints = 20
-testm <- ctModel(Tpoints = Tpoints, n.latent = 1, n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
-  DIFFUSION = diag(.1, 1), TDPREDEFFECT = diag(1, 1), TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
-  T0VAR = diag(100, 1), TDPREDMEANS = matrix(c(0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ncol = 1, nrow = (Tpoints-1)))
+testm <- ctModel(Tpoints = Tpoints, n.latent = 1, 
+  n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
+  DIFFUSION = diag(.1, 1), TDPREDEFFECT = diag(1, 1), 
+  TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
+  T0VAR = diag(100, 1), 
+  TDPREDMEANS = matrix(c(0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ncol = 1, nrow = (Tpoints-1)))
 testd <- ctGenerate(testm, n.subjects = 100, burnin = 300)
 
-testm <- ctModel(Tpoints = Tpoints, n.latent = 1, n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
-  DIFFUSION = diag(.0, 1), TDPREDEFFECT = diag(1, 1), TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
-  T0VAR = diag(1, 1), TDPREDMEANS = matrix(c(0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ncol = 1, nrow = (Tpoints-1)))
+testm <- ctModel(Tpoints = Tpoints, n.latent = 1, n.TDpred = 1, 
+  n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
+  DIFFUSION = diag(.001, 1), TDPREDEFFECT = diag(1, 1), 
+  TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), 
+  T0MEANS = matrix(0, ncol = 1, nrow = 1),
+  T0VAR = diag(1, 1), 
+  TDPREDMEANS = matrix(c(0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ncol = 1, nrow = (Tpoints-1)))
 testdpure <- ctGenerate(testm, n.subjects = 1, burnin = 300)
 
 par(mfrow = c(1, 2), cex = .7)
@@ -134,14 +143,20 @@ for(i in 1:5){
 }
 
 Tpoints = 20
-testm <- ctModel(Tpoints = Tpoints, n.latent = 1, n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
-  DIFFUSION = diag(.15, 1), TDPREDEFFECT = diag(1.6, 1), TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
-  T0VAR = diag(100, 1), TDPREDMEANS = matrix(c(0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), ncol = 1, nrow = (19)))
+testm <- ctModel(Tpoints = Tpoints, n.latent = 1, 
+  n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
+  DIFFUSION = diag(.15, 1), TDPREDEFFECT = diag(1.6, 1), 
+  TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
+  T0VAR = diag(100, 1), 
+  TDPREDMEANS = matrix(c(0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), ncol = 1, nrow = (19)))
 testd <- ctGenerate(testm, n.subjects = 100, burnin = 300)
 
-testm <- ctModel(Tpoints = Tpoints, n.latent = 1, n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
-  DIFFUSION = diag(.0, 1), TDPREDEFFECT = diag(1.6, 1), TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
-  T0VAR = diag(1, 1), TDPREDMEANS = matrix(c(0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), ncol = 1, nrow = (19)))
+testm <- ctModel(Tpoints = Tpoints, n.latent = 1, 
+  n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
+  DIFFUSION = diag(.001, 1), TDPREDEFFECT = diag(1.6, 1), 
+  TDPREDVAR = diag(0, Tpoints-1), CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
+  T0VAR = diag(1, 1), 
+  TDPREDMEANS = matrix(c(0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), ncol = 1, nrow = (19)))
 testdpure <- ctGenerate(testm, n.subjects = 1, burnin = 300)
 
 plot(0:(Tpoints-1), testdpure[, 1:Tpoints], type = 'l', ylim = c(min(testd[, 1:Tpoints]), max(testd[, 1:Tpoints])), ylab = 'Dependent variable', xlab = 'Time', lwd = 3, main = 'Level predictor')
@@ -170,7 +185,8 @@ summary(tdpredfit, verbose = TRUE)["discreteTDPREDEFFECT"]
 
 ## ----example2TDpredlevel, include = TRUE, eval = TRUE, echo = TRUE, cache = TRUE----
 data("ctExample2")
-tdpredlevelmodel <- ctModel(n.manifest = 2, n.latent = 3, n.TDpred = 1, 
+tdpredlevelmodel <- ctModel(n.manifest = 2, n.latent = 3, 
+  n.TDpred = 1, 
   Tpoints = 8, manifestNames = c("LeisureTime", "Happiness"), 
   TDpredNames = "MoneyInt", 
   latentNames = c("LeisureTime", "Happiness", "MoneyIntLatent"),
@@ -210,7 +226,7 @@ data("ctExample4")
 
 basemodel <- ctModel(n.latent = 1, n.manifest = 3, Tpoints = 20,
   LAMBDA = matrix(c(1, "lambda2", "lambda3"), nrow = 3, ncol = 1),
-  TRAITVAR="auto", MANIFESTMEANS = matrix(c(0, "manifestmean2", 
+  MANIFESTMEANS = matrix(c(0, "manifestmean2", 
     "manifestmean3"), nrow = 3, ncol = 1))
 
 freemodel <- basemodel
@@ -218,7 +234,7 @@ freemodel$LAMBDA[3, 1] <- "groupfree"
 groups <- paste0("g", rep(1:2, each = 10))
 
 multif <- ctMultigroupFit(datawide = ctExample4, groupings = groups,
-  ctmodelobj = basemodel, freemodel = freemodel)
+  objective='Kalman',ctmodelobj = basemodel, freemodel = freemodel)
 
 ## ----multigroupOutput, echo = FALSE-------------------------------------------
 multif$mxobj$output$estimate[grep("lambda3", names(multif$mxobj$output$estimate))]
@@ -227,11 +243,11 @@ multif$mxobj$output$estimate[grep("lambda3", names(multif$mxobj$output$estimate)
 genm <- ctModel(Tpoints = 200, n.latent = 2, n.manifest = 1, 
   LAMBDA = matrix(c(1, 0), nrow = 1, ncol = 2),
   DIFFUSION = matrix(c(0, 0, 0, 1), 2),
-  MANIFESTVAR = diag(.6,1),
+  MANIFESTVAR = t(chol(diag(.6,1))),
   DRIFT = matrix(c(0, -.1, 1, -.2), nrow = 2),   
   CINT = matrix(c(1, 0), nrow = 2))
 
-data <- ctGenerate(genm, n.subjects = 1, burnin = 200, dT = 1)
+data <- ctGenerate(genm, n.subjects = 1, burnin = 200)
 
 ctIndplot(data, n.subjects = 1 , n.manifest = 1, Tpoints = 200)
 
@@ -241,7 +257,7 @@ model <- ctModel(Tpoints = 200, n.latent = 2, n.manifest = 1,
   DRIFT = matrix(c(0, "regulation", 1, "diffusionAR"), nrow = 2),   
   CINT = matrix(c("processCINT", 0), nrow = 2))
 
-fit <- ctFit(data, model, stationary = c("T0VAR"), carefulFit = FALSE)
+fit <- ctFit(data, model, stationary = c("T0VAR"))
 
 ## ----osscilating, cache = TRUE, echo = TRUE, eval = TRUE, include = TRUE------
 data("Oscillating")
@@ -272,7 +288,7 @@ fitWithInits <- ctFit(data = ctExample1, ctmodelobj = example1model,
 data("ctExample1")
 traitmodel <- ctModel(n.manifest = 2, n.latent = 2, Tpoints = 6, 
   LAMBDA = diag(2), manifestNames = c("LeisureTime", "Happiness"), 
-  latentNames = c("LeisureTime", "Happiness"), TRAITVAR = "auto")
+  latentNames = c("LeisureTime", "Happiness"), MANIFESTTRAITVAR = "auto")
 traitfit <- ctFit(datawide = ctExample1, ctmodelobj = traitmodel)
 
 discrete <- ctExample1
@@ -302,7 +318,8 @@ summary(example1traitfit)$omxsummary$CI
 #  output <- matrix(NA, 10, 7)
 #  colnames(output) <- c('True', 'ctsem', 'cts', 'PSM', 'yuima', 'arima', 'OpenMx')
 #  for(i in 1:nrow(output)){
-#  generatingModel <- ctModel(n.latent = 1, n.manifest = 1, Tpoints = 500,
+#  generatingModel <- ctModel(n.latent = 1, n.manifest = 1,
+#    Tpoints = 500,
 #    LAMBDA = diag(1), DRIFT = matrix(-.3, nrow = 1),
 #    CINT = matrix(3, 1, 1),
 #    MANIFESTVAR = diag(0, 1),
@@ -315,14 +332,15 @@ summary(example1traitfit)$omxsummary$CI
 #  longData <- ctDeintervalise(longData)
 #  
 #  ### ctsem package
-#  ctsemModel <- ctModel(n.latent=1, n.manifest = 1, Tpoints = 500,
+#  ctsemModel <- ctModel(n.latent=1, n.manifest = 1,
+#    Tpoints = 500,
 #    MANIFESTVAR = diag(0, 1),
 #    LAMBDA = diag(1))
 #  ctsemFit <- ctFit(ctsemData, ctsemModel, stationary = c('T0VAR'))
 #  output[i,2] <- mxEval(DRIFT, ctsemFit$mxobj)
 #  
 #  ### CTS package
-#  ctsData <- longData[, c('AbsTime', 'Y1')]
+#  ctsData <- longData[, c('time', 'Y1')]
 #  library(cts)
 #  ctsFit <- car(ctsData, order = 1, scale = 1)
 #  output[i, 3] <- -1 * (1 + ctsFit$phi) / (1 - ctsFit$phi)
@@ -345,7 +363,8 @@ summary(example1traitfit)$omxsummary$CI
 #  output[i, 6]<-log(arfit$coef[1])
 #  
 #  ### OpenMx state space continuous time function (specified via ctsem here)
-#  ctsemModel <- ctModel(n.latent=1, n.manifest = 1, Tpoints = 500,
+#  ctsemModel <- ctModel(n.latent=1, n.manifest = 1,
+#    Tpoints = 500,
 #    MANIFESTVAR = diag(0, 1), T0VAR=diag(1), LAMBDA = diag(1))
 #  mxFit <- ctFit(ctsemData, ctsemModel, objective='Kalmanmx',
 #    carefulFit = FALSE)
