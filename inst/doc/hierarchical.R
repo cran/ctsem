@@ -38,8 +38,7 @@ options(width = 100, scipen = 12, digits = 3)
 
 
 ## ----install,eval=FALSE---------------------------------------------------------------------------
-#  require('devtools')
-#  install_github("ctsem",username='cdriveraus')
+#  install.packages("ctsem")
 
 ## ----data,echo=FALSE,size='footnotesize'----------------------------------------------------------
 temp=ctstantestdat
@@ -74,8 +73,8 @@ model$pars[,c('TI1_effect','TI2_effect','TI3_effect')]<-FALSE
 model$pars[c(19,20),c('TI1_effect','TI2_effect','TI3_effect')]<-TRUE
 
 ## ----fitting,cache=TRUE---------------------------------------------------------------------------
-fit<-ctStanFit(datalong = ctstantestdat, ctstanmodel = model, iter=100, chains=2, 
-  plot=FALSE, control=list(max_treedepth = 6))
+fit<-ctStanFit(datalong = ctstantestdat, ctstanmodel = model, iter=200, 
+  chains=2, plot=FALSE, control=list(max_treedepth = 6))
 
 ## ----output,eval=FALSE----------------------------------------------------------------------------
 #  summary(fit)
@@ -116,7 +115,7 @@ datalong <- cbind(id, time, sunspots)
 
 #fit
 fit <- ctStanFit(datalong, model, iter=400, chains=2, 
-  control=list(adapt_delta=.9))
+  stationary=TRUE, control=list(adapt_delta=.9))
 
 #output
 summary(fit)$popmeans

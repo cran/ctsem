@@ -19,7 +19,7 @@ ctStanParnames <- function(x,substrings=c('hmean_','hsd_')){
   }
   return(out)
 }
-
+ 
 
 #'ctStanContinuousPars
 #'
@@ -31,19 +31,21 @@ ctStanParnames <- function(x,substrings=c('hmean_','hsd_')){
 #'@param iter Either character string 'all' which will then use all post-warmup iterations, 
 #'or an integer specifying which iteration/s to use.
 #'@param calcfunc Function to apply over samples, must return a single value. 
-#'By default the mean over all samples is returned, but one might also be interested in
-#'the \code{\link[stats]{sd}} or \code{\link[stats]{quantile}} functions.
-#'@param ... additional parameters to pass to calcfunc. For instance, with calcfunc = quantile, 
+#'By default the median over all samples is returned using the \code{\link[stats]{quantile}} function, 
+#'but one might also be interested in the \code{\link[base]{mean}} or \code{\link[stats]{sd}}, for instance.
+#'@param calcfuncargs A list of additional parameters to pass to calcfunc. 
+#'For instance, with the default of calcfunc = quantile, 
 #'the probs argument is needed to ensure only a single value is returned.
 #'@examples
-#'#posterior mean over all subjects
+#'#posterior median over all subjects (also reflects mean of unconstrained pars)
 #'ctStanContinuousPars(ctstantestfit)
 #'
 #'#posterior 95% quantiles for subject 2
-#'ctStanContinuousPars(ctstantestfit, subjects=2, calcfunc=quantile, probs = .95)
+#'ctStanContinuousPars(ctstantestfit, subjects=2, calcfunc=quantile, 
+#'calcfuncargs=list(probs=0.95))
 #'@export
 ctStanContinuousPars <- function(ctstanfitobj,subjects='all',iter='all',
-  calcfunc=mean,...){
+  calcfunc=quantile,calcfuncargs=list(probs=0.5)){
   
   if(subjects[1] != 'all' && !is.integer(as.integer(subjects))) stop('
     subjects argument must be either "all" or an integer denoting specific subjects')
@@ -75,7 +77,7 @@ ctStanContinuousPars <- function(ctstanfitobj,subjects='all',iter='all',
   # if(collapseSubjects) collapsemargin=c(collapsemargin,2)
   
   for(matname in c('DRIFT','DIFFUSION','CINT','T0MEANS', 
-    'T0VAR','MANIFESTMEANS','MANIFESTVAR','LAMBDA', if(!is.null(e$TDPREDEFFECT)) 'TDPREDEFFECT')){
+    'T0VAR','MANIFESTMEANS',if(!is.null(e$MANIFESTVAR)) 'MANIFESTVAR','LAMBDA', if(!is.null(e$TDPREDEFFECT)) 'TDPREDEFFECT')){
     
     if(dim(e[[matname]])[2] > 1) subselection <- subjects else subselection <- 1
     
@@ -83,26 +85,28 @@ ctStanContinuousPars <- function(ctstanfitobj,subjects='all',iter='all',
     
     if(matname %in% c('T0MEANS','CINT', 'MANIFESTMEANS')) vector <- TRUE
     
-    if(!vector) assign(matname, 
-      array(ctCollapse(inarray = e[[matname]][,subselection,,,drop=FALSE],
-        collapsemargin = collapsemargin, 
-        collapsefunc = calcfunc,...),dim=dim(e[[matname]])[-c(1,2)])
-    )
+    calcfuncargs$collapsemargin = collapsemargin
+    calcfuncargs$collapsefunc=calcfunc
     
-    if(vector) assign(matname,
-      array(ctCollapse(inarray = e[[matname]][,subselection,,drop=FALSE],
-        collapsemargin = collapsemargin, 
-        collapsefunc = calcfunc, 
-        ...),dim=c(dim(e[[matname]])[-c(1,2)],1))
-    )
+    if(!vector) {
+      calcfuncargs$inarray = e[[matname]][,subselection,,,drop=FALSE]
+      assign(matname, array(do.call(ctCollapse,calcfuncargs),dim=dim(e[[matname]])[-c(1,2)]))
+    }
+    
+    if(vector) {
+      calcfuncargs$inarray = e[[matname]][,subselection,,drop=FALSE]
+      assign(matname, array(do.call(ctCollapse,calcfuncargs),dim=c(dim(e[[matname]])[-c(1,2)],1)))
+    }
     
   }
   
   DRIFTHATCH<-DRIFT %x% diag(nrow(DRIFT)) + diag(nrow(DRIFT)) %x% DRIFT
   asymDIFFUSION<-matrix(-solve(DRIFTHATCH) %*% c(DIFFUSION), nrow=nrow(DRIFT)) 
-
+  
   model<-list(DRIFT=DRIFT,T0VAR=T0VAR,DIFFUSION=DIFFUSION,asymDIFFUSION=asymDIFFUSION,CINT=CINT,T0MEANS=T0MEANS,
-    MANIFESTMEANS=MANIFESTMEANS,MANIFESTVAR=MANIFESTVAR, LAMBDA=LAMBDA)
+    MANIFESTMEANS=MANIFESTMEANS, LAMBDA=LAMBDA)
+  
+  if(!is.null(e$MANIFESTVAR)) model$MANIFESTVAR=MANIFESTVAR
   
   if(!is.null(e$TDPREDEFFECT)) model$TDPREDEFFECT<-TDPREDEFFECT
   
@@ -160,7 +164,8 @@ ctDiscretePars<-function(ctpars,times=seq(0,10,.1),type='all'){
 #'@param subjects Either 'all', to take the average over all subjects, or a vector of integers denoting which
 #'subjects.
 #'@param times Numeric vector of positive values, discrete time parameters will be calculated for each.
-#'@param quantiles Which quantiles to return
+#'@param quantiles Which quantiles to return. If plotting, specify 3 quantiles, 
+#'the 2nd will be plotted as a line with 1 and 3 as uncertainty bounds.
 #'@param plot Logical. If TRUE, plots output using \code{\link{ctStanDiscreteParsPlot}}
 #'instead of returning output. 
 #'@param ... additional plotting arguments to control \code{\link{ctStanDiscreteParsPlot}}
@@ -194,7 +199,7 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
   #get all ctparameter matrices at once and remove unneeded subjects
   ctpars <- list()
   for(matname in c('DRIFT','DIFFUSION','CINT','T0MEANS', 
-    'T0VAR','MANIFESTMEANS','MANIFESTVAR','LAMBDA', if(!is.null(e$TDPREDEFFECT)) 'TDPREDEFFECT')){
+    'T0VAR','MANIFESTMEANS',if(!is.null(e$MANIFESTVAR)) 'MANIFESTVAR','LAMBDA', if(!is.null(e$TDPREDEFFECT)) 'TDPREDEFFECT')){
     
     vector <- FALSE
     if(matname %in% c('T0MEANS','CINT', 'MANIFESTMEANS')) vector <- TRUE
@@ -207,7 +212,7 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
         paste0('e[[matname]][, ',
           ifelse(xdims[2] > 1, 'subjects',1),if(length(xdims)>1) paste0(rep(', ',length(xdims)-2),collapse=''),']')
     )),dim=dimout)
-    
+     
     ctpars[[matname]] <-aperm(ctpars[[matname]],c(3,if(length(dim(ctpars[[matname]]))>3) 4, 1, 2))
   }
   
@@ -218,22 +223,25 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
     message('Getting ', type[typei],', may take a moment...')
     matrixtype=ifelse(type[typei] %in% c('discreteDRIFT'),TRUE, FALSE) #include any matrix type outputs
     
-    out[[typei]] <- plyr::aaply(1:niter,1,function(iterx){
+    out[[typei]] <- plyr::aaply(1:niter,1,function(iterx){ #for every iteration
       if(collapseSubjects) subjectvec=1 else subjectvec=1:nsubjects #average over subjects before computing? much faster but answers dif question.
-      plyr::aaply(subjectvec,1,function(subjecty){
-        ctparsxy <- plyr::llply(ctpars, function(obji) {
-          ismatrix = length(dim(obji)) > 3 #check if obji is a matrix or vector
-          out=eval(parse(text=paste0('obji[,',
+      plyr::aaply(subjectvec,1,function(subjecty){ #for all subjects at once, or 1 subject at a time...
+        ctparsxy <- plyr::llply(ctpars, function(obji) { #
+          ismatrix = length(dim(obji)) > 3 #check if obji (ctparameter) is a matrix or vector
+          ctparsout=array(eval(parse(text=paste0('obji[,',
             if(ismatrix) ',',
             iterx,',',
-            ifelse(dim(obji)[ifelse(ismatrix,4,3)] > 1, ifelse(collapseSubjects, '1:nsubjects', 'subjecty'),1),
-            ']')))
+            ifelse(dim(obji)[ifelse(ismatrix,4,3)] > 1, #if the parameter varies over multiple subjects,
+              ifelse(collapseSubjects, '1:nsubjects',  #and we collapse over subjects, return values for all subjects
+                'subjecty'), #if we don't collapse over subjects, just return for specified subject
+              1),#if the parameter doesn't vary over subjects then just return the only parameter
+            ']'))),dim=dim(obji)[-ifelse(ismatrix,3,2)]) #set dims to dims of par object without iterations
           
-          if(collapseSubjects & dim(obji)[ifelse(ismatrix,4,3)] > 1) out <- ctCollapse(out,
-            collapsemargin = ifelse(ismatrix,3,2),
-            collapsefunc = mean)
+          if(collapseSubjects) ctparsout <- ctCollapse(ctparsout, #if we need to collapse over multiple subjects
+            collapsemargin = ifelse(ismatrix,3,2), #then collapse the subject margin
+            collapsefunc = median) #via the median function
           
-          return(out)
+          return(ctparsout)
         })
         
         
@@ -246,16 +254,19 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
       },.drop=FALSE)
     },.drop=FALSE)
     
-    out[[typei]] = plyr::aaply(quantiles, 1, function(quantx) 
-      ctCollapse(inarray=out[[typei]],collapsemargin=c(1,if(collapseSubjects) 2),collapsefunc=quantile,probs=quantx)
-    )
-    
-    
     dimlist<- list(quantiles=paste0('quantile_',quantiles),
-      row=dimnames(out[[typei]])[[2]],
-      col=dimnames(out[[typei]])[[3]],
+      row=dimnames(out[[typei]])[[3]],
+      col=dimnames(out[[typei]])[[4]],
       times=paste0('t',times)
     )
+    
+    out[[typei]] = plyr::aaply(quantiles, 1, function(quantx) {
+      ctCollapse(inarray=out[[typei]],collapsemargin=c(1,if(collapseSubjects) 2),collapsefunc=quantile,probs=quantx)
+    } ,.drop=FALSE)
+    
+    
+
+    
     if(!matrixtype) dimlist[[3]]=NULL
     
     dimnames(out[[typei]])=dimlist

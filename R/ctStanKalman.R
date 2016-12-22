@@ -49,7 +49,8 @@ ctStanKalman<-function(ctstanfitobj, datalong=NULL, timerange='asdata', timestep
   
   if(is.null(datalong)) { #get relevant data
     time<-ctstanfitobj$data$time
-    datalong<-cbind(ctstanfitobj$data$subject,time,ctstanfitobj$data$Y,ctstanfitobj$data$tdpreds)
+    datalong<-cbind(ctstanfitobj$data$subject,time,ctstanfitobj$data$Y)
+    if(ctstanfitobj$ctstanmodel$n.TDpred > 0) datalong <- cbind(datalong,ctstanfitobj$data$tdpreds)
     
     colnames(datalong)<-c('subject','time',
       ctstanfitobj$ctstanmodel$manifestNames,
@@ -57,10 +58,12 @@ ctStanKalman<-function(ctstanfitobj, datalong=NULL, timerange='asdata', timestep
   }
   if(!all(subjects %in% datalong[,'subject'])) stop('Invalid subjects specified!')
   
+  diffusionindices<-ctstanfitobj$data$diffusionindices
+  
   for(subjecti in subjects){
     
     #setup subjects data, interpolating and extending as necessary
-    sdat=datalong[datalong[,'subject'] == subjecti,]
+    sdat=datalong[datalong[,'subject'] == subjecti,,drop=FALSE]
     if(timestep != 'asdata' || timerange[1] != 'asdata') {
       if(timerange[1]=='asdata') stimerange <- range(sdat[,'time']) else {
         stimerange <- timerange
@@ -84,7 +87,8 @@ ctStanKalman<-function(ctstanfitobj, datalong=NULL, timerange='asdata', timestep
       manifestNames=ctstanfitobj$ctstanmodel$manifestNames,
       latentNames=ctstanfitobj$ctstanmodel$latentNames,
       TDpredNames=ctstanfitobj$ctstanmodel$TDpredNames,
-      timecol='time')
+      timecol='time',
+      diffusionindices=diffusionindices)
   }
   
   if(plot) {
@@ -244,7 +248,7 @@ ctStanKalmanPlot<-function(x, subjects, kalmanvec=c('y','yprior'),
           backwardstimesindex=order(plist$x,decreasing=TRUE)
 
           # if(is.null(polygoncontrol$angle)) 
-            polygoncontrol$angle=stats::runif(1,0,359)
+            # polygoncontrol$angle=stats::runif(1,0,359)
             polygonargs<-polygoncontrol
             polygonargs$x=c(plist$x,plist$x[backwardstimesindex])
             polygonargs$y=c(plist$y + errormultiply * sqrt(out[[subiname]][[errorvec[kveci]]][kdimi,kdimi,]), 
