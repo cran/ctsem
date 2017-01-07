@@ -39,6 +39,8 @@
 #' (so approx 65% of the population mean prior), is first fit with penalised maximum likelihood to determine starting values
 #' for the chains. This can help speed convergence and avoid problematic regions for certain problems.
 #' @param chains number of chains to sample.
+#' @param cores number of cpu cores to use. Either 'maxneeded' to use as many as available,
+#' up to the number of chains, or an integer.
 #' @param control List of arguments sent to \code{\link[rstan]{stan}} control argument, regarding warmup / sampling behaviour.
 #' @param verbose Logical. If TRUE, prints log probability at each iteration.
 #' @param stationary Logical. If TRUE, T0VAR and T0MEANS input matrices are ignored, 
@@ -75,7 +77,7 @@
 #' @export
 ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=2000, kalman=TRUE, binomial=FALSE,
   esthyper=TRUE, fit=TRUE, stationary=FALSE,plot=FALSE,  diffusionindices='all',
-  asymdiffusion=FALSE,optimize=FALSE, vb=FALSE, chains=1,inits=NULL,initwithoptim=FALSE,
+  asymdiffusion=FALSE,optimize=FALSE, vb=FALSE, chains=1,cores='maxneeded', inits=NULL,initwithoptim=FALSE,
   control=list(adapt_delta=.9, adapt_init_buffer=30, adapt_window=2,
     max_treedepth=10,stepsize=.001),verbose=FALSE,...){
   
@@ -182,10 +184,15 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=2000, kalman=T
   }
 
   #clean ctspec structure
+  found=FALSE
+  comparison=c(NA,NA,"FALSE")
+  names(comparison)=c('param','transform','indvarying')
   for(rowi in 1:nrow(ctspec)){
     if( !is.na(ctspec$value[rowi])) {
-      found<-TRUE
-      ctspec[rowi,c('param','transform','indvarying')]<-c(NA,NA,FALSE)
+      if(!identical(unlist(ctspec[rowi,c('param','transform','indvarying')]),comparison)) {
+        found<-TRUE
+        ctspec[rowi,c('param','transform','indvarying')]=comparison
+      }
     }
   }
   if(found) message('Minor inconsistencies in model found - removing param name, transform and indvarying from any parameters with a value specified')
@@ -860,7 +867,7 @@ print("lp = ", target());
   if(fit==TRUE){
     
     standata<-list(
-      Y=cbind(datalong[,manifestNames]),
+      Y=cbind(as.matrix(datalong[,manifestNames])),
       subject=datalong[,'id'],
       nsubjects=nsubjects,
       nmanifest=n.manifest,
@@ -903,10 +910,11 @@ print("lp = ", target());
     if(!is.na(ctstanmodel$stationarymeanprior)) standata$stationarymeanprior=array(ctstanmodel$stationarymeanprior,dim=n.latent)
     if(!is.na(ctstanmodel$stationaryvarprior)) standata$stationaryvarprior=array(ctstanmodel$stationaryvarprior,dim=n.latent)
     
-    if(n.TIpred > 0) standata$tipreds <- tipreds
+    if(n.TIpred > 0) standata$tipreds <- as.matrix(tipreds)
     
     if(n.TDpred > 0) standata<-c(standata,list(tdpreds=array(tdpreds,dim=c(nrow(tdpreds),ncol(tdpreds)))))
     
+    message('Compiling model - ignore below warning re number of chains')
     sm <- rstan::stan(model_code = c(stanmodeltext), 
       data = standata, chains = 0)
     
@@ -980,6 +988,9 @@ print("lp = ", target());
       stanplot(chains=chains,seed=stanseed)
     }
     
+    if(cores=='maxneeded') cores=min(c(chains,parallel::detectCores()))
+    
+    message('Sampling...')
     stanfit <- rstan::stan(fit = sm, 
       enable_random_init=TRUE,init_r=.1,
       init=staninits,
@@ -987,7 +998,7 @@ print("lp = ", target());
       iter=iter,
       data = standata, chains = ifelse(optimize==FALSE & vb==FALSE,chains,0), control=control,
       sample_file=sample_file,
-      cores=min(c(chains,parallel::detectCores())),...) 
+      cores=cores,...) 
     
     
     

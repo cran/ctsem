@@ -273,8 +273,7 @@ oscillatingm <- ctModel(n.latent = 2, n.manifest = 1, Tpoints = 11,
   T0VAR = matrix(c("T0var11", "T0var21", 0, "T0var22"), nrow = 2, ncol = 2),
   DRIFT = matrix(c(0, "crosseffect", 1, "autoeffect"), nrow = 2, ncol = 2), 
   CINT = matrix(0, ncol = 1, nrow = 2),
-  DIFFUSION = matrix(c(0, 0, 0, "diffusion"), nrow = 2, ncol = 2),
-  startValues = inits)
+  DIFFUSION = matrix(c(0, 0, 0, "diffusion"), nrow = 2, ncol = 2))
 
 oscillatingf <- ctFit(Oscillating, oscillatingm, carefulFit = FALSE)
 
@@ -303,10 +302,6 @@ example1traitfit <- ctCI(traitfit, confidenceintervals = 'DRIFT')
 summary(example1traitfit)$omxsummary$CI
 
 ## ----packagecomparison, eval=FALSE, cache=TRUE, fig.keep='none'---------------
-#    if (!requireNamespace("PSM", quietly = TRUE)) {
-#      stop("PSM package needed for this function to work. Please install it.",
-#        call. = FALSE)
-#    }
 #    if (!requireNamespace("cts", quietly = TRUE)) {
 #      stop("cts package needed for this function to work. Please install it.",
 #        call. = FALSE)
@@ -315,14 +310,14 @@ summary(example1traitfit)$omxsummary$CI
 #      stop("yuima package needed for this function to work. Please install it.",
 #        call. = FALSE)
 #    }
-#  output <- matrix(NA, 10, 7)
-#  colnames(output) <- c('True', 'ctsem', 'cts', 'PSM', 'yuima', 'arima', 'OpenMx')
+#  output <- matrix(NA, 10, 6)
+#  colnames(output) <- c('True', 'ctsem', 'cts', 'yuima', 'arima', 'OpenMx')
 #  for(i in 1:nrow(output)){
 #  generatingModel <- ctModel(n.latent = 1, n.manifest = 1,
 #    Tpoints = 500,
 #    LAMBDA = diag(1), DRIFT = matrix(-.3, nrow = 1),
 #    CINT = matrix(3, 1, 1),
-#    MANIFESTVAR = diag(0, 1),
+#    MANIFESTVAR = diag(0.00001, 1),
 #    DIFFUSION = t(chol(diag(5, 1))))
 #  
 #  output[i, 1] <- generatingModel$DRIFT #true value
@@ -345,22 +340,17 @@ summary(example1traitfit)$omxsummary$CI
 #  ctsFit <- car(ctsData, order = 1, scale = 1)
 #  output[i, 3] <- -1 * (1 + ctsFit$phi) / (1 - ctsFit$phi)
 #  
-#  ### PSM package
-#  psmFit <- ctPSMfit(ctsemData, omxStartValues =
-#      omxGetParameters(ctsemFit$mxobj), ctsemModel)
-#  output[i, 4] <- -exp(psmFit$PSMfit$opt$par[2])
-#  
 #  ### yuima package (not plotted - potential issues due to dT=1)
 #  library(yuima)
 #  mod <- setModel(drift="drift * x + cint", diffusion = "diffusion")
 #  ou <- setYuima(model = mod, data = setData(longData[,'Y1'], delta = 1))
 #  mlout <- qmle(ou,start = list(drift = -.3, diffusion = 1, cint = 1))
-#  output[i, 5] <- mlout@coef[2]
+#  output[i, 4] <- mlout@coef[2]
 #  
 #  ### arima (from stats package, discrete time analysis only)
 #  arfit <- arima(longData[, 'Y1'], order = c(1, 0, 0))
 #  log(arfit$coef[1]) #transform ar1 parameter to drift parameter
-#  output[i, 6]<-log(arfit$coef[1])
+#  output[i, 5]<-log(arfit$coef[1])
 #  
 #  ### OpenMx state space continuous time function (specified via ctsem here)
 #  ctsemModel <- ctModel(n.latent=1, n.manifest = 1,
@@ -368,7 +358,7 @@ summary(example1traitfit)$omxsummary$CI
 #    MANIFESTVAR = diag(0, 1), T0VAR=diag(1), LAMBDA = diag(1))
 #  mxFit <- ctFit(ctsemData, ctsemModel, objective='Kalmanmx',
 #    carefulFit = FALSE)
-#  output[i,7] <- mxEval(DRIFT, ctsemFit$mxobj)
+#  output[i,6] <- mxEval(DRIFT, ctsemFit$mxobj)
 #  
 #  } #end for loop
 #  
@@ -377,10 +367,9 @@ summary(example1traitfit)$omxsummary$CI
 #    ylab='Density',
 #    main = 'Density of estimates of drift parameter (true value -0.3)')
 #  points(density(output[1:i, 3]), col='red', type='l', lty=3, lwd=1)
-#  points(density(output[1:i, 4]), col='green', type='l', lty=2, lwd=1)
-#  points(density(output[1:i, 6]), col='blue', type='l', lwd=1, lty=3)
-#  points(density(output[1:i, 7]), col='yellow', type='l', lwd=1, lty=5)
+#  points(density(output[1:i, 5]), col='blue', type='l', lwd=1, lty=3)
+#  points(density(output[1:i, 6]), col='green', type='l', lwd=1, lty=5)
 #  legend('topleft', bty='n',
-#    text.col = c('black','red','green','blue', 'yellow'),
-#    legend = c('ctsem', 'cts', 'PSM', 'arima', 'OpenMx'))
+#    text.col = c('black','red','blue', 'green'),
+#    legend = c('ctsem', 'cts', 'arima', 'OpenMx'))
 
