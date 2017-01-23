@@ -12,6 +12,9 @@
 
 summary.ctStanFit<-function(object,...){
 
+  if(class(object$stanfit)=='stanfit'){ #summary of samples
+  
+  
 s<-getMethod('summary','stanfit')(object$stanfit)
 
 parnames=gsub('hsd_','',object$stanfit@model_pars[grep('hsd',object$stanfit@model_pars)])
@@ -115,16 +118,25 @@ out$popcorr = popcorr
 
 
 out$tipreds=round(s$summary[c(grep('tipred_',rownames(s$summary))),
-  c('mean','sd','2.5%','97.5%','n_eff','Rhat'),drop=FALSE],3)
+  c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE],3)
 
 out$popsd=round(s$summary[c(grep('hsd_',rownames(s$summary))),
-  c('mean','sd','2.5%','97.5%','n_eff','Rhat'),drop=FALSE],3)
+  c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE],3)
 
 out$popmeans=round(s$summary[c(grep('hmean_',rownames(s$summary))),
-  c('mean','sd','2.5%','97.5%','n_eff','Rhat'),drop=FALSE],3)
+  c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE],3)
 
 out$logprob=round(s$summary[c(grep('lp',rownames(s$summary))),
-  c('mean','sd','2.5%','97.5%','n_eff','Rhat'),drop=FALSE],3)
-
+  c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE],3)
+  }
+  
+  
+if(class(object$stanfit)!='stanfit'){ #optimization summary
+  out=list()
+out$popmeans=object$stanfit$transformedpars[grep('hmean_',rownames(object$stanfit$transformedpars)),]
+out$popsd=object$stanfit$transformedpars[grep('hsd_',rownames(object$stanfit$transformedpars)),]
+out$logprob=round(-object$stanfit$optimfit$value)
+}
+  
 return(out)
 }

@@ -31,7 +31,8 @@
 #' data<-ctGenerate(generatingModel,n.subjects=15,burnin=10)
 #' @export
 
-ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dtmean=1,logdtsd=0,wide=TRUE,simultdpredeffect=FALSE){
+ctGenerate<-function(ctmodelobj,n.subjects=100,burnin=0,dtmean=1,logdtsd=0,
+  wide=TRUE,simultdpredeffect=TRUE){
   
   
   ###read in model
@@ -41,9 +42,18 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dtmean=1,logdtsd=0,wide
     if(is.matrix(ctmodelobj[[i]])){ #if this element is a matrix, continue on...
      
     if(any(is.na(suppressWarnings(as.numeric(get(names(ctmodelobj[i]))))))){ #if it contains character labels
+      
+      if(!names(ctmodelobj[i]) %in% c('T0VAR','MANIFESTVAR','TRAITVAR','MANIFESTTRAITVAR','TDPREDVAR','TIPREDVAR')) {
       assign(names(ctmodelobj[i]),matrix(0,nrow=nrow(get(names(ctmodelobj[i]))), #set the values to 0 instead
                                       ncol=ncol(get(names(ctmodelobj[i])))))
       message(paste0(names(ctmodelobj[i])," contained character labels - setting matrix to 0"))
+    }
+      
+      if(names(ctmodelobj[i]) %in% c('T0VAR','MANIFESTVAR','TRAITVAR','MANIFESTTRAITVAR','TDPREDVAR','TIPREDVAR')) {
+        assign(names(ctmodelobj[i]),diag(0.00001,nrow(get(names(ctmodelobj[i])))))
+        message(paste0(names(ctmodelobj[i])," contained character labels - setting matrix to diagonal 0.00001"))
+      }
+      
     }
     
      #set any matrices to numeric elements
@@ -77,7 +87,7 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dtmean=1,logdtsd=0,wide
   fullTpoints<-burnin+Tpoints
   
   if(n.TDpred > 0) {
-    TDPREDMEANS <- rbind(matrix(0,nrow=(burnin+ifelse(simultdpredeffect,0,1))*n.TDpred),
+    TDPREDMEANS <- rbind(matrix(0,nrow=(1+burnin+ifelse(simultdpredeffect,0,1))*n.TDpred)[-1,,drop=FALSE],
     TDPREDMEANS)
     if(simultdpredeffect) TDPREDMEANS=rbind(TDPREDMEANS,0)
   }
@@ -99,7 +109,7 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dtmean=1,logdtsd=0,wide
     }
     
     if(any(MANIFESTTRAITVARchol != 0)) {
-      skpars$MANIFESTMEANS = skpars$MANIFESTMEANS + MANIFESTTRAITVARchol %*% rnorm(n.latent,0,1)
+      skpars$MANIFESTMEANS = skpars$MANIFESTMEANS + MANIFESTTRAITVARchol %*% rnorm(n.manifest,0,1)
     }
     
     if(n.TIpred > 0) {
@@ -130,7 +140,6 @@ ctGenerate<-function(ctmodelobj,n.subjects=1000,burnin=0,dtmean=1,logdtsd=0,wide
   if(wide==FALSE) return(datalong) else {
     datawide <- ctLongToWide(datalong = datalong,id = 'id',time = 'time',
       manifestNames = manifestNames, TDpredNames = TDpredNames,TIpredNames = TIpredNames)
-    
     datawide <- ctIntervalise(datawide = datawide,Tpoints = Tpoints,n.manifest = n.manifest,n.TDpred = n.TDpred,n.TIpred = n.TIpred,
       manifestNames=manifestNames,TDpredNames=TDpredNames,TIpredNames=TIpredNames)
     return(datawide)
