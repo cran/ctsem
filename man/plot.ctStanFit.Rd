@@ -51,4 +51,3 @@ rstan::stan_trace(ctstantestfit$stanfit,
 pars=ctStanParnames(ctstantestfit,'hmean_'))
 }
 }
-

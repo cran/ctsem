@@ -3,8 +3,9 @@ library('ctsem')
 library(knitr)
 render_sweave()
 set.seed(22)
+knit_hooks$set(crop = hook_pdfcrop)
 opts_chunk$set(fig.path = 'figures/plots-', warning = FALSE, fig.align = 'center', width.cutoff = 80, fig.show = 'hold', eval = TRUE, echo = TRUE, message = FALSE, background = "white", prompt = TRUE, highlight = FALSE, comment = NA, tidy = FALSE, out.truncate = 80)
-options(replace.assign = TRUE, width = 80, prompt = "R> ", scipen = 12, digits = 3)
+options(replace.assign = TRUE, width = 80, prompt = "R> ", scipen = 12, digits = 3,crop=TRUE)
 
 
 # setwd('C:\\Users\\driver\\Dropbox\\MPIB\\CT-SEM\\manual') #set this working directory!
@@ -18,13 +19,13 @@ Sys.setenv(TEXINPUTS = getwd(),
 #  semModel<-ctModel(n.latent=2, n.manifest=3, TRAITVAR='auto',
 #    n.TIpred=2, n.TDpred=1, Tpoints=3,
 #    LAMBDA=matrix(c(1,'lambda21', 0, 0,1,0),nrow=3))
-#  semFit<-ctFit(datastructure, semModel, nofit=T)
+#  semFit<-ctFit(datastructure, semModel, nofit=TRUE)
 #  semFit$mxobj$A$labels
 #  semFit$mxobj$S$labels
 #  semFit$mxobj$M$labels
 #  semFit$mxobj$F$values
 
-## ----install, echo = T, eval = F----------------------------------------------
+## ----install, echo = TRUE, eval = FALSE---------------------------------------
 #  install.packages("ctsem")
 #  library("ctsem")
 
@@ -77,20 +78,19 @@ example1cifit <- ctCI(example1fit, confidenceintervals = "DRIFT")
 summary(example1cifit)$omxsummary$CI
 
 ## ----example2fit, cache = TRUE------------------------------------------------
-
 data("ctExample1")
 traitmodel <- ctModel(n.manifest = 2, n.latent = 2, Tpoints = 6, 
   LAMBDA = diag(2), manifestNames = c("LeisureTime", "Happiness"), 
-  latentNames = c("LeisureTime", "Happiness"), MANIFESTTRAITVAR = "auto")
+  latentNames = c("LeisureTime", "Happiness"), TRAITVAR = "auto")
 traitfit <- ctFit(datawide = ctExample1, ctmodelobj = traitmodel)
 
 ## ----traitparamplot, include = TRUE, cache = FALSE, echo = FALSE, results = 'hide', fig.height = 4----
 par(mfrow = c(2, 2))
-par(mar = c(2, 4, 2, 2))
-plot(example1fit, wait = FALSE, max.time = 20, mean = FALSE, withinVariance = FALSE,randomImpulse = F,
-  experimentalImpulse = F)
-plot(traitfit, wait = FALSE, max.time = 20, mean = FALSE, withinVariance = FALSE,randomImpulse = F,
-  experimentalImpulse = F)
+par(mar = c(3, 4, 2, 2),mgp=c(1.5,.5,0),lwd=2)
+plot(example1fit, wait = FALSE, max.time = 20, mean = FALSE, withinVariance = FALSE,randomImpulse = FALSE,
+  experimentalImpulse = FALSE)
+plot(traitfit, wait = FALSE, max.time = 20, mean = FALSE, withinVariance = FALSE,randomImpulse = FALSE,
+  experimentalImpulse = FALSE)
 
 ## ----example1TIpred, include = TRUE, cache = TRUE, echo = TRUE, results = 'hide'----
 data("ctExample1TIpred")
@@ -117,10 +117,11 @@ cat("\n")
 summary(tipredfit, verbose = TRUE)["addedTIPREDVAR"]
 
 ## ----tdpreddemo, echo = FALSE, eval = TRUE, fig.height = 3--------------------
+par(mar=c(3.0,2.5,1.5,.5)+.1,mgp=c(1.5,.5,0),lwd=2)
 Tpoints = 19
 testm <- ctModel(Tpoints = Tpoints, n.latent = 1, 
   n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
-  DIFFUSION = diag(.1, 1), TDPREDEFFECT = diag(1, 1), 
+  DIFFUSION = diag(.5, 1), TDPREDEFFECT = diag(1, 1), 
   CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
   T0VAR = diag(100, 1), 
   TDPREDMEANS = matrix(c(0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ncol = 1, nrow = (Tpoints)))
@@ -145,7 +146,7 @@ for(i in 1:5){
 Tpoints = 19
 testm <- ctModel(Tpoints = Tpoints, n.latent = 1, 
   n.TDpred = 1, n.manifest = 1, LAMBDA = diag(1), DRIFT = diag(-.3, 1),
-  DIFFUSION = diag(.15, 1), TDPREDEFFECT = diag(1.6, 1), 
+  DIFFUSION = diag(.5, 1), TDPREDEFFECT = diag(1.6, 1), 
   CINT = diag(4, 1), T0MEANS = matrix(0, ncol = 1, nrow = 1),
   T0VAR = diag(100, 1), 
   TDPREDMEANS = matrix(c(0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), ncol = 1, nrow = (19)))
@@ -222,7 +223,7 @@ freemodel$LAMBDA[3, 1] <- "groupfree"
 groups <- paste0("g", rep(1:2, each = 10))
 
 multif <- ctMultigroupFit(datawide = ctExample4, groupings = groups,
-  objective='Kalman',ctmodelobj = basemodel, freemodel = freemodel)
+  objective='Kalman', ctmodelobj = basemodel, freemodel = freemodel)
 
 ## ----multigroupOutput, echo = FALSE-------------------------------------------
 multif$mxobj$output$estimate[grep("lambda3", names(multif$mxobj$output$estimate))]
@@ -242,8 +243,7 @@ ctIndplot(data, n.subjects = 1 , n.manifest = 1, Tpoints = 200)
 model <- ctModel(Tpoints = 200, n.latent = 2, n.manifest = 1, 
   LAMBDA = matrix(c(1, 0), nrow = 1, ncol = 2),
   DIFFUSION = matrix(c(0, 0, 0, "diffusion"), 2),
-  DRIFT = matrix(c(0, "regulation", 1, "diffusionAR"), nrow = 2),   
-  CINT = matrix(c("processCINT", 0), nrow = 2))
+  DRIFT = matrix(c(0, "regulation", 1, "diffusionAR"), nrow = 2))
 
 fit <- ctFit(data, model, stationary = c("T0VAR"))
 
@@ -260,7 +260,6 @@ oscillatingm <- ctModel(n.latent = 2, n.manifest = 1, Tpoints = 11,
   T0MEANS = matrix(c('m1', 'm2'), nrow = 2, ncol = 1),
   T0VAR = matrix(c("T0var11", "T0var21", 0, "T0var22"), nrow = 2, ncol = 2),
   DRIFT = matrix(c(0, "crosseffect", 1, "autoeffect"), nrow = 2, ncol = 2),
-  CINT = matrix(0, ncol = 1, nrow = 2),
   MANIFESTMEANS = matrix('manifestmean', nrow = 1, ncol = 1),
   DIFFUSION = matrix(c(0, 0, 0, "diffusion"), nrow = 2, ncol = 2),
  startValues=inits)
@@ -277,19 +276,20 @@ fitWithInits <- ctFit(data = ctExample1, ctmodelobj = example1model,
 data("ctExample1")
 traitmodel <- ctModel(n.manifest = 2, n.latent = 2, Tpoints = 6, 
   LAMBDA = diag(2), manifestNames = c("LeisureTime", "Happiness"), 
-  latentNames = c("LeisureTime", "Happiness"), MANIFESTTRAITVAR = "auto")
+  latentNames = c("LeisureTime", "Happiness"), TRAITVAR = "auto")
 traitfit <- ctFit(datawide = ctExample1, ctmodelobj = traitmodel)
+traitfit <- ctCI(traitfit, confidenceintervals = 'DRIFT')
 
 discrete <- ctExample1
 discrete[ , paste0('dT', 1:5)] <- mean(discrete[ , paste0('dT', 1:5)])
 discretefit <- ctFit(discrete, traitmodel)
-
 discretefit <- ctCI(discretefit, confidenceintervals = 'DRIFT')
-summary(discretefit)$omxsummary$CI
 
-## ----traitfitconfidenceintervals,cache=TRUE-----------------------------------
-example1traitfit <- ctCI(traitfit, confidenceintervals = 'DRIFT')
-summary(example1traitfit)$omxsummary$CI
+summary(traitfit)$omxsummary$Minus2LogLikelihood
+summary(traitfit)$omxsummary$CI
+
+summary(discretefit)$omxsummary$Minus2LogLikelihood
+summary(discretefit)$omxsummary$CI
 
 ## ----packagecomparison, eval=FALSE, cache=TRUE, fig.keep='none'---------------
 #    if (!requireNamespace("cts", quietly = TRUE)) {
@@ -304,7 +304,7 @@ summary(example1traitfit)$omxsummary$CI
 #  colnames(output) <- c('True', 'ctsem', 'cts', 'yuima', 'arima', 'OpenMx')
 #  for(i in 1:nrow(output)){
 #  generatingModel <- ctModel(n.latent = 1, n.manifest = 1,
-#    Tpoints = 500,
+#    Tpoints = 200,
 #    LAMBDA = diag(1), DRIFT = matrix(-.3, nrow = 1),
 #    CINT = matrix(3, 1, 1),
 #    MANIFESTVAR = diag(0.00001, 1),
@@ -313,13 +313,13 @@ summary(example1traitfit)$omxsummary$CI
 #  output[i, 1] <- generatingModel$DRIFT #true value
 #  
 #  ctsemData <- ctGenerate(generatingModel, n.subjects=1, burnin=300)
-#  longData <- ctWideToLong(ctsemData, Tpoints=500, n.manifest=1)
+#  longData <- ctWideToLong(ctsemData, Tpoints=200, n.manifest=1)
 #  longData <- ctDeintervalise(longData)
 #  
 #  ### ctsem package
 #  ctsemModel <- ctModel(n.latent=1, n.manifest = 1,
-#    Tpoints = 500,
-#    MANIFESTVAR = diag(0, 1),
+#    Tpoints = 200,
+#    MANIFESTVAR = diag(0.0001, 1),
 #    LAMBDA = diag(1))
 #  ctsemFit <- ctFit(ctsemData, ctsemModel, stationary = c('T0VAR'))
 #  output[i,2] <- mxEval(DRIFT, ctsemFit$mxobj)
@@ -344,7 +344,7 @@ summary(example1traitfit)$omxsummary$CI
 #  
 #  ### OpenMx state space continuous time function (specified via ctsem here)
 #  ctsemModel <- ctModel(n.latent=1, n.manifest = 1,
-#    Tpoints = 500,
+#    Tpoints = 200,
 #    MANIFESTVAR = diag(0, 1), T0VAR=diag(1), LAMBDA = diag(1))
 #  mxFit <- ctFit(ctsemData, ctsemModel, objective='Kalmanmx',
 #    carefulFit = FALSE)

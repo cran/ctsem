@@ -293,7 +293,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=2000, kalman=T
   message('Unique discreteDRIFT calculations per step required = ', length(unique(driftindex))-1)
   message('Unique discreteCINT calculations per step required = ', length(unique(cintindex))-1)
   message('Unique discreteDIFFUSION calculations per step required = ', length(unique(diffusionindex))-1)
-  # browser()
+  
   # datalong[sort(c(which(dT > 5),which(dT > 5)+1,which(dT > 5)-1)),1:2]
   
   if(n.TDpred > 0) {
@@ -470,7 +470,9 @@ matrix cov(vector[] mat,int nrows,int ncols){
       
       transformed data{
       matrix[nlatent,nlatent] IIlatent;
+      matrix[nlatent*nlatent,nlatent*nlatent] IIlatent2;
       IIlatent = diag_matrix(rep_vector(1,nlatent));
+      IIlatent2 = diag_matrix(rep_vector(1,nlatent*nlatent));
       }
       
       parameters {
@@ -590,6 +592,8 @@ matrix cov(vector[] mat,int nrows,int ncols){
           '),'
 
         for(individual in 1:',checkvarying('DIFFUSION','nsubjects','1'),') DIFFUSION[individual] = sdpcor2cov_lp(DIFFUSION[individual],0,1);
+
+        //for(individual in 1:',checkvarying('DRIFT','nsubjects','1'),') DRIFT[individual] = -matrix_exp(DRIFT[individual]);
         
         ',if(continuoustime) paste0('
           for(individual in 1:',checkvarying('DRIFT','nsubjects','1'),') {
@@ -601,7 +605,9 @@ matrix cov(vector[] mat,int nrows,int ncols){
           
           ',if(!asymdiffusion) paste0('
             for(individual in 1:',checkvarying(c('DIFFUSION','DRIFT'),'nsubjects','1'),'){
-            asymDIFFUSIONvec[individual] =  -(DRIFTHATCH',checkvarying(c('DRIFT'),'[individual]','[1]'),' \\ to_vector(DIFFUSION',checkvarying(c('DIFFUSION'),'[individual]','[1]'),'[diffusionindices,diffusionindices]));
+            asymDIFFUSIONvec[individual] =  -(DRIFTHATCH',checkvarying(c('DRIFT'),'[individual]','[1]'),
+              ' \\ to_vector(DIFFUSION',checkvarying(c('DIFFUSION'),'[individual]','[1]'),
+              '[diffusionindices,diffusionindices]));
             for(drowi in 1:ndiffusion) {
             for(dcoli in 1:ndiffusion){
             asymDIFFUSION[individual][drowi,dcoli] =  asymDIFFUSIONvec[individual][drowi+(dcoli-1)*ndiffusion];
@@ -612,7 +618,7 @@ matrix cov(vector[] mat,int nrows,int ncols){
         
         if(!continuoustime & !asymdiffusion) paste0('
           for(individual in 1:',checkvarying(c('DIFFUSION','DRIFT'),'nsubjects','1'),'){
-          asymDIFFUSIONvec[individual] = (iilatent2 - kron_prod(DRIFT',checkvarying(c('DRIFT'),'[individual]','[1]'),', DRIFT',checkvarying(c('DRIFT'),'[individual]','[1]'),')) * 
+          asymDIFFUSIONvec[individual] = (IIlatent2 - kron_prod(DRIFT',checkvarying(c('DRIFT'),'[individual]','[1]'),', DRIFT',checkvarying(c('DRIFT'),'[individual]','[1]'),')) * 
           to_vector(DIFFUSION',checkvarying(c('DIFFUSION'),'[individual]','[1]'),');
           for(drowi in 1:nlatent) {
           for(dcoli in 1:nlatent){
@@ -671,6 +677,18 @@ matrix cov(vector[] mat,int nrows,int ncols){
           '),'
       
       ',if(!kalman) 'etapostbase ~ normal(0,1); \n','
+
+// adjust partial correlation probabilities 
+        ',paste0(unlist(lapply(1:nrow(ctspec),function(rowi) {
+          out<-''
+          if(ctspec$matrix[rowi] %in% c('T0VAR','DIFFUSION') & ctspec$row[rowi] > ctspec$col[rowi]) {
+            out=paste0('target += beta_lpdf(inv_logit(',
+            'hypermeans[',which(ctspec$param[is.na(ctspec$value)] == ctspec$param[rowi]),']',
+            ')| 1.5 + (nlatent-1)/2 - .6 * ',ctspec$col[rowi],', 1.5 + (nlatent-1)/2 - .6 * ',ctspec$col[rowi],'); \n ')
+          }
+return(out)
+})),collapse=''),'
+
       
       // pre-calculate necessary discrete time matrices      
       counter=0;
@@ -709,8 +727,9 @@ matrix cov(vector[] mat,int nrows,int ncols){
       }
       
       
-      // stationarity priors
+      
       ',if(!is.na(ctstanmodel$stationaryvarprior)) paste0('
+  // stationarity priors
         for(individual in 1:nsubjects) {
         (diagonal(',
         if(!asymdiffusion) 'asym', 'DIFFUSION[',
@@ -939,7 +958,7 @@ print("lp = ", target());
     if(is.null(control$adapt_delta)) control$adapt_delta <- .9
     if(is.null(control$adapt_window)) control$adapt_window <- 2
     if(is.null(control$max_treedepth)) control$max_treedepth <- 10
-    if(is.null(control$adapt_init_buffer)) adapt_init_buffer=30
+    if(is.null(control$adapt_init_buffer)) adapt_init_buffer=3
     
     stanseed<-floor(as.numeric(Sys.time()))
     
@@ -1066,7 +1085,7 @@ print("lp = ", target());
         method='L-BFGS-B',hessian = TRUE)
       convergence=optimfit$convergence
       }
-      # browser()
+      
       est=optimfit$par
       sds=sqrt(diag(solve(optimfit$hessian)))
       lest= est - 1.96 * sds
