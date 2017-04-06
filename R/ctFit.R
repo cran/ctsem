@@ -80,7 +80,7 @@
 #' mfrowOld<-par()$mfrow
 #' par(mfrow=c(2, 3))
 #' 
-#' ### example from Driver, Oud, Voelkle (2015), 
+#' ### example from Driver, Oud, Voelkle (2017), 
 #' ### simulated happiness and leisure time with unobserved heterogeneity.
 #' data(ctExample1)
 #' traitmodel <- ctModel(n.manifest=2, n.latent=2, Tpoints=6, LAMBDA=diag(2), 
@@ -206,6 +206,9 @@ ctFit  <- function(datawide, ctmodelobj,
     message('discreteTime==TRUE set -- timing information ignored. Parameter estimates will *not* correspond with those from continous time models.')
     #     carefulFit<-FALSE
     #     stationary<-NULL    
+    if(transformedParams==FALSE){
+      stop('For discreteTime=TRUE you must also set transformedParams=FALSE')
+    }
   }
   
   
@@ -639,8 +642,16 @@ ctFit  <- function(datawide, ctmodelobj,
     
     #trait loadings to latent
     # browser()
-    A$labels[cbind(rep(1:latentend,each=n.latent), (latentend+1):(latentend+n.latent))] <- paste0('discreteTRAIT_T',
+    if(!discreteTime) A$labels[cbind(rep(1:latentend,each=n.latent), (latentend+1):(latentend+n.latent))] <- paste0('discreteTRAIT_T',
       rep(0:(Tpoints-1),each=n.latent^2),'[',rep(1:n.latent,each=n.latent),',',1:n.latent,']')
+    
+     if(discreteTime) {
+       for(i in 1:(Tpoints-1)){
+         # browser()
+         A$values[(i*n.latent+1):(i*n.latent+n.latent), (latentend+1):(latentend+n.latent)] <- diag(1,n.latent)
+       }
+     }
+     
     
     #trait variance
     S$values[(latentend+1):(latentend+n.latent), (latentend+1):(latentend+n.latent)] <- diag(1,n.latent)
@@ -1333,6 +1344,9 @@ ctFit  <- function(datawide, ctmodelobj,
   }
   
   if(discreteTime==TRUE | transformedParams==FALSE){
+    lboundmat=diag(1,n.latent)
+    lboundmat[lboundmat==0] <- NA
+    lboundmat[lboundmat==1] <- 0
     DRIFT$mxmatrix <- list( OpenMx::mxMatrix(name = "DRIFT", type = "Full", labels = DRIFT$labels, values = DRIFT$values, free = DRIFT$free))
     
     T0VAR<-dechol('T0VAR')
@@ -1340,17 +1354,19 @@ ctFit  <- function(datawide, ctmodelobj,
     MANIFESTVAR <- dechol('MANIFESTVAR')
     
     T0VAR$mxmatrix<-list(
-      OpenMx::mxMatrix(name = "T0VAR", values=T0VAR$values, labels=T0VAR$labels, ncol=n.latent, nrow=n.latent, free=T0VAR$free)
+      OpenMx::mxMatrix(name = "T0VAR", values=T0VAR$values, labels=T0VAR$labels, 
+        lbound=lboundmat, ncol=n.latent, nrow=n.latent, free=T0VAR$free)
     )
     
     DIFFUSION$mxmatrix<- list(
-      OpenMx::mxMatrix(name = "DIFFUSION",type = "Full", labels = DIFFUSION$labels, values = DIFFUSION$values, #DIFFUSION matrix of dynamic innovations
+      OpenMx::mxMatrix(name = "DIFFUSION",type = "Full", labels = DIFFUSION$labels, 
+        lbound=lboundmat, values = DIFFUSION$values, #DIFFUSION matrix of dynamic innovations
         free = DIFFUSION$free, nrow = n.latent, ncol = n.latent)
     )
     
     MANIFESTVAR$mxmatrix<- list(
       OpenMx::mxMatrix(name='MANIFESTVAR', free=MANIFESTVAR$free, values=MANIFESTVAR$values, 
-        labels=MANIFESTVAR$labels, nrow=n.manifest, ncol=n.manifest)
+        lbound=lboundmat, labels=MANIFESTVAR$labels, nrow=n.manifest, ncol=n.manifest)
     )
   }
   
@@ -1473,7 +1489,15 @@ ctFit  <- function(datawide, ctmodelobj,
         
         OpenMx::mxMatrix(name = "T0TRAITEFFECT", values=T0TRAITEFFECT$values, labels=T0TRAITEFFECT$labels, 
           ncol=n.latent, nrow=n.latent, free=T0TRAITEFFECT$free, type='Full')
-        
+      )
+    }
+    if(discreteTime==FALSE && transformedParams==FALSE){
+      model <- OpenMx::mxModel(model, 
+        traitalgs,
+        OpenMx::mxMatrix(name = "TRAITVAR", values=TRAITVAR$values, labels=TRAITVAR$labels, 
+          ncol=n.latent, nrow=n.latent, free=TRAITVAR$free, type='Full'),
+        OpenMx::mxMatrix(name = "T0TRAITEFFECT", values=T0TRAITEFFECT$values, labels=T0TRAITEFFECT$labels, 
+          ncol=n.latent, nrow=n.latent, free=T0TRAITEFFECT$free, type='Full')
       )
     }
     

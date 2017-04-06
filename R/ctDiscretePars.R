@@ -103,12 +103,33 @@ ctStanContinuousPars <- function(ctstanfitobj,subjects='all',iter='all',
   DRIFTHATCH<-DRIFT %x% diag(nrow(DRIFT)) + diag(nrow(DRIFT)) %x% DRIFT
   asymDIFFUSION<-matrix(-solve(DRIFTHATCH) %*% c(DIFFUSION), nrow=nrow(DRIFT)) 
   
+  ln=ctstanfitobj$ctstanmodel$latentNames
+  mn=ctstanfitobj$ctstanmodel$manifestNames
+  tdn=ctstanfitobj$ctstanmodel$TDpredNames
+  dimnames(DRIFT)=list(ln,ln)
+  dimnames(DIFFUSION)=list(ln,ln)
+  dimnames(asymDIFFUSION)=list(ln,ln)
+  rownames(CINT)=ln
+  rownames(MANIFESTMEANS)=mn
+  rownames(T0MEANS)=ln
+
+  dimnames(T0VAR)=list(ln,ln)
+  dimnames(asymDIFFUSION)=list(ln,ln)
+  dimnames(LAMBDA)=list(mn,ln)
+  
   model<-list(DRIFT=DRIFT,T0VAR=T0VAR,DIFFUSION=DIFFUSION,asymDIFFUSION=asymDIFFUSION,CINT=CINT,T0MEANS=T0MEANS,
     MANIFESTMEANS=MANIFESTMEANS, LAMBDA=LAMBDA)
   
-  if(!is.null(e$MANIFESTVAR)) model$MANIFESTVAR=MANIFESTVAR
+  if(!is.null(e$MANIFESTVAR)) {
+    dimnames(MANIFESTVAR)=list(mn,mn)
+    model$MANIFESTVAR=MANIFESTVAR
+    
+  }
   
-  if(!is.null(e$TDPREDEFFECT)) model$TDPREDEFFECT<-TDPREDEFFECT
+  if(!is.null(e$TDPREDEFFECT)) {
+    dimnames(TDPREDEFFECT)=list(ln,tdn)
+    model$TDPREDEFFECT<-TDPREDEFFECT
+  }
   
   return(model)
 }
@@ -132,7 +153,7 @@ ctStanContinuousPars <- function(ctstanfitobj,subjects='all',iter='all',
 #'
 #'@export
 ctDiscretePars<-function(ctpars,times=seq(0,10,.1),type='all'){
-  
+
   if(type=='all') type=c('discreteDRIFT','latentMeans') #this needs to match with ctStanDiscretePars
   nlatent=nrow(ctpars$DRIFT)
   latentNames=paste0('eta',1:nlatent)
@@ -192,7 +213,8 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
   outdims=dim(e$DRIFT)
   niter=outdims[1]
   nlatent=outdims[3]
-  latentNames=paste0('eta',1:nlatent)
+  latentNames=ctstanfitobj$ctstanmodel$latentNames
+
   
   out<-list()
   
@@ -275,6 +297,9 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
   }
   
   names(out) <- type
+
+  dimnames(out$discreteDRIFT)$row=latentNames
+  dimnames(out$discreteDRIFT)$col=latentNames
   
   if(plot) {
     ctStanDiscreteParsPlot(out,times=times,latentNames=ctstanfitobj$ctstanmodel$latentNames,...)
@@ -333,14 +358,14 @@ ctStanDiscreteParsPlot<- function(x,indices='all',add=FALSE,legend=TRUE, polygon
   plotcontrol=list(ylab='Value',xlab='Time interval',
     main='Regression coefficients',type='l'),grid=TRUE,
   legendcontrol=list(x='topright',bg='white'),
-  polygonalpha=.1,
-  polygoncontrol=list(border=NA, steps=50)){
+  polygonalpha=.3,
+  polygoncontrol=list(border=NA, steps=20)){
   
   input <- x[[1]] #ctStanDiscretePars(x,type='discreteDRIFT',times=times,quantiles=quantiles,...)[[1]]
   
   nlatent=dim(input)[1]
   
-  if(latentNames[1]=='auto') latentNames=paste0('eta',1:nlatent)
+  if(latentNames[1]=='auto') latentNames=dimnames(x$discreteDRIFT)$row
   
   if(is.null(plotcontrol$ylab)) plotcontrol$ylab  <- 'Value'
   if(is.null(plotcontrol$xlab)) plotcontrol$xlab  <- 'Time interval'

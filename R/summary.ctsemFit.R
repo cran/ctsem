@@ -118,14 +118,13 @@ omxSummary<-function(object,verbose=FALSE){
 
 
 ctParamsSummary<-function(object,ctSummaryMatrices){
-  
-  parnames<-rownames(object$mxobj$output$standardErrors)
-  parvalues<-c(object$mxobj$output$estimate)
+  parnames<-names(omxGetParameters(object$mxobj))
+  parvalues<-omxGetParameters(object$mxobj)
   newparvalues<-parvalues
-  parsd<-c(object$mxobj$output$standardErrors)
+  parsd<-object$mxobj$output$standardErrors
   parmatrix<-rep(NA,length(parnames))
  
-  
+  # browser()
   for(parami in 1:length(parnames)){ #for every free param
     for(matrixi in names(ctSummaryMatrices)[names(ctSummaryMatrices) %in% names(object$ctmodelobj)]){ #check every matrix that is in both ctmodelobj and output
       if(parnames[parami] %in% object$ctmodelobj[[matrixi]]) { #if the free param is in the ctmodelobj matrix

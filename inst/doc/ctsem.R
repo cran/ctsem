@@ -214,16 +214,14 @@ fit <- ctFit(data = ctExample3, ctmodelobj = model, objective = "Kalman",
 data("ctExample4")
 
 basemodel <- ctModel(n.latent = 1, n.manifest = 3, Tpoints = 20,
-  LAMBDA = matrix(c(1, "lambda2", "lambda3"), nrow = 3, ncol = 1),
-  MANIFESTMEANS = matrix(c(0, "manifestmean2", 
-    "manifestmean3"), nrow = 3, ncol = 1))
+  LAMBDA = matrix(c(1, "lambda2", "lambda3"), nrow = 3, ncol = 1))
 
 freemodel <- basemodel
 freemodel$LAMBDA[3, 1] <- "groupfree"
 groups <- paste0("g", rep(1:2, each = 10))
 
 multif <- ctMultigroupFit(datawide = ctExample4, groupings = groups,
-  objective='Kalman', ctmodelobj = basemodel, freemodel = freemodel)
+  ctmodelobj = basemodel, freemodel = freemodel)
 
 ## ----multigroupOutput, echo = FALSE-------------------------------------------
 multif$mxobj$output$estimate[grep("lambda3", names(multif$mxobj$output$estimate))]
@@ -291,8 +289,8 @@ summary(traitfit)$omxsummary$CI
 summary(discretefit)$omxsummary$Minus2LogLikelihood
 summary(discretefit)$omxsummary$CI
 
-## ----packagecomparison, eval=FALSE, cache=TRUE, fig.keep='none'---------------
-#    if (!requireNamespace("cts", quietly = TRUE)) {
+## ----packagecomparison, eval=FALSE, cache=TRUE--------------------------------
+#     if (!requireNamespace("cts", quietly = TRUE)) {
 #      stop("cts package needed for this function to work. Please install it.",
 #        call. = FALSE)
 #    }
@@ -300,11 +298,12 @@ summary(discretefit)$omxsummary$CI
 #      stop("yuima package needed for this function to work. Please install it.",
 #        call. = FALSE)
 #    }
-#  output <- matrix(NA, 10, 6)
+#  Tpoints<-500
+#  output <- matrix(NA, 100, 6)
 #  colnames(output) <- c('True', 'ctsem', 'cts', 'yuima', 'arima', 'OpenMx')
 #  for(i in 1:nrow(output)){
 #  generatingModel <- ctModel(n.latent = 1, n.manifest = 1,
-#    Tpoints = 200,
+#    Tpoints = Tpoints,
 #    LAMBDA = diag(1), DRIFT = matrix(-.3, nrow = 1),
 #    CINT = matrix(3, 1, 1),
 #    MANIFESTVAR = diag(0.00001, 1),
@@ -312,13 +311,13 @@ summary(discretefit)$omxsummary$CI
 #  
 #  output[i, 1] <- generatingModel$DRIFT #true value
 #  
-#  ctsemData <- ctGenerate(generatingModel, n.subjects=1, burnin=300)
-#  longData <- ctWideToLong(ctsemData, Tpoints=200, n.manifest=1)
+#  ctsemData <- ctGenerate(generatingModel, n.subjects=1, burnin=30)
+#  longData <- ctWideToLong(ctsemData, Tpoints=500, n.manifest=1)
 #  longData <- ctDeintervalise(longData)
 #  
 #  ### ctsem package
 #  ctsemModel <- ctModel(n.latent=1, n.manifest = 1,
-#    Tpoints = 200,
+#    Tpoints = Tpoints,
 #    MANIFESTVAR = diag(0.0001, 1),
 #    LAMBDA = diag(1))
 #  ctsemFit <- ctFit(ctsemData, ctsemModel, stationary = c('T0VAR'))
@@ -342,23 +341,43 @@ summary(discretefit)$omxsummary$CI
 #  log(arfit$coef[1]) #transform ar1 parameter to drift parameter
 #  output[i, 5]<-log(arfit$coef[1])
 #  
-#  ### OpenMx state space continuous time function (specified via ctsem here)
+#  ### OpenMx state space function
 #  ctsemModel <- ctModel(n.latent=1, n.manifest = 1,
-#    Tpoints = 200,
-#    MANIFESTVAR = diag(0, 1), T0VAR=diag(1), LAMBDA = diag(1))
-#  mxFit <- ctFit(ctsemData, ctsemModel, objective='Kalmanmx',
-#    carefulFit = FALSE)
-#  output[i,6] <- mxEval(DRIFT, ctsemFit$mxobj)
+#    Tpoints = Tpoints,
+#    MANIFESTVAR = diag(0.0001, 1), T0VAR=diag(1), LAMBDA = diag(1))
+#  cdim <- list('Y1', c('eta1'))
+#  
+#  amat <- mxMatrix('Full', 1, 1, TRUE, .3,
+#  	name='A', lbound=-10)
+#  bmat <- mxMatrix('Full', 1, 1, FALSE, 0, name='B')
+#  cmat <- mxMatrix('Full', 1, 1, FALSE, 1, name='C', dimnames=cdim)
+#  dmat <- mxMatrix('Full', 1, 1, TRUE, 1, name='D')
+#  qmat <- mxMatrix('Full', 1, 1, TRUE, 1, name='Q')
+#  rmat <- mxMatrix('Diag', 1, 1, FALSE, .0001, name='R')
+#  xmat <- mxMatrix('Full', 1, 1, TRUE, 7, name='x0', lbound=-10, ubound=10)
+#  pmat <- mxMatrix('Diag', 1, 1, FALSE, 1, name='P0')
+#  umat <- mxMatrix('Full', 1, 1, FALSE, 1, name='u')
+#  tmat <- mxMatrix('Full', 1, 1, name='time', labels='data.time')
+#  
+#  osc <- mxModel("AR1",
+#  	amat, bmat, cmat, dmat, qmat, rmat, xmat, pmat, umat, tmat,
+#  	mxExpectationStateSpace('A', 'B', 'C', 'D', 'Q', 'R', 'x0', 'P0', 'u'),
+#  	mxFitFunctionML(),
+#  	mxData(longData, 'raw'))
+#  
+#  oscr <- mxRun(osc)
+#  
+#  output[i,6] <-  log(mxEval(A, oscr))
 #  
 #  } #end for loop
 #  
 #  ### plot output
-#  plot(density(output[1:i, 2]), xlim = c(-.4, -.1), lty = 2, lwd = 1,
+#  plot(density(output[1:i, 2]), xlim = c(-.4, -.1), lty = 2, lwd = 2,
 #    ylab='Density',
 #    main = 'Density of estimates of drift parameter (true value -0.3)')
-#  points(density(output[1:i, 3]), col='red', type='l', lty=3, lwd=1)
-#  points(density(output[1:i, 5]), col='blue', type='l', lwd=1, lty=3)
-#  points(density(output[1:i, 6]), col='green', type='l', lwd=1, lty=5)
+#  points(density(output[1:i, 3]), col='red', type='l', lty=3, lwd=3)
+#  points(density(output[1:i, 5]), col='blue', type='l', lwd=2, lty=2)
+#  points(density(output[1:i, 6]), col='green', type='l', lwd=4, lty=5)
 #  legend('topleft', bty='n',
 #    text.col = c('black','red','blue', 'green'),
 #    legend = c('ctsem', 'cts', 'arima', 'OpenMx'))

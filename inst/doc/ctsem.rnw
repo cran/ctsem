@@ -20,7 +20,7 @@ Manuel C. Voelkle \\ Humboldt University Berlin \\ Max Planck Institute for Huma
 \Shorttitle{Continuous Time Structural Equation Modelling With \pkg{ctsem}} %% a short title (if necessary)
 
 \Abstract{
-We introduce \pkg{ctsem} \citep{driverInPresscontinuous}, an \proglang{R} package for continuous time structural equation modelling of panel (\textit{N} > 1) and time series (\textit{N} = 1) data, using full information maximum likelihood. Most dynamic models (e.g., cross-lagged panel models) in the social and behavioural sciences are discrete time models. An assumption of discrete time models is that time intervals between measurements are equal, and that all subjects were assessed at the same intervals. Violations of this assumption are often ignored due to the difficulty of accounting for varying time intervals, therefore parameter estimates can be biased and the time course of effects becomes ambiguous. By using stochastic differential equations to estimate an underlying continuous process, continuous time models allow for any pattern of measurement occasions. By interfacing to \pkg{OpenMx}, \pkg{ctsem} combines the flexible specification of structural equation models with the enhanced data gathering opportunities and improved estimation of continuous time models. \pkg{ctsem} can estimate relationships over time for multiple latent processes, measured by multiple noisy indicators with varying time intervals between observations. Within and between effects are estimated simultaneously by modelling both observed covariates and unobserved heterogeneity. Exogenous shocks with different shapes, group differences, higher order diffusion effects and oscillating processes can all be simply modeled. We first introduce and define continuous time models, then show how to specify and estimate a range of continuous time models using \pkg{ctsem}.     
+We introduce \pkg{ctsem} \citep{driver2017continuous}, an \proglang{R} package for continuous time structural equation modelling of panel (\textit{N} > 1) and time series (\textit{N} = 1) data, using full information maximum likelihood. Most dynamic models (e.g., cross-lagged panel models) in the social and behavioural sciences are discrete time models. An assumption of discrete time models is that time intervals between measurements are equal, and that all subjects were assessed at the same intervals. Violations of this assumption are often ignored due to the difficulty of accounting for varying time intervals, therefore parameter estimates can be biased and the time course of effects becomes ambiguous. By using stochastic differential equations to estimate an underlying continuous process, continuous time models allow for any pattern of measurement occasions. By interfacing to \pkg{OpenMx}, \pkg{ctsem} combines the flexible specification of structural equation models with the enhanced data gathering opportunities and improved estimation of continuous time models. \pkg{ctsem} can estimate relationships over time for multiple latent processes, measured by multiple noisy indicators with varying time intervals between observations. Within and between effects are estimated simultaneously by modelling both observed covariates and unobserved heterogeneity. Exogenous shocks with different shapes, group differences, higher order diffusion effects and oscillating processes can all be simply modeled. We first introduce and define continuous time models, then show how to specify and estimate a range of continuous time models using \pkg{ctsem}.     
 }
 
 \Keywords{time series, longitudinal modelling, panel data, state space, structural equation modelling, continuous time, stochastic differential equation, dynamic models, Kalman filter, \proglang{R}}
@@ -295,7 +295,7 @@ options(width = 80)
 
 \begin{figure}[p]
 \includegraphics[width = \textwidth]{pathdiagramtwoprocessfull2}
-\caption{ \label{fig:pathdiagramtwoprocessfull} The first three time points of a two process continuous time model, with three manifest indicators (blue) measuring 2 latent processes (purple), one time dependent predictor(dark green), and two time independent predictors (light green). Variance / covariance paths are in orange, regressions in red. Light grey paths indicate those that are constrained to a function of other parameters. Note that the value of parameters for all paths to latents at time 2 and higher do not directly represent the effect, rather, the effect depends on a function including the shown parameter and the time interval $\Delta$\textit{t}. Covariances between the time dependent predictor and traits (yellow) are not drawn.}
+\caption{ \label{fig:pathdiagramtwoprocessfull} The first three time points of a two process continuous time model, with three manifest indicators (blue) measuring 2 latent processes (purple), one time dependent predictor(dark green), and two time independent predictors (light green). Variance / covariance paths are in orange, regressions in red. Light grey paths indicate those that are constrained to a function of other parameters. Note that the value of parameters for all paths to latents at time 2 and higher do not directly represent the effect, rather, the effect depends on a function including the shown parameter and the time interval $\Delta$\textit{t}. Manifest intercepts are not shown.}
 \end{figure}
 
 \subsection{Conversion from long format with absolute times} \label{sec:datalong}\nopagebreak 
@@ -384,11 +384,11 @@ examplemodel <- ctModel(n.latent = 2, n.manifest = 2, Tpoints = 3,
 @
 \begin{figure}[!p]
 \includegraphics[width = \textwidth]{pathdiagramtwoprocessbasic}
-\caption{ \label{fig:pathdiagramtwoprocessbasic} A two process continuous time model with manifest indicators (blue) measuring latent processes (purple). Variance / covariance paths are in orange, regressions in red. Light grey paths indicate those that are either fixed to certain values or constrained to other parameters. Note that the value of the parameters for all paths to latents at time 2 and higher do not directly represent the effect, rather, the effect depends on a function of the shown parameter and the time interval $\Delta$\textit{t}. This model includes neither observed or unobserved between person variance, nor any time dependent predictors. }
+\caption{ \label{fig:pathdiagramtwoprocessbasic} A two process continuous time model with manifest indicators (blue) measuring latent processes (purple). Variance / covariance paths are in orange, regressions in red. Light grey paths indicate those that are either fixed to certain values or constrained to other parameters. Note that the value of the parameters for all paths to latents at time 2 and higher do not directly represent the effect, rather, the effect depends on a function of the shown parameter and the time interval $\Delta$\textit{t}. This model includes neither observed or unobserved between person variance, nor any time dependent predictors. Manifest intercepts are not shown.}
 \end{figure}
 A visual representation of this model is shown in Figure \ref{fig:pathdiagramtwoprocessbasic}. With \code{n.latent = 2}, we have specified a model with 2 latent processes, shown in purple. Each of these is measured by a single manifest indicator (in blue), for a total of 2 manifest variables, specified with \code{n.manifest = 2}. Loadings between latents and manifests are fixed to 1.00 (indicated by the 2$\times$2 diagonal LAMBDA matrix) at 3 measurement occasions, specified by \code{Tpoints = 3}. Because no other parameters are specified, the model defaults are used, resulting in a bivariate latent process model where each manifest variable has a measurement error variance (manifestvar\_Y1\_Y1, manifestvar\_Y2\_Y2), and a mean fixed to 0. The initial latent variables of each process have freely estimated means (T0mean\_eta1, T0mean\_eta2), variances (T0var\_eta1\_eta1, T0var\_eta2\_eta2), and covariance (T0var\_eta2\_eta1). Subsequent latent variables of each process all have an innovation term, with the variance dependent on a function of the diffusion matrix (variances diffusion\_eta1\_eta1, diffusion\_eta2\_eta2, covariance diffusion\_eta2\_eta1), drift matrix, and time interval $\Delta$\textit{t} (Note that although we speak here of variance and covariance parameters for the sake of intuitive understanding, \pkg{ctsem} works with Cholesky decomposed covariance matrices, discussed in Section \ref{sec:transforms}).
 Each latent variable in our two processes has continuous auto effects on itself according to the drift\_eta1\_eta1 and drift\_eta2\_eta2 parameters (the diagonals of the drift matrix), and cross effects to the other process according to the drift\_eta1\_eta2 and drift\_eta2\_eta1 parameters (the off diagonals). This drift matrix combines with time interval $\Delta$\textit{t} to generate the auto and cross regressions shown in the diagram.  As usual, the first process listed in the parameter name represents the row of the drift matrix, and the second the column, with the direction of effects flowing from column to row -- so the parameter drift\_eta1\_eta2 represents the effect of a change in process 2 on later values of process 1. 
-Each process also has a continuous intercept (cint{\_}eta1, cint{\_}eta2), which, in combination with the drift matrix, sets the level to which each process asymptotes.
+Each process also has a continuous intercept (cint{\_}eta1, cint{\_}eta2), which, in combination with the drift matrix, sets the level to which each process asymptotes. These are fixed to zero by default, as the manifest intercepts (via the MANIFESTMEANS matrix) account for non zero levels, by default.
 To develop an understanding of the parameter matrices or simply view a model, printing the model object (e.g. \code{print(examplemodel)}) is recommended. To track how these matrices are used within the complete SEM specification, one must first estimate the model (discussed in Section \ref{sec:modelfit}), and may then view the A, S, F or M matrices typical to a RAM specification \citet{mcardle1984algebraic} via \code{example1fit$mxobj$A} (for the A matrix).
 
 \subsubsection{Cholesky decomposed variance / covariance input matrices}\label{sec:transforms}\nopagebreak
@@ -643,16 +643,14 @@ In some cases, certain groups or individuals may exhibit different model paramet
 data("ctExample4")
 
 basemodel <- ctModel(n.latent = 1, n.manifest = 3, Tpoints = 20,
-  LAMBDA = matrix(c(1, "lambda2", "lambda3"), nrow = 3, ncol = 1),
-  MANIFESTMEANS = matrix(c(0, "manifestmean2", 
-    "manifestmean3"), nrow = 3, ncol = 1))
+  LAMBDA = matrix(c(1, "lambda2", "lambda3"), nrow = 3, ncol = 1))
 
 freemodel <- basemodel
 freemodel$LAMBDA[3, 1] <- "groupfree"
 groups <- paste0("g", rep(1:2, each = 10))
 
 multif <- ctMultigroupFit(datawide = ctExample4, groupings = groups,
-  objective='Kalman', ctmodelobj = basemodel, freemodel = freemodel)
+  ctmodelobj = basemodel, freemodel = freemodel)
 @
 
 <<multigroupOutput, echo = FALSE>>=
@@ -806,14 +804,14 @@ summary(discretefit)$omxsummary$Minus2LogLikelihood
 summary(discretefit)$omxsummary$CI
 @
 
-In this case, the log likelihood of the fit is worse, and the parameter estimates tend toward the nonsensical, with difficulties estimating confidence intervals for some parameters.
+In this case, the log likelihood of the fit is worse, parameter estimates do not look very sensible, and there can be difficulties estimating confidence intervals for some parameters.
 
 \newpage
 \section{Package comparisons} \label{app:appendixA}\nopagebreak
 The following script loops over a sequence in which data is generated from a very simple model (to facilitate comparison), then various packages are used to fit the data, and the distribution of parameter estimates is then plotted. \pkg{ctsem} is used to generate 500 time points of data for a single individual, for a single perfectly measured, stationary process with a drift value of -0.3. The different packages at times use different transformations of the parameters, but for ease of comparison these are transformed to the drift parameter in \pkg{ctsem}. This comparison is not intended as a critique of any package, differences in intended use and estimation routines may result in the observed differences, and it is hoped the provided code  may help others to explore alternatives when necessary.
 
-<<packagecomparison, eval=FALSE, cache=TRUE, fig.keep='none'>>=
-  if (!requireNamespace("cts", quietly = TRUE)) {
+<<packagecomparison, eval=FALSE, cache=TRUE>>=
+   if (!requireNamespace("cts", quietly = TRUE)) {
     stop("cts package needed for this function to work. Please install it.",
       call. = FALSE)
   }
@@ -821,11 +819,12 @@ The following script loops over a sequence in which data is generated from a ver
     stop("yuima package needed for this function to work. Please install it.",
       call. = FALSE)
   }
-output <- matrix(NA, 10, 6)
+Tpoints<-500
+output <- matrix(NA, 100, 6)
 colnames(output) <- c('True', 'ctsem', 'cts', 'yuima', 'arima', 'OpenMx')
 for(i in 1:nrow(output)){
 generatingModel <- ctModel(n.latent = 1, n.manifest = 1, 
-  Tpoints = 200,
+  Tpoints = Tpoints,
   LAMBDA = diag(1), DRIFT = matrix(-.3, nrow = 1),
   CINT = matrix(3, 1, 1),
   MANIFESTVAR = diag(0.00001, 1),
@@ -833,13 +832,13 @@ generatingModel <- ctModel(n.latent = 1, n.manifest = 1,
 
 output[i, 1] <- generatingModel$DRIFT #true value
 
-ctsemData <- ctGenerate(generatingModel, n.subjects=1, burnin=300)
-longData <- ctWideToLong(ctsemData, Tpoints=200, n.manifest=1)
+ctsemData <- ctGenerate(generatingModel, n.subjects=1, burnin=30)
+longData <- ctWideToLong(ctsemData, Tpoints=500, n.manifest=1)
 longData <- ctDeintervalise(longData)
 
 ### ctsem package
 ctsemModel <- ctModel(n.latent=1, n.manifest = 1, 
-  Tpoints = 200,
+  Tpoints = Tpoints,
   MANIFESTVAR = diag(0.0001, 1),
   LAMBDA = diag(1))
 ctsemFit <- ctFit(ctsemData, ctsemModel, stationary = c('T0VAR'))
@@ -863,23 +862,43 @@ arfit <- arima(longData[, 'Y1'], order = c(1, 0, 0))
 log(arfit$coef[1]) #transform ar1 parameter to drift parameter
 output[i, 5]<-log(arfit$coef[1])
 
-### OpenMx state space continuous time function (specified via ctsem here)
+### OpenMx state space function
 ctsemModel <- ctModel(n.latent=1, n.manifest = 1, 
-  Tpoints = 200,
-  MANIFESTVAR = diag(0, 1), T0VAR=diag(1), LAMBDA = diag(1))
-mxFit <- ctFit(ctsemData, ctsemModel, objective='Kalmanmx', 
-  carefulFit = FALSE)
-output[i,6] <- mxEval(DRIFT, ctsemFit$mxobj)
+  Tpoints = Tpoints,
+  MANIFESTVAR = diag(0.0001, 1), T0VAR=diag(1), LAMBDA = diag(1))
+cdim <- list('Y1', c('eta1'))
+
+amat <- mxMatrix('Full', 1, 1, TRUE, .3,
+	name='A', lbound=-10)
+bmat <- mxMatrix('Full', 1, 1, FALSE, 0, name='B')
+cmat <- mxMatrix('Full', 1, 1, FALSE, 1, name='C', dimnames=cdim)
+dmat <- mxMatrix('Full', 1, 1, TRUE, 1, name='D')
+qmat <- mxMatrix('Full', 1, 1, TRUE, 1, name='Q')
+rmat <- mxMatrix('Diag', 1, 1, FALSE, .0001, name='R')
+xmat <- mxMatrix('Full', 1, 1, TRUE, 7, name='x0', lbound=-10, ubound=10)
+pmat <- mxMatrix('Diag', 1, 1, FALSE, 1, name='P0')
+umat <- mxMatrix('Full', 1, 1, FALSE, 1, name='u')
+tmat <- mxMatrix('Full', 1, 1, name='time', labels='data.time')
+
+osc <- mxModel("AR1", 
+	amat, bmat, cmat, dmat, qmat, rmat, xmat, pmat, umat, tmat,
+	mxExpectationStateSpace('A', 'B', 'C', 'D', 'Q', 'R', 'x0', 'P0', 'u'),
+	mxFitFunctionML(),
+	mxData(longData, 'raw'))
+
+oscr <- mxRun(osc)
+
+output[i,6] <-  log(mxEval(A, oscr))
 
 } #end for loop
 
 ### plot output
-plot(density(output[1:i, 2]), xlim = c(-.4, -.1), lty = 2, lwd = 1, 
+plot(density(output[1:i, 2]), xlim = c(-.4, -.1), lty = 2, lwd = 2, 
   ylab='Density',
   main = 'Density of estimates of drift parameter (true value -0.3)')
-points(density(output[1:i, 3]), col='red', type='l', lty=3, lwd=1)
-points(density(output[1:i, 5]), col='blue', type='l', lwd=1, lty=3)
-points(density(output[1:i, 6]), col='green', type='l', lwd=1, lty=5)
+points(density(output[1:i, 3]), col='red', type='l', lty=3, lwd=3)
+points(density(output[1:i, 5]), col='blue', type='l', lwd=2, lty=2)
+points(density(output[1:i, 6]), col='green', type='l', lwd=4, lty=5)
 legend('topleft', bty='n', 
   text.col = c('black','red','blue', 'green'),
   legend = c('ctsem', 'cts', 'arima', 'OpenMx'))
