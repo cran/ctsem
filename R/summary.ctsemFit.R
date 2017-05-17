@@ -121,7 +121,8 @@ ctParamsSummary<-function(object,ctSummaryMatrices){
   parnames<-names(omxGetParameters(object$mxobj))
   parvalues<-omxGetParameters(object$mxobj)
   newparvalues<-parvalues
-  parsd<-object$mxobj$output$standardErrors
+  if(is.null(object$mxobj$output$standardErrors)) parsd<-matrix(NA,nrow=length(parvalues))
+  else parsd<-object$mxobj$output$standardErrors
   parmatrix<-rep(NA,length(parnames))
  
   # browser()
@@ -192,13 +193,17 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
     MANIFESTVAR<-tryCatch({ mxEval(MANIFESTVAR,mxobj, compute=TRUE)}, error=function(e) e )
     tryCatch({  dimnames(MANIFESTVAR)<-list(manifestNames,manifestNames)}, error=function(e) e )
     outlist<-c(outlist,'MANIFESTVAR')
-    
+
     if(verbose==TRUE){
       MANIFESTVARdiag<-tryCatch({ diag(diag(MANIFESTVAR),n.manifest)+diag(c(ridging),n.manifest)}, error=function(e) e )
       MANIFESTVARstd<-tryCatch({ suppressWarnings(solve(sqrt(MANIFESTVARdiag)) %&% MANIFESTVAR)}, error=function(e) e )
       tryCatch({  dimnames(MANIFESTVARstd)<-list(latentNames,latentNames)}, error=function(e) e )
       outlist<-c(outlist,'MANIFESTVARstd')
     }
+    
+    MANIFESTMEANS<-tryCatch({ mxEval(MANIFESTMEANS,mxobj, compute=TRUE)}, error=function(e) e )
+    tryCatch({  dimnames(MANIFESTMEANS)<-list(manifestNames,manifestNames)}, error=function(e) e )
+    outlist<-c(outlist,'MANIFESTMEANS')
     
     CINT<-tryCatch({ mxobj$CINT$values}, error=function(e) e )
     if(asymptotes==TRUE) CINT <- tryCatch({ -DRIFT %*% CINT}, error=function(e) e )
@@ -255,7 +260,7 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
     #     outlist<-c(outlist,'asymTOTALVARstd')
     
     
-    if('T0VAR' %in% stationary == FALSE){ #then include base T0 matrices
+    # if('T0VAR' %in% stationary == FALSE){ #then include base T0 matrices
       T0VAR<-tryCatch({ OpenMx::mxEval(T0VAR, mxobj,compute=TRUE)}, error=function(e) e )
       tryCatch({  dimnames(T0VAR)<-list(latentNames,latentNames)}, error=function(e) e )
       outlist<-c(outlist,'T0VAR')
@@ -271,13 +276,13 @@ ctSummaryMatrices<-function(object,ridging=FALSE,timeInterval=1,verbose=FALSE,..
         outlist<-c(outlist,'T0VARstd')
       }
       
-    } # end T0VAR matrices
+    # } # end T0VAR matrices
     
-    if('T0MEANS' %in% stationary == FALSE){ #then include base T0 matrices
+    # if('T0MEANS' %in% stationary == FALSE){ #then include base T0 matrices
       T0MEANS<-tryCatch({ OpenMx::mxEval(T0MEANS, mxobj,compute=TRUE)}, error=function(e) e )
       tryCatch({  rownames(T0MEANS)<-latentNames}, error=function(e) e )
       outlist<-c(outlist,'T0MEANS')
-    }
+    # }
     
     
     #trait matrices

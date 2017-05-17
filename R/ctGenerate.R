@@ -8,9 +8,6 @@
 #' @param dtmean Positive numeric. Average time interval (delta T) to use.
 #' @param logdtsd Numeric. Standard deviation for variability of the time interval.
 #' @param wide Logical. Output in wide format?
-#' @param simultdpredeffect logical - whether time dependent predictors impact 
-#' instantaneously, or an instant *after* instantaneously. 
-#' Switch reflects difference between ctStanFit and ctFit.
 #' @details TRAITVAR and MANIFESTRAITVAR are treated as Cholesky factor covariances 
 #' of CINT and MANIFESTMEANS, respectively. 
 #' TRAITTDPREDCOV and TIPREDCOV matrices are not accounted for, at present. 
@@ -34,7 +31,7 @@
 #' @export
 
 ctGenerate<-function(ctmodelobj,n.subjects=100,burnin=0,dtmean=1,logdtsd=0,
-  wide=TRUE,simultdpredeffect=TRUE){
+  wide=TRUE){
   
   
   ###read in model
@@ -88,20 +85,26 @@ ctGenerate<-function(ctmodelobj,n.subjects=100,burnin=0,dtmean=1,logdtsd=0,
   
   fullTpoints<-burnin+Tpoints
   
-  if(n.TDpred > 0) {
-    TDPREDMEANS <- rbind(matrix(0,nrow=(1+burnin+ifelse(simultdpredeffect,0,1))*n.TDpred)[-1,,drop=FALSE],
-    TDPREDMEANS)
-    if(simultdpredeffect) TDPREDMEANS=rbind(TDPREDMEANS,0)
-  }
+  # if(n.TDpred > 0) { #add burnin to TDPREDMEANS
+  #   browser()
+  #   TDPREDMEANS <- matrix(rbind(matrix(0,nrow=1+(burnin),ncol=n.TDpred)[-1,,drop=FALSE], #additional row added then removed in case no burnin
+  #   matrix(TDPREDMEANS,ncol=n.TDpred)),ncol=1) #ugly transform to avoid burnin offset with multiple tdpreds 
+  # }
   
   # TRAITVARchol = t(chol(-solve(DRIFT) %*% TRAITVAR %*% -t(solve(DRIFT))))
   
   for(si in 1:n.subjects){
+    
     dt<- exp(rnorm(fullTpoints,log(dtmean),logdtsd))
     time=rep(0,fullTpoints)
     for(t in 2:fullTpoints) time[t] = round(time[t-1] + dt[t],3)
-    if(n.TDpred > 0) tdpreds <- matrix(sapply(1:(fullTpoints),function(x) 
-      TDPREDMEANS[(1+(x-1)*n.TDpred):(x*n.TDpred)] + TDPREDVARchol[1:n.TDpred,1:n.TDpred] %*% rnorm(n.TDpred,0,1)),byrow=TRUE, ncol=n.TDpred)
+    
+    
+    if(n.TDpred > 0) {
+     
+      tdpreds <- rbind(matrix(0,nrow=1+(burnin),ncol=n.TDpred)[-1,,drop=FALSE], #additional row added then removed in case no burnin
+        matrix(TDPREDMEANS + TDPREDVARchol %*% rnorm(nrow(TDPREDVARchol),0,1),ncol=n.TDpred))
+}
     
     skpars=kpars
     if(any(TRAITVARchol != 0)) {

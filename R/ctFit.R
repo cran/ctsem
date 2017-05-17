@@ -149,6 +149,7 @@ ctFit  <- function(datawide, ctmodelobj,
   if(nofit == TRUE) carefulFit <- FALSE
   
   if(all(stationary %in% 'all')) stationary<-c('T0VAR','T0MEANS','T0TIPREDEFFECT','T0TRAITEFFECT')
+  if(is.null(stationary)) stationary <- c('')
   
   n.latent<-ctmodelobj$n.latent
   n.manifest<-ctmodelobj$n.manifest
@@ -206,9 +207,9 @@ ctFit  <- function(datawide, ctmodelobj,
     message('discreteTime==TRUE set -- timing information ignored. Parameter estimates will *not* correspond with those from continous time models.')
     #     carefulFit<-FALSE
     #     stationary<-NULL    
-    if(transformedParams==FALSE){
-      stop('For discreteTime=TRUE you must also set transformedParams=FALSE')
-    }
+    # if(transformedParams==TRUE){
+    #   stop('For discreteTime=TRUE you must also set transformedParams=FALSE')
+    # }
   }
   
   
@@ -218,7 +219,7 @@ ctFit  <- function(datawide, ctmodelobj,
     #### if all tdpreds non missing, use observed covariance and means
     if(all(!is.na(datawide[, paste0(TDpredNames, '_T', rep(0:(Tpoints-1), each=n.TDpred))]))){
       ctmodelobj$TDPREDVAR= t(chol(Matrix::nearPD(
-        cov(datawide[, paste0(TDpredNames, '_T', rep(0:(Tpoints-1), each=n.TDpred))]) + 
+        cov(datawide[, paste0(TDpredNames, '_T', rep(0:(Tpoints-1), each=n.TDpred)),drop=FALSE]) + 
           diag(.0000001, n.TDpred*(Tpoints)))$mat))
       ctmodelobj$TDPREDMEANS[,]=apply(datawide[, paste0(TDpredNames, '_T', rep(0:(Tpoints-1), each=n.TDpred))],2,mean)
       message('No missing time dependent predictors - TDPREDVAR and TDPREDMEANS fixed to observed moments for speed')
@@ -279,8 +280,7 @@ ctFit  <- function(datawide, ctmodelobj,
   
   ## if Kalman objective, rearrange data to long format and set Tpoints to 2 (so only single discrete algebras are generated)
   if(objective=='Kalman' | objective=='Kalmanmx') {
-    #     if(nrow(datawide) > 1) stop('To use Kalman filter implementation with multiple subjects, see function ctMultigroupFit')
-    
+
     if(n.TDpred >0){
       if(any(is.na(datawide[, paste0(TDpredNames, '_T', 0:(Tpoints-1))] ))) stop('NA predictors are not possible with Kalman objective')
     }
@@ -302,14 +302,7 @@ ctFit  <- function(datawide, ctmodelobj,
       datawide<-ctDeintervalise(datawide,dT='dT1')
       colnames(datawide)[which(colnames(datawide)=='time')] <-'dT1'
     }
-    
-    # if(n.TDpred >0){
-    #   datawide[1:(Tpoints), TDpredNames]<-datawide[1:(Tpoints), TDpredNames]
-    #   datawide[1, TDpredNames]<-0
-    # }
-    
-    
-    
+
     Tpoints<-2
     firstObsDummy<-matrix(c(1,rep(NA,times=nrow(datawide)-1)), nrow=nrow(datawide))
     for(i in 2:nrow(datawide)){
@@ -364,7 +357,7 @@ ctFit  <- function(datawide, ctmodelobj,
     return(output)
   }
   
-  T0VAR <- processInputMatrix(ctmodelobj['T0VAR'], symmetric = FALSE, randomscale=0, diagadd = 3, chol=TRUE)
+  T0VAR <- processInputMatrix(ctmodelobj['T0VAR'], symmetric = FALSE, randomscale=0, diagadd = 10, chol=TRUE)
 
   T0MEANS <- processInputMatrix(ctmodelobj["T0MEANS"], symmetric = FALSE, randomscale=1, diagadd = 0)
   MANIFESTMEANS <- processInputMatrix(ctmodelobj["MANIFESTMEANS"], symmetric = FALSE, randomscale=1, diagadd = 0)
@@ -374,7 +367,7 @@ ctFit  <- function(datawide, ctmodelobj,
   DRIFT <- processInputMatrix(ctmodelobj["DRIFT"],  symmetric = FALSE,randomscale=0, 
     addvalues= ifelse(crossEffectNegStarts==TRUE,-.05,0), diagadd=ifelse(discreteTime==TRUE,.5,-.4))
   
-  DIFFUSION <- processInputMatrix(ctmodelobj["DIFFUSION"], symmetric = FALSE, randomscale=0, diagadd = 3)      
+  DIFFUSION <- processInputMatrix(ctmodelobj["DIFFUSION"], symmetric = FALSE, randomscale=0, diagadd = 10)      
   
   CINT <- processInputMatrix(ctmodelobj["CINT"], randomscale=.1)    
   
@@ -1871,45 +1864,35 @@ ctFit  <- function(datawide, ctmodelobj,
   
   if(objective=='Kalman'){ 
     
-    discreteDIFFUSIONmatrix<-OpenMx::mxMatrix(name='discreteDIFFUSIONmatrix',
-      labels=paste0('discreteDIFFUSION_T1[',1:n.latent,',', rep(1:n.latent,each=n.latent),']'),
-      nrow=n.latent,ncol=n.latent,free=FALSE)
+    # discreteDIFFUSIONmatrix<-OpenMx::mxMatrix(name='discreteDIFFUSIONmatrix',
+    #   labels=paste0('discreteDIFFUSION_T1[',1:n.latent,',', rep(1:n.latent,each=n.latent),']'),
+    #   nrow=n.latent,ncol=n.latent,free=FALSE)
     
     D<-OpenMx::mxMatrix(name='D', values=MANIFESTMEANS$values, labels=MANIFESTMEANS$labels, 
       nrow=n.manifest, ncol=1, free=MANIFESTMEANS$free)
     
+    intercept <- OpenMx::mxAlgebra(name='intercept',discreteCINT_T1)
+    
     u<-OpenMx::mxMatrix(name='u', values=1, nrow=1, ncol=1, free=FALSE)
     
-    if(n.subjects==1){ #then simple kalman
-      
-      model<-OpenMx::mxModel(model, 
-        D, u,  discreteDIFFUSIONmatrix,
-        mxExpectationStateSpace(A='discreteDRIFT_T1', B='discreteCINT_T1', C='LAMBDA', 
-          D="D", Q='discreteDIFFUSIONmatrix', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u"), 
-        mxFitFunctionML()
-      )
-    }
+    discreteDRIFT<-mxAlgebra(name='discreteDRIFT',  (1-firstObsDummy) %x% discreteDRIFT_T1)
     
-    if(n.subjects > 1){ #then account for further first time point observations
+    kalmanT0MEANS <- OpenMx::mxAlgebra(name='kalmanT0MEANS',T0MEANS)
+    
+    x0 <-  OpenMx::mxAlgebra(name='x0', T0MEANS)
+
+    # if(n.subjects==1){ #then simple kalman
+    #   
+    #   model<-OpenMx::mxModel(model, 
+    #     D, u,  discreteDIFFUSIONmatrix,
+    #     mxExpectationStateSpace(A='discreteDRIFT_T1', B='discreteCINT_T1', C='LAMBDA', 
+    #       D="D", Q='discreteDIFFUSIONmatrix', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u"), 
+    #     mxFitFunctionML()
+    #   )
+    # }
+    # 
+    # if(n.subjects > 1){ #then account for further first time point observations
       
-      discreteDRIFT<-mxAlgebra(name='discreteDRIFT',  (1-firstObsDummy) %x% discreteDRIFT_T1)
-      
-      model<-OpenMx::mxModel(model, 
-        D, u,  discreteDIFFUSIONmatrix, discreteDRIFT,
-        mxAlgebra(name='intercept', (1-firstObsDummy) %x% discreteCINT_T1 + firstObsDummy %x% T0MEANS),
-        
-        
-        
-        mxAlgebra(name='discreteDIFFUSIONwithdummy',  (1-firstObsDummy) %x% discreteDIFFUSIONmatrix + firstObsDummy %x% (T0VAR)),
-        
-        mxMatrix(name='firstObsDummy', free=FALSE, labels='data.firstObsDummy', nrow=1, ncol=1),
-        
-        mxExpectationStateSpace(A='discreteDRIFT', B='intercept', C='LAMBDA', 
-          D="D", Q='discreteDIFFUSIONwithdummy', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u"), 
-        
-        mxFitFunctionML()
-        
-      )
       
       #free intercepts
       #      randIntercepts<- OpenMx::mxMatrix(type = "Full", 
@@ -1924,31 +1907,57 @@ ctFit  <- function(datawide, ctmodelobj,
       #          mxAlgebra(name='CINTalg',randIntercepts[,data.id]),
       #          mxMatrix(name='CINT',labels=paste0('CINTalg[',1:n.latent,',1]'),nrow=n.latent,ncol=1,type='Full')
       #        )
-      
-    } #end multi subject kalman
-    # browser()
+      # 
+    # } #end multi subject kalman
     
     if(n.TDpred>0){
-      discreteCINT_T1labels<-matrix(paste0('discreteCINT_T1[', 1:n.latent, ',','1]'), nrow=n.latent)
-      discreteTDPREDEFFECT_T1labels<-matrix(paste0('discreteTDPREDEFFECT_T1[', 1:n.latent, ',', rep(1:n.TDpred, each=n.latent), ']'), nrow=n.latent)
-      TDPREDEFFECT$ref<-paste0('data.', TDpredNames)
+      interceptCINTlabels<-matrix(paste0('discreteCINT_T1[', 1:n.latent, ',','1]'), nrow=n.latent)
+      interceptTDPREDlabels<-matrix(paste0('TDPREDEFFECT[', 1:n.latent, ',', rep(1:n.TDpred, each=n.latent), ']'), nrow=n.latent)
       
-      model<-OpenMx::mxModel(model, 
-        mxMatrix(name='B', free=FALSE , nrow=n.latent, ncol=n.TDpred+1, 
-          labels=cbind(discreteCINT_T1labels, discreteTDPREDEFFECT_T1labels)), 
+      model<-OpenMx::mxModel(model,
+        OpenMx::mxMatrix(type='Full',name='TDPREDS',
+          labels=paste0('data.', TDpredNames),free=FALSE,ncol=1,nrow=n.TDpred))
+      
+      intercept<-  OpenMx::mxMatrix(type='Full',name='intercept', free=FALSE , nrow=n.latent, ncol=n.TDpred+1, 
+          labels=cbind(interceptCINTlabels, interceptTDPREDlabels))
+      
+      kalmanT0MEANS <- OpenMx::mxMatrix(type='Full',name='kalmanT0MEANS',free=FALSE,nrow=n.latent,ncol=n.TDpred+1,
+        labels=c(paste0('T0MEANS[',1:n.latent,',1]'),rep(NA,n.TDpred*n.latent)),values=0)
+      
+      kalmanT0MEANS <- OpenMx::mxAlgebra(name='kalmanT0MEANS',cbind(T0MEANS,TDPREDEFFECT))
+      
+      x0 <-  OpenMx::mxAlgebra(name='x0', T0MEANS) # + TDPREDEFFECT %*% TDPREDS
         
-        mxMatrix(name='D', nrow=n.manifest, ncol=1+n.TDpred, 
+      D <-  OpenMx::mxMatrix(name='D', nrow=n.manifest, ncol=1+n.TDpred, 
           free=c(MANIFESTMEANS$free, rep(FALSE, n.TDpred*n.manifest)), 
           values=c(MANIFESTMEANS$values, rep(0, n.TDpred*n.manifest)), 
-          labels=c(MANIFESTMEANS$labels, rep(NA, n.TDpred*n.manifest))), 
+          labels=c(MANIFESTMEANS$labels, rep(NA, n.TDpred*n.manifest)))
         
-        mxMatrix(name='u', ncol=1, nrow=n.TDpred+1, free=FALSE, 
+      u <-  OpenMx::mxMatrix(name='u', ncol=1, nrow=n.TDpred+1, free=FALSE, 
           values=c(1, rep(0, n.TDpred)), 
-          labels=c(NA, TDPREDEFFECT$ref)),         
-        
-        mxExpectationStateSpace(A='discreteDRIFT_T1', B='B', C='LAMBDA', D="D", Q='discreteDIFFUSIONmatrix', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u")
-      )
+          labels=c(NA, paste0('data.', TDpredNames)))
+      
+      
     }
+ 
+  
+  
+  model<-OpenMx::mxModel(model, 
+    D, u, discreteDRIFT,intercept,kalmanT0MEANS,x0,
+    
+    mxAlgebra(name='B', (1-firstObsDummy) %x% intercept + firstObsDummy %x% kalmanT0MEANS), # 
+    
+    mxAlgebra(name='discreteDIFFUSIONwithdummy',  (1-firstObsDummy) %x% discreteDIFFUSION_T1 + firstObsDummy %x% (T0VAR)),
+    
+    mxMatrix(name='firstObsDummy', free=FALSE, labels='data.firstObsDummy', nrow=1, ncol=1),
+    
+    mxExpectationStateSpace(A='discreteDRIFT', B='B', C='LAMBDA', 
+      D="D", Q='discreteDIFFUSIONwithdummy', R='MANIFESTVAR', x0='x0', P0='T0VAR', u="u"), 
+    
+    mxFitFunctionML()
+    
+  )
+  
   }
   
   
