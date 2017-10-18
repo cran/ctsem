@@ -187,6 +187,9 @@ ctDiscretePars<-function(ctpars,times=seq(0,10,.1),type='all'){
 #'@param times Numeric vector of positive values, discrete time parameters will be calculated for each.
 #'@param quantiles Which quantiles to return. If plotting, specify 3 quantiles, 
 #'the 2nd will be plotted as a line with 1 and 3 as uncertainty bounds.
+#'@param nsamples Number of samples from the stanfit to use for plotting. Higher values will
+#'increase smoothness / accuracy, at cost of plotting speed. Values greater than the total
+#'number of samples will be set to total samples.
 #'@param plot Logical. If TRUE, plots output using \code{\link{ctStanDiscreteParsPlot}}
 #'instead of returning output. 
 #'@param ... additional plotting arguments to control \code{\link{ctStanDiscreteParsPlot}}
@@ -195,12 +198,15 @@ ctDiscretePars<-function(ctpars,times=seq(0,10,.1),type='all'){
 #'plot=TRUE,indices='all')
 #'@export
 ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=10,by=.1), 
-  quantiles = c(.025, .5, .975),plot=FALSE,...){
+  quantiles = c(.025, .5, .975),nsamples=500,plot=FALSE,...){
   
   type='discreteDRIFT'
   collapseSubjects=TRUE #consider this for a switch
   
   e<-rstan::extract(ctstanfitobj$stanfit)
+  
+ 
+  
   if(type=='all') type=c('discreteDRIFT','latentMeans') #must match with ctDiscretePars
   
   if(subjects[1] != 'all' && !is.integer(as.integer(subjects))) stop('
@@ -214,6 +220,9 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
   niter=outdims[1]
   nlatent=outdims[3]
   latentNames=ctstanfitobj$ctstanmodel$latentNames
+  
+  if(nsamples > niter) nsamples <- niter
+  samples <- sample(1:niter,nsamples)
 
   
   out<-list()
@@ -245,14 +254,14 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
     message('Getting ', type[typei],', may take a moment...')
     matrixtype=ifelse(type[typei] %in% c('discreteDRIFT'),TRUE, FALSE) #include any matrix type outputs
     
-    out[[typei]] <- plyr::aaply(1:niter,1,function(iterx){ #for every iteration
+    out[[typei]] <- plyr::aaply(1:nsamples,1,function(iterx){ #for every iteration
       if(collapseSubjects) subjectvec=1 else subjectvec=1:nsubjects #average over subjects before computing? much faster but answers dif question.
       plyr::aaply(subjectvec,1,function(subjecty){ #for all subjects at once, or 1 subject at a time...
         ctparsxy <- plyr::llply(ctpars, function(obji) { #
           ismatrix = length(dim(obji)) > 3 #check if obji (ctparameter) is a matrix or vector
           ctparsout=array(eval(parse(text=paste0('obji[,',
             if(ismatrix) ',',
-            iterx,',',
+            samples[iterx],',',
             ifelse(dim(obji)[ifelse(ismatrix,4,3)] > 1, #if the parameter varies over multiple subjects,
               ifelse(collapseSubjects, '1:nsubjects',  #and we collapse over subjects, return values for all subjects
                 'subjecty'), #if we don't collapse over subjects, just return for specified subject
@@ -327,8 +336,6 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
 #'@param times Numeric vector of positive values, discrete time parameters will be calculated for each.
 #'@param latentNames Vector of character strings denoting names for the latent variables. 
 #''auto' just uses eta1 eta2 etc.
-#'@param ylim Either 'auto' to determine automatically, or vector of length 2 specifying
-#'upper and lower limits of y axis.
 #'@param lwdvec Either 'auto', or a vector of positive integers denoting line widths for each quantile.
 #''auto' specifies c(1,3,1) if there are 3 quantiles to be plotted (default), otherwise simply 3.
 #'@param ltyvec Either 'auto', or a vector of line type integers (as for the lty parameter normally)
@@ -353,8 +360,8 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
 #'@export
 
 ctStanDiscreteParsPlot<- function(x,indices='all',add=FALSE,legend=TRUE, polygon=TRUE, 
-  quantiles=c(.05,.5,.95), times=seq(0,10,.1),latentNames='auto',
-  ylim='auto',lwdvec='auto',colvec='auto',ltyvec='auto',
+  quantiles=c(.025,.5,.975), times=seq(0,10,.1),latentNames='auto',
+  lwdvec='auto',colvec='auto',ltyvec='auto',
   plotcontrol=list(ylab='Value',xlab='Time interval',
     main='Regression coefficients',type='l'),grid=TRUE,
   legendcontrol=list(x='topright',bg='white'),
@@ -371,6 +378,7 @@ ctStanDiscreteParsPlot<- function(x,indices='all',add=FALSE,legend=TRUE, polygon
   if(is.null(plotcontrol$xlab)) plotcontrol$xlab  <- 'Time interval'
   if(is.null(plotcontrol$main)) plotcontrol$main  <- 'Regression coefficients'
   if(is.null(plotcontrol$type)) plotcontrol$type  <- 'l'
+
   
   if(is.null(legendcontrol$x)) legendcontrol$x = 'topright'
   if(is.null(legendcontrol$bg)) legendcontrol$bg = 'white'
@@ -389,22 +397,25 @@ ctStanDiscreteParsPlot<- function(x,indices='all',add=FALSE,legend=TRUE, polygon
   if(ltyvec[1]=='auto') ltyvec=1:nrow(indices)
   if(lwdvec[1]=='auto') lwdvec= rep(3,nrow(indices))
   
-  if(colvec[1]=='auto') colvec=grDevices::rainbow(nrow(indices),alpha=.8)
+  if(colvec[1]=='auto') colvec=grDevices::rainbow(nrow(indices),alpha=.8,v=.9)
   
-  if(ylim=='auto') ylim=range(plyr::aaply(input,c(3,4),function(x)
+  if(is.null(plotcontrol$ylim)) plotcontrol$ylim=range(plyr::aaply(input,c(3,4),function(x) 
     x[indices]),na.rm=TRUE) #range of diagonals
-  
 
   
  
   #blank plot
   blankargs=plotcontrol
-  blankargs$ylim=ylim
   blankargs$xlim=range(times)
   blankargs$y=NA
   blankargs$x=NA
   do.call(plot,blankargs)
-  if(grid) grid()
+  if(grid) {
+    grid()
+    par(new=TRUE)
+    do.call(plot,blankargs)
+    par(new=FALSE)
+  }
   
   ####plotting confidence region
   if(polygon) {
@@ -439,7 +450,6 @@ ctStanDiscreteParsPlot<- function(x,indices='all',add=FALSE,legend=TRUE, polygon
       plotargs$lty=ltyvec[cc]
       plotargs$col=ifelse(qi!= 2,grDevices::adjustcolor(colvec[cc],alpha.f=.5) ,colvec[cc])
       plotargs$lwd=ifelse(qi!= 2,1, lwdvec[cc])
-      plotargs$ylim=ylim
       do.call(points,plotargs)
     }}
   

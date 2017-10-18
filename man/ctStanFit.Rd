@@ -4,13 +4,13 @@
 \alias{ctStanFit}
 \title{ctStanFit}
 \usage{
-ctStanFit(datalong, ctstanmodel, stanmodeltext = NA, iter = 2000,
+ctStanFit(datalong, ctstanmodel, stanmodeltext = NA, iter = 1000,
   kalman = TRUE, binomial = FALSE, esthyper = TRUE, fit = TRUE,
   stationary = FALSE, plot = FALSE, diffusionindices = "all",
   asymdiffusion = FALSE, optimize = FALSE, nopriors = FALSE, vb = FALSE,
   chains = 1, cores = "maxneeded", inits = NULL, initwithoptim = FALSE,
-  control = list(adapt_delta = 0.9, adapt_init_buffer = 10, adapt_window = 5,
-  max_treedepth = 10, stepsize = 0.001), verbose = FALSE, ...)
+  control = list(adapt_delta = 0.8, adapt_init_buffer = 2, adapt_window = 2,
+  max_treedepth = 8, stepsize = 0.001), verbose = FALSE, ...)
 }
 \arguments{
 \item{datalong}{long format data containing columns for subject id (numeric values, 1 to max subjects), manifest variables, 
@@ -40,7 +40,9 @@ parameters, or to fix the distributions to maximum likelihood estimates conditio
 \item{fit}{If TRUE, fit specified model using Stan, if FALSE, return stan model object without fitting.}
 
 \item{stationary}{Logical. If TRUE, T0VAR and T0MEANS input matrices are ignored, 
-the parameters are instead fixed to long run expectations}
+the parameters are instead fixed to long run expectations. More control over this can be achieved
+by instead setting parameter names of T0MEANS and T0VAR matrices in the input model to 'stationary', for
+elements that should be fixed to stationarity.}
 
 \item{plot}{if TRUE, a Shiny program is launched upon fitting to interactively plot samples. 
 May struggle with many (e.g., > 5000) parameters, and may leave sample files in working directory if sampling is terminated.}

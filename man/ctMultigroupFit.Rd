@@ -4,18 +4,22 @@
 \alias{ctMultigroupFit}
 \title{Fits a multiple group continuous time model.}
 \usage{
-ctMultigroupFit(datawide, groupings, ctmodelobj, fixedmodel = NA,
-  freemodel = NA, carefulFit = TRUE, omxStartValues = NULL,
-  retryattempts = 15, showInits = FALSE, ...)
+ctMultigroupFit(dat, groupings, ctmodelobj, dataform = "wide",
+  fixedmodel = NA, freemodel = NA, carefulFit = TRUE,
+  omxStartValues = NULL, retryattempts = 15, showInits = FALSE, ...)
 }
 \arguments{
-\item{datawide}{Wide format data, as used in \code{\link{ctFit}}.  See \code{\link{ctLongToWide}} to
+\item{dat}{Wide format data, as used in \code{\link{ctFit}}.  See \code{\link{ctLongToWide}} to
 easily convert long format data.}
 
-\item{groupings}{Vector of character labels designating group membership for each row of datawide.
-These will be prefixed on relevant parameter estimates in the summary.}
+\item{groupings}{For wide format: Vector of character labels designating group membership for each row of dat.
+For long format: Named list of groups, with each list element containing a vector of subject id's for the group.
+In both cases, group names will be prefixed on relevant parameter estimates in the summary.}
 
 \item{ctmodelobj}{Continuous time model to fit, specified via \code{\link{ctModel}} function.}
+
+\item{dataform}{either "wide" or "long" depending on which input format you wish to use for the data. 
+See details of \code{\link{ctFit}} and or vignette.}
 
 \item{fixedmodel}{Modified version of ctmodelobj, wherein any parameters you wish to keep 
 fixed over groups should be given the value 'groupfixed'.  
@@ -66,7 +70,7 @@ freemodel<-basemodel
 freemodel$LAMBDA[3,1]<-'groupfree'
 groups<-paste0('g',rep(1:2, each=10),'_')
 
-multif<-ctMultigroupFit(datawide=ctExample4, groupings=groups,
+multif<-ctMultigroupFit(dat=ctExample4, groupings=groups,
                        ctmodelobj=basemodel, freemodel=freemodel)
 summary(multif)
 
@@ -77,7 +81,7 @@ fixedmodel<-basemodel
 fixedmodel$LAMBDA[2,1]<-'groupfixed'
 groups<-paste0('g',rep(1:2, each=10),'_')
 
-multif<-ctMultigroupFit(datawide=ctExample4, groupings=groups,
+multif<-ctMultigroupFit(dat=ctExample4, groupings=groups,
                        ctmodelobj=basemodel, fixedmodel=fixedmodel)
 summary(multif) 
 }

@@ -1,8 +1,8 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 2.4.0
-Date: 2017-05-16
+Version: 2.5.0
+Date: 2017-10-16
 Authors@R: c(person("Charles", "Driver", role =
     c("aut","cre","cph"),email="driver@mpib-berlin.mpg.de"),
     person("Manuel", "Voelkle", role = c("aut","cph")),
@@ -20,16 +20,16 @@ License: GPL-3
 Depends: R (>= 3.2.0), OpenMx (>= 2.3.0), Rcpp
 URL: https://github.com/cdriveraus/ctsem
 Imports: rstan (>= 2.13), plyr, Matrix, stats, utils, graphics,
-        methods, grDevices, parallel
+        methods, grDevices, parallel, shiny
 LazyData: Yes
 Suggests: knitr, testthat, cts, yuima, shinystan
 VignetteBuilder: knitr
 RoxygenNote: 6.0.1
 NeedsCompilation: no
-Packaged: 2017-05-16 22:30:11 UTC; driver
+Packaged: 2017-10-18 09:45:32 UTC; driver
 Author: Charles Driver [aut, cre, cph],
   Manuel Voelkle [aut, cph],
   Han Oud [aut, cph]
 Maintainer: Charles Driver <driver@mpib-berlin.mpg.de>
 Repository: CRAN
-Date/Publication: 2017-05-17 19:48:56 UTC
+Date/Publication: 2017-10-18 10:04:06 UTC

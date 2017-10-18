@@ -5,9 +5,9 @@ context("singleprocess")
 
 test_that("time calc", {
 set.seed(4)
-Tpoints<-30
+Tpoints<-60
 n.manifest=1
-nsubjects=20
+nsubjects=60
 n.latent=1
 
 DRIFT=matrix(c(-.3), nrow=n.latent, ncol=n.latent)
@@ -23,7 +23,7 @@ genm=ctModel(Tpoints=Tpoints,
   MANIFESTVAR=matrix(c(2), nrow=n.manifest, ncol=n.manifest))
 
 cd=ctGenerate(ctmodelobj=genm, n.subjects=nsubjects, burnin=0, dtmean=1, 
-  logdtsd=0,simultdpredeffect=TRUE,wide=TRUE)
+  logdtsd=0,wide=TRUE)
 
 long=ctWideToLong(datawide = cd,Tpoints = Tpoints,n.manifest = n.manifest)
 long=ctDeintervalise(datalong = long)
@@ -40,9 +40,9 @@ sm<-ctModel(Tpoints=Tpoints,type='stanct',
   LAMBDA=diag(1,n.manifest))
 
 sm$pars$indvarying[!(sm$pars$matrix %in% c('T0MEANS','CINT'))]=FALSE
-sm$pars$transform[(sm$pars$matrix %in% c('DRIFT'))]='-exp(param)-.0001'
-sm$pars$transform[(sm$pars$matrix %in% c('DIFFUSION','T0VAR','MANIFESTVAR'))]='log(exp(param)+1)*500'
-sm$pars$sdscale=1
+# sm$pars$transform[(sm$pars$matrix %in% c('DRIFT'))]='-exp(param)-.0001'
+# sm$pars$transform[(sm$pars$matrix %in% c('DIFFUSION','T0VAR','MANIFESTVAR'))]='log(exp(param)+1)*500'
+# sm$pars$sdscale=1
 # sm$pars$indvarying=FALSE
 
 
@@ -50,16 +50,9 @@ sm$pars$sdscale=1
 
 sf=ctStanFit(datalong=long,ctstanmodel=sm,
   # stanmodeltext=sm2,
-  iter=600,chains=3,plot=T,fit=T,optimize=F,kalman=F)
-summary(sf)
+  iter=300,chains=3,plot=FALSE,fit=TRUE,optimize=FALSE,kalman=TRUE)
+sfsum <- summary(sf)
 
-sm2=sm
-# sm2$pars$indvarying[sm$pars$matrix=='T0MEANS']=TRUE
-sm2$pars=sm2$pars[sm2$pars$matrix!='T0VAR',]
-sf2=ctStanFit2(datalong=long,ctstanmodel=sm2,
-  # stanmodeltext=smtext,
-  iter=600,chains=3,plot=T,fit=T,optimize=F,kalman=F)
-summary(sf2)
 
 m<-ctModel(Tpoints=Tpoints,type='omx',
   n.latent=n.latent,n.manifest=n.manifest,
@@ -69,16 +62,12 @@ m<-ctModel(Tpoints=Tpoints,type='omx',
   # MANIFESTMEANS=matrix(0),
   LAMBDA=diag(1,n.manifest))
 
-f=ctFit(datawide=wide,ctmodelobj=m)
+f=ctFit(dat=wide,ctmodelobj=m)
 summary(f)$ctparameters
 
-#check traits using different fit approaches
-expect_equal(rep(0,4),c(fmlstrait$mxobj$DRIFT$values-fmmtrait$mxobj$DRIFT$values),tolerance=1e-2)
-expect_equal(rep(0,4),c(fmltrait$mxobj$DRIFT$values-fmptrait$mxobj$DRIFT$values[1:2,1:2]),tolerance=1e-2)
+stantraitvar <- (-1/(sfsum$popmeans[2,1])) %*% sfsum$popsd[2,1]^2 %*% (-1/(sfsum$popmeans[2,1]))
 
-# expect_equal(rep(0,4),c(expm(fmlstrait$mxobj$DRIFT$values)-dfmltrait$mxobj$DRIFT$values),tolerance=1e-2)
-
-#check DRIFT is reasonably estimated
-expect_equal(rep(0,4),c(fmltrait$mxobj$DRIFT$values-DRIFT),tolerance=.1)
+#check drift using different fit approaches
+expect_equal(sfsum$popmeans[2,1],summary(f)$ctparameters[2,1],tolerance=1e-2)
 
 })

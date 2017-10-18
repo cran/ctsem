@@ -4,7 +4,7 @@ library(knitr)
 render_sweave()
 set.seed(22)
 knit_hooks$set(crop = hook_pdfcrop)
-opts_chunk$set(fig.path = 'figures/plots-', warning = FALSE, fig.align = 'center', width.cutoff = 80, fig.show = 'hold', eval = TRUE, echo = TRUE, message = FALSE, background = "white", prompt = TRUE, highlight = FALSE, comment = NA, tidy = FALSE, out.truncate = 80)
+opts_chunk$set(fig.path = 'figures/plots-', warning = FALSE, fig.align = 'center', width.cutoff = 80, fig.show = 'hold', eval = TRUE, echo = TRUE, message = FALSE, background = "white", prompt = FALSE, highlight = FALSE, comment = NA, tidy = FALSE, out.truncate = 80)
 options(replace.assign = TRUE, width = 80, prompt = "R> ", scipen = 12, digits = 3,crop=TRUE)
 
 
@@ -57,7 +57,7 @@ data("ctExample1")
 example1model <- ctModel(n.latent = 2, n.manifest = 2, Tpoints = 6, 
   manifestNames = c("LeisureTime", "Happiness"), 
   latentNames = c("LeisureTime", "Happiness"), LAMBDA = diag(2))
-example1fit <- ctFit(datawide = ctExample1, ctmodelobj = example1model)
+example1fit <- ctFit(dat = ctExample1, ctmodelobj = example1model)
 
 ## ----example1ctfittable, include = TRUE, echo = TRUE--------------------------
 summary(example1fit, verbose = TRUE)["discreteDRIFTstd"]
@@ -68,7 +68,7 @@ summary(example1fit, verbose = TRUE)["discreteDRIFTstd"]
 ## ----example1testing, cache = TRUE, echo = TRUE-------------------------------
 testmodel <- example1model
 testmodel$DRIFT[1, 2] <- 0
-testfit <- ctFit(datawide = ctExample1, ctmodelobj = testmodel)
+testfit <- ctFit(dat = ctExample1, ctmodelobj = testmodel)
 
 ## ----mxcompare----------------------------------------------------------------
 mxCompare(example1fit$mxobj, testfit$mxobj)
@@ -82,7 +82,7 @@ data("ctExample1")
 traitmodel <- ctModel(n.manifest = 2, n.latent = 2, Tpoints = 6, 
   LAMBDA = diag(2), manifestNames = c("LeisureTime", "Happiness"), 
   latentNames = c("LeisureTime", "Happiness"), TRAITVAR = "auto")
-traitfit <- ctFit(datawide = ctExample1, ctmodelobj = traitmodel)
+traitfit <- ctFit(dat = ctExample1, ctmodelobj = traitmodel)
 
 ## ----traitparamplot, include = TRUE, cache = FALSE, echo = FALSE, results = 'hide', fig.height = 4----
 par(mfrow = c(2, 2))
@@ -99,7 +99,7 @@ tipredmodel <- ctModel(n.manifest = 2, n.latent = 2, n.TIpred = 1,
   latentNames = c("LeisureTime", "Happiness"),
   TIpredNames = "NumFriends",
  Tpoints = 6, LAMBDA = diag(2), TRAITVAR = "auto")
-tipredfit <- ctFit(datawide = ctExample1TIpred, ctmodelobj = tipredmodel)
+tipredfit <- ctFit(dat = ctExample1TIpred, ctmodelobj = tipredmodel)
 
 summary(tipredfit, verbose = TRUE)["TIPREDEFFECT"]
 summary(tipredfit, verbose = TRUE)["discreteTIPREDEFFECT"]
@@ -171,7 +171,7 @@ tdpredmodel <- ctModel(n.manifest = 2, n.latent = 2, n.TDpred = 1,
   Tpoints = 8, manifestNames = c("LeisureTime", "Happiness"), 
   TDpredNames = "MoneyInt", latentNames = c("LeisureTime", "Happiness"),
   LAMBDA = diag(2), TRAITVAR = "auto")
-tdpredfit <- ctFit(datawide = ctExample2, ctmodelobj = tdpredmodel,
+tdpredfit <- ctFit(dat = ctExample2, ctmodelobj = tdpredmodel,
   stationary=c('T0VAR','T0TRAITEFFECT'))
 summary(tdpredfit, verbose = TRUE)["TDPREDEFFECT"]
 
@@ -196,7 +196,7 @@ tdpredlevelmodel$T0MEANS[3] <- 0
 tdpredlevelmodel$TDPREDEFFECT[1:3, ] <- c(0,0,1)
 tdpredlevelmodel$DRIFT[3, ] <- c(0,0,-.000001)
 
-tdpredlevelfit <- ctFit(datawide = ctExample2, 
+tdpredlevelfit <- ctFit(dat = ctExample2, 
   ctmodelobj = tdpredlevelmodel, 
   stationary=c('T0VAR','T0TRAITEFFECT'))
 
@@ -205,10 +205,8 @@ summary(tdpredlevelfit, verbose = TRUE)[c("DRIFT","TDPREDEFFECT")]
 ## ----timeseries, cache = TRUE, echo = TRUE------------------------------------
 data("ctExample3")
 model <- ctModel(n.latent = 1, n.manifest = 3, Tpoints = 100, 
-  LAMBDA = matrix(c(1, "lambda2", "lambda3"), nrow = 3, ncol = 1), 
-  MANIFESTMEANS = matrix(c(0, "manifestmean2", "manifestmean3"), nrow = 3, 
-    ncol = 1))
-fit <- ctFit(data = ctExample3, ctmodelobj = model, objective = "Kalman",
+  LAMBDA = matrix(c(1, "lambda2", "lambda3"), nrow = 3, ncol = 1))
+fit <- ctFit(dat = ctExample3, ctmodelobj = model, objective = "Kalman",
   stationary = c("T0VAR"))
 
 ## ----multigroup, cache = TRUE, echo = TRUE------------------------------------
@@ -221,7 +219,7 @@ freemodel <- basemodel
 freemodel$LAMBDA[3, 1] <- "groupfree"
 groups <- paste0("g", rep(1:2, each = 10))
 
-multif <- ctMultigroupFit(datawide = ctExample4, groupings = groups,
+multif <- ctMultigroupFit(dat = ctExample4, groupings = groups,
   ctmodelobj = basemodel, freemodel = freemodel)
 
 ## ----multigroupOutput, echo = FALSE-------------------------------------------
@@ -249,7 +247,7 @@ fit <- ctFit(data, model, stationary = c("T0VAR"))
 ## ----osscilating, cache = TRUE, echo = TRUE, eval = TRUE, include = TRUE------
 data("Oscillating")
 
-inits <- c(-39, -.3, 1.01, 10.01, .1, 10.01, 0.05, .9, 0)
+inits <- c(-39, -.3, 1.01, 1.01, .1, 1.01, 0.05, .9, 0)
 names(inits) <- c("crosseffect","autoeffect", "diffusion",
   "T0var11", "T0var21", "T0var22","m1", "m2", 'manifestmean')
 
@@ -268,7 +266,7 @@ oscillatingf <- ctFit(Oscillating, oscillatingm, carefulFit = FALSE)
 ## ----inits, echo = TRUE-------------------------------------------------------
 omxInits <- omxGetParameters(example1fit$mxobj)
 
-fitWithInits <- ctFit(data = ctExample1, ctmodelobj = example1model, 
+fitWithInits <- ctFit(dat = ctExample1, ctmodelobj = example1model, 
   omxStartValues = omxInits)
 
 ## ----fulldiscretecomparison,cache=TRUE----------------------------------------
@@ -276,7 +274,7 @@ data("ctExample1")
 traitmodel <- ctModel(n.manifest = 2, n.latent = 2, Tpoints = 6, 
   LAMBDA = diag(2), manifestNames = c("LeisureTime", "Happiness"), 
   latentNames = c("LeisureTime", "Happiness"), TRAITVAR = "auto")
-traitfit <- ctFit(datawide = ctExample1, ctmodelobj = traitmodel)
+traitfit <- ctFit(dat = ctExample1, ctmodelobj = traitmodel)
 traitfit <- ctCI(traitfit, confidenceintervals = 'DRIFT')
 
 discrete <- ctExample1

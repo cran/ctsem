@@ -83,17 +83,20 @@ if(type=='standt') continuoustime<-FALSE
   ctspec$transform[ctspec$matrix %in% c('LAMBDA') &  freeparams] <- '(param+.5) * 10'
   
   ctspec$transform[ctspec$matrix %in% c('DIFFUSION','MANIFESTVAR', 'T0VAR') & 
-      freeparams & ctspec$row != ctspec$col] <- 'inv_logit(param)*2-1'
+      freeparams & ctspec$row != ctspec$col] <- '(param)' #'inv_logit(param)*2-1'
   
-  ctspec$transform[ctspec$matrix %in% c('DIFFUSION','MANIFESTVAR', 'T0VAR') & 
-      freeparams & ctspec$row == ctspec$col] <- 'exp(param*2) +.00001' #'1/(.1+exp(param*1.8))*10+.001'
+  ctspec$transform[ctspec$matrix %in% c('MANIFESTVAR', 'T0VAR') & 
+      freeparams & ctspec$row == ctspec$col] <- 'exp(param)' #'1/(.1+exp(param*1.8))*10+.001'
+  
+  ctspec$transform[ctspec$matrix %in% c('DIFFUSION') & 
+      freeparams & ctspec$row == ctspec$col] <- 'exp(param*2)' #'1/(.1+exp(param*1.8))*10+.001'
   
   if(continuoustime==TRUE){
     ctspec$transform[ctspec$matrix %in% c('DRIFT') & 
         freeparams & ctspec$row == ctspec$col] <- '-log(exp(-param*1.5)+1)-.00001' #'log(1/(1+(exp(param*-1.5))))'
     
     ctspec$transform[ctspec$matrix %in% c('DRIFT') & freeparams & 
-        ctspec$row != ctspec$col] <- '(param)*.5'
+        ctspec$row != ctspec$col] <- '(param)'
   }
   if(continuoustime==FALSE){
     ctspec$transform[ctspec$matrix %in% c('DRIFT') & freeparams & 
@@ -105,8 +108,12 @@ if(type=='standt') continuoustime<-FALSE
   
   nparams<-sum(freeparams)
   
-  if(all(indvarying=='all'))  indvarying<-rep(TRUE,nparams)
-  if(length(indvarying) != sum(freeparams)) stop('indvarying must be ', nparams,' long!')
+  if(all(indvarying=='all'))  {
+    indvarying<-rep(TRUE,nparams)
+    indvarying[ctspec$matrix[is.na(ctspec$value)] %in% 'T0VAR'] <- FALSE
+  }
+  
+  if(length(indvarying) != nparams) stop('indvarying must be ', nparams,' long!')
   nindvarying <- sum(indvarying)
   
   
@@ -134,9 +141,14 @@ if(type=='standt') continuoustime<-FALSE
     continuoustime=continuoustime)
   class(out)<-'ctStanModel'
   
-  if(n.TIpred > 0) out$tipredeffectprior <- 'normal(0,1)'
+  if(n.TIpred > 0) {
+    out$tipredeffectprior <- 'normal(0,1)'
+    out$tipredsimputedprior <- 'normal(0,10)'
+  }
   # out$hypersdpriorscale <- 1
-  # out$hypersdtransform <- 'hypersd .* sdscale'
+  out$rawhypersd <- 'normal(0,1)'
+  out$rawhypersdlowerbound <- NA
+  out$hypersdtransform <- 'exp(rawhypersd * 2 ) .* sdscale'
   out$stationarymeanprior <- NA
   out$stationaryvarprior <- NA
   

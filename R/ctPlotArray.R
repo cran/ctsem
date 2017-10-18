@@ -32,6 +32,7 @@ ctPlotArray <- function(yarray,x,
   legend=TRUE,legendcontrol=list(x='topright'),
   polygon=TRUE, polygonalpha=.1,polygoncontrol=list(border=NA,steps=50)){
   
+  # browser()
   separate=FALSE
   nvars<-dim(yarray)[2]
   
@@ -55,7 +56,7 @@ ctPlotArray <- function(yarray,x,
   
   if(all(ltyvec=='auto')) ltyvec = 1:nvars
   if(all(lwdvec=='auto')) lwdvec = rep(3,nvars)
-  if(all(colvec=='auto')) colvec = rainbow(nvars)
+  if(all(colvec=='auto')) colvec = rainbow(nvars,v=.9)
   if(all(typevec=='auto')) typevec = rep('l',nvars)
   # if(all(mainvec=='auto')){
   #   if(separate) mainvec=dimnames(yarray)[[2]] else mainvec =rep(ifelse(is.null(plotcontrol$main),'',plotcontrol$main),nvars)
@@ -63,7 +64,8 @@ ctPlotArray <- function(yarray,x,
   
   plotargs<-plotcontrol
   plotargs$x <- x
-  if(!separate && is.null(plotcontrol$ylim)) plotargs$ylim = range(yarray)
+  if(!separate && is.null(plotcontrol$ylim)) plotargs$ylim = range(yarray,na.rm=TRUE)+ c(0,
+    (max(yarray,na.rm=TRUE) - min(yarray,na.rm=TRUE)) /3)
   plotargs$xlim = range(x,na.rm=TRUE)
   
   ctpolyargs<-polygoncontrol
@@ -76,16 +78,21 @@ ctPlotArray <- function(yarray,x,
   blankargs$y=NA
   blankargs$x=NA
   do.call(plot,blankargs)
-  if(grid) grid()
+  if(grid) {
+    grid()
+    par(new=TRUE)
+    do.call(plot,blankargs)
+    par(new=FALSE)
+  }
   
   #confidence
   if(polygon) {
     for(pari in c(1:dim(yarray)[2],dim(yarray)[2]:1)){
       ctpolyargs$col=adjustcolor(colvec[pari],alpha.f=max(c(.004,polygonalpha/ctpolyargs$steps)))
-      ctpolyargs$x=plotargs$x
-      ctpolyargs$y=yarray[,pari,2] #predict(loess(yarray[,pari,2]~ctpolyargs$x))
-      ctpolyargs$yhigh = yarray[,pari,3] #predict(loess(yarray[,pari,3]~ctpolyargs$x))
-      ctpolyargs$ylow = yarray[,pari,1]#predict(loess(yarray[,pari,1]~ctpolyargs$x))
+      ctpolyargs$x=plotargs$x[!is.na(plotargs$x) & !is.na(yarray[,pari,2])]
+      ctpolyargs$y=yarray[,pari,2][!is.na(plotargs$x) & !is.na(yarray[,pari,2])] #predict(loess(yarray[,pari,2]~ctpolyargs$x))
+      ctpolyargs$yhigh = yarray[,pari,3][!is.na(plotargs$x) & !is.na(yarray[,pari,2])] #predict(loess(yarray[,pari,3]~ctpolyargs$x))
+      ctpolyargs$ylow = yarray[,pari,1][!is.na(plotargs$x) & !is.na(yarray[,pari,2])]#predict(loess(yarray[,pari,1]~ctpolyargs$x))
       
       do.call(ctPoly,ctpolyargs) 
     }

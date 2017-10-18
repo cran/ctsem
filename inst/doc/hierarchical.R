@@ -59,10 +59,10 @@ head(model$pars,8)
 
 ## ----transform, fig.width=8, fig.height=6---------------------------------------------------------
 par(mfrow=c(1,2))
-plot(model,rows=11)
+plot(model,rows=11,hypersd=1)
 print(model$pars$transform[11])
 model$pars$transform[11]<- "(exp(param*2) +.0001)*.2"
-plot(model,rows=11)
+plot(model, rows=11, hypersd=1)
 
 ## ----restrictbetween------------------------------------------------------------------------------
 model$pars[c(15,18),]$indvarying<-FALSE
@@ -72,23 +72,28 @@ model$pars$sdscale[1:28] <- .5
 model$pars[,c('TI1_effect','TI2_effect','TI3_effect')]<-FALSE
 model$pars[c(19,20),c('TI1_effect','TI2_effect','TI3_effect')]<-TRUE
 
-## ----fitting,cache=TRUE---------------------------------------------------------------------------
+## ----fitting,include=FALSE,cache=TRUE-------------------------------------------------------------
 fit<-ctStanFit(datalong = ctstantestdat, ctstanmodel = model, iter=200, 
   chains=2, plot=FALSE, control=list(max_treedepth = 6))
 
+## ----fittingshow,include=TRUE,eval=FALSE----------------------------------------------------------
+#  fit<-ctStanFit(datalong = ctstantestdat, ctstanmodel = model, iter=200,
+#    chains=2, plot=FALSE, control=list(max_treedepth = 6))
+
 ## ----output,eval=FALSE----------------------------------------------------------------------------
-#  summary(fit)
+#  summary(fit,timeinterval = 1)
 
 ## ----plots1,echo=FALSE,fig.width=8, fig.height=6--------------------------------------------------
 ctStanDiscretePars(fit, plot=TRUE)
 
 ## ----outputposterior------------------------------------------------------------------------------
-ctStanPlotPost(ctstanfitobj = fit, rows=11)
+ctStanPlotPost(obj = fit, rows=11)
 
 ## ----kalmanplot,echo=TRUE,fig.width=10,fig.height=7-----------------------------------------------
-ctStanKalman(fit, subjects=2, timerange=c(0,60), timestep=.1, plot=TRUE)
+ctKalman(fit, subjects=2, timerange=c(0,60), kalmanvec=c('y', 'ysmooth'), 
+  timestep=.1, plot=TRUE)
 
-## ----sunspots,cache=TRUE--------------------------------------------------------------------------
+## ----sunspots,include=FALSE, cache=TRUE-----------------------------------------------------------
 #get data
  sunspots<-sunspot.year
  sunspots<-sunspots[50: (length(sunspots) - (1988-1924))]
@@ -101,23 +106,50 @@ datalong <- cbind(id, time, sunspots)
   manifestNames='sunspots', 
   latentNames=c('ss_level', 'ss_velocity'),
    LAMBDA=matrix(c( 1, 'ma1' ), nrow=1, ncol=2),
-   DRIFT=matrix(c(0, 1,   'a21', 'a22'), nrow=2, ncol=2, byrow=TRUE),
+   DRIFT=matrix(c(0, 'a21', 1, 'a22'), nrow=2, ncol=2),
    MANIFESTMEANS=matrix(c('m1'), nrow=1, ncol=1),
-   # MANIFESTVAR=matrix(0, nrow=1, ncol=1),
    CINT=matrix(c(0, 0), nrow=2, ncol=1),
-   DIFFUSION=matrix(c(
-     0, 0,
-     0, "diffusion"), ncol=2, nrow=2, byrow=TRUE))
+   T0VAR=matrix(c(0,0,0,1), nrow=2, ncol=2), #Because single subject
+   DIFFUSION=matrix(c(0, 0, 0, "diffusion"), ncol=2, nrow=2))
  
  model$pars$indvarying<-FALSE #Because single subject
  model$pars$transform[14]<- '(param)*5+44 ' #Because not mean centered
  model$pars$transform[4]<-'log(exp(-param*1.5)+1)' #To avoid multi modality 
 
 #fit
-fit <- ctStanFit(datalong, model, iter=400, chains=2, control=list(adapt_delta=.9))
+fit <- ctStanFit(datalong, model, iter=300, chains=2)
 
 #output
 summary(fit)$popmeans
+
+## ----sunspotsshow,include=TRUE,eval=FALSE---------------------------------------------------------
+#  #get data
+#   sunspots<-sunspot.year
+#   sunspots<-sunspots[50: (length(sunspots) - (1988-1924))]
+#   id <- 1
+#   time <- 1749:1924
+#  datalong <- cbind(id, time, sunspots)
+#  
+#  #setup model
+#   model <- ctModel(type='stanct', n.latent=2, n.manifest=1,
+#    manifestNames='sunspots',
+#    latentNames=c('ss_level', 'ss_velocity'),
+#     LAMBDA=matrix(c( 1, 'ma1' ), nrow=1, ncol=2),
+#     DRIFT=matrix(c(0, 'a21', 1, 'a22'), nrow=2, ncol=2),
+#     MANIFESTMEANS=matrix(c('m1'), nrow=1, ncol=1),
+#     CINT=matrix(c(0, 0), nrow=2, ncol=1),
+#     T0VAR=matrix(c(0,0,0,1), nrow=2, ncol=2), #Because single subject
+#     DIFFUSION=matrix(c(0, 0, 0, "diffusion"), ncol=2, nrow=2))
+#  
+#   model$pars$indvarying<-FALSE #Because single subject
+#   model$pars$transform[14]<- '(param)*5+44 ' #Because not mean centered
+#   model$pars$transform[4]<-'log(exp(-param*1.5)+1)' #To avoid multi modality
+#  
+#  #fit
+#  fit <- ctStanFit(datalong, model, iter=300, chains=2)
+#  
+#  #output
+#  summary(fit)$popmeans
 
 ## ----sdtransforms---------------------------------------------------------------------------------
 #population mean and subject level deviations (pre-transformation)
@@ -130,17 +162,14 @@ indparamsbase_post <- rnorm(50, 0, 1) #hypothetical sample
 
 #population standard deviation prior
 
-hypersd_prior <- rnorm(99999, 0, 1)
-hypersd_prior <- hypersd_prior[hypersd_prior > 0]
+rawhypersd_prior <- rnorm(99999, 0, 1)
+hypersd_prior <- exp(rawhypersd_prior * 2 )
 
 #population standard deviation posterior
 
 hypersd_post <- .4 #hypothetical
 
-#population cholesky correlation matrix
-#lower triangle sampled from uniform(-1, 1), 
-#upper triangle fixed to 0, 
-#diagonal calculated according to hypersd.
+#square root of population correlation matrix
 hypercorrchol_post <- 1 #because only 1 parameter here...
 
 #population cholesky covariance matrix 
@@ -159,22 +188,4 @@ indparams <- -log(exp(-1.5 * indparams) + 1)
 hsd_ourparameter <- abs( #via delta approximation
   (-log(exp(-1.5 * (hypermeans_post + hypersd_post)) + 1) - 
    -log(exp(-1.5 * (hypermeans_post - hypersd_post)) + 1) ) / 2)
-
-## ----priorplots3,fig.height=12,fig.width=10,cache=FALSE,echo=FALSE, crop=FALSE--------------------
-param<-rnorm(9999999)
-par(mfrow=c(3,2),mar=c(4,3,3,1),mgp=c(2,.5,0),cex=1)
-yy<-exp(4*param)
-yy<-yy[yy<10]
-plot(density(yy,from=-.1 ,bw=.01,n=5000),type='l', lwd=3, xlim=c(-.1,5),ylim=c(0,1),  xaxs='i', yaxs='i',xlab='Value',main='Std. deviation')
-grid()
-plot(density(yy^2,from=-.1 ,bw=.02,n=5000),type='l', lwd=3, xlim=c(-.5,25), ylim=c(0,.1), xaxs='i', yaxs='i',xlab='Value',main='Variance')
-grid()
-plot(density(-log(exp(-param*1.5)+1),bw=.02,n=5000),type='l',lwd=3,ylim=c(0,1),xlim=c(-5,0), xaxs='i', yaxs='i', xlab='Value', main='Auto effect')
-grid()
-plot(density(exp(-log(exp(-param*1.5)+1))),type='l',lwd=3,ylim=c(0,1.6), xaxs='i', yaxs='i', xlab='Value', main='Autoregression | $\\Delta t = 1$')
-grid()
-plot(density(2/(1+exp(param))-1,n=5000,bw=.03,from=-1,to=1), type='l', lwd=3, xlim=c(-1,1), xaxs='i', ylim=c(0,1), yaxs='i', xlab='Value',main='Partial correlation')
-grid()
-plot(density((param)),type='l',lwd=2,ylim=c(0,.5),xlim=c(-4,4),xaxs='i',yaxs='i', xlab='Value', main='Other parameters')
-grid()
 
