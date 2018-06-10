@@ -7,7 +7,6 @@
 #' @examples
 #' \dontrun{
 #' #### example 1 
-#' library(rstan)
 #' scode <- "
 #' parameters {
 #'   real y[2]; 
@@ -51,6 +50,7 @@ stanplot<-function(chains,seed){
     output$chainPlot <- renderPlot({
     parameter<-input$parameter
     begin<-input$begin
+    refresh <- input$refresh
     colimport<-rep("NULL",length(varnames))
     colimport[which(varnames %in% parameter)]<-NA
     begin<-input$begin
@@ -78,20 +78,20 @@ stanplot<-function(chains,seed){
     grid()
     
     })
-    },ui=fluidPage(
+    },ui=shiny::fluidPage(
     # Application title
-    titlePanel("stan mid-sampling plots..."),
-    sidebarLayout(
+    shiny::titlePanel("stan mid-sampling plots..."),
+    shiny::sidebarLayout(
     # Sidebar with a slider input for number of observations
-    sidebarPanel(
-    sliderInput("begin", "Start of range:", min = 1,max=iter,value = 1,step=1), 
-    selectInput("parameter", "Choose a parameter:", choices = varnames),
-    actionButton("refresh", "Refresh sample data")
+    shiny::sidebarPanel(
+    shiny::sliderInput("begin", "Start of range:", min = 1,max=iter,value = 1,step=1), 
+    shiny::selectInput("parameter", "Choose a parameter:", choices = varnames),
+    shiny::actionButton("refresh", "Refresh sample data")
     ),
     
     # Show a plot of the generated distribution
-    mainPanel(
-    plotOutput("chainPlot")
+    shiny::mainPanel(
+    shiny::plotOutput("chainPlot")
     )
     ))),
     launch.browser=TRUE)
@@ -108,7 +108,7 @@ stanseed<-floor(as.numeric(Sys.time()))
 
   stanplot(chains=chains,seed=stanseed)
   
-  out=stan(iter=iter,chains=chains,sample_file=sample_file,...)
+  out=sampling(iter=iter,chains=chains,sample_file=sample_file,...)
 
   for(chaini in 1:chains) system(paste0("rm ",tmpdir,'/',stanseed,"samples_",chaini,".csv"))
   system(paste0('rm ',tmpdir,'/stanplottemp.R'))

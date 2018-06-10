@@ -8,38 +8,25 @@
 Minimal output from \code{\link{ctStanFit}} from ctsem package.
 }
 \examples{
-\dontrun{
-### generator for ctstantestfit
-set.seed(2)
-Tpoints=50
-n.manifest=2
-n.TDpred=0
-n.TIpred=3
-n.latent=2
-n.subjects=3
-
-testm<-ctModel(type='omx',Tpoints=Tpoints,n.latent=n.latent,
-n.TDpred=n.TDpred,n.TIpred=n.TIpred,n.manifest=n.manifest,
-  MANIFESTVAR=diag(0.5,2),
-  TIPREDEFFECT=matrix(c(0,0,0,0,0,0),nrow=2),
-  TIPREDVAR=matrix(c(1,-.2,0, 0,1,0, 0,0,.5),nrow=3),
-  TDPREDEFFECT=matrix(c(.1,-.2),nrow=2),
-  TDPREDVAR=matrix(0,nrow=n.TDpred*(Tpoints),ncol=n.TDpred*(Tpoints)),
-  TDPREDMEANS=matrix(rnorm(n.TDpred*(Tpoints),0,1),nrow=n.TDpred*(Tpoints)),
-  LAMBDA=diag(1,2),
-  DRIFT=matrix(c(-.3,.2,-.1,-.2),nrow=2),
-  DIFFUSION=matrix(c(.3,.1,0,.2),2),CINT=matrix(c(0,0),nrow=2),
-  T0MEANS=matrix(0,ncol=1,nrow=2),
-  T0VAR=diag(100,2))
-cd<-ctGenerate(testm,n.subjects=n.subjects,burnin=30,wide=FALSE)
-
+\dontrun{#' 
 checkm<-ctModel(type='stanct',Tpoints=Tpoints,
   n.latent=n.latent,n.TDpred=n.TDpred,n.TIpred=n.TIpred,
+  MANIFESTVAR=matrix(c('merror',0,0,'merror'),2,2),
+  MANIFESTMEANS=matrix(0,nrow=n.manifest),
+  CINT=matrix(c('cint1','cint2'),ncol=1),
   n.manifest=n.manifest,LAMBDA=diag(2))
   
-checkm$pars$indvarying[-1:-2] <- FALSE
+checkm$pars$indvarying[-c(7,13)] <- FALSE
+checkm$pars$sdscale <- .1
+ 
+checkm$pars[c(-1,-2, -21,-22) ,c('TI1_effect','TI2_effect','TI3_effect')] <- FALSE
 
-ctstantestfit<-ctStanFit(cd,checkm,iter=20,chains=2)
+ctstantestfit<-ctStanFit(ctstantestdat,checkm,iter=800, warmup=780,chains=2, 
+  control=list(max_treedepth=8,adapt_delta=.8))
+summary(ctstantestfit)
 save(ctstantestfit,file='.\\\\data\\\\ctstantestfit.rda')
+paths <- sort(Sys.glob(c("data/*.rda", "data/*.RData")))
+library(tools)
+resaveRdaFiles(paths)
 }
 }

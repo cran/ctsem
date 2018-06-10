@@ -1,3 +1,12 @@
+suppressOutput <- function(...,verbose=0){
+  if(verbose > 0) return(eval(...)) else return(capture.output(eval(...)))
+}
+
+naf <-function(x){
+  x[is.na(x)] <- FALSE
+  return(x)
+}
+
 # helper function to generate an index matrix, or return unique elements of a matrix
 indexMatrix<-function(dimension,symmetrical=FALSE,upper=FALSE,lowerTriangular=FALSE, sep=NULL,starttext=NULL,endtext=NULL,
   unique=FALSE,rowoffset=0,coloffset=0,indices=FALSE,diagonal=TRUE,namesvector=NULL){
@@ -14,6 +23,44 @@ indexMatrix<-function(dimension,symmetrical=FALSE,upper=FALSE,lowerTriangular=FA
   }
   return(tempmatrix)
 }
+
+#convert id's to ascending numeric 
+makeNumericIDs <- function(datalong,idName='id',timeName='time'){
+  originalid <- unique(datalong[,idName])
+  datalong[,idName] <- match(datalong[,idName],originalid)
+  
+  datalong <- datalong[order(datalong[,idName],datalong[,timeName]),] #sort by id then time
+  
+  if(any(is.na(as.numeric(datalong[,idName])))) stop('id column may not contain NA\'s or character strings!')
+  return(datalong)
+}
+
+#' Right multiply a matrix by its transpose.
+#'
+#' @param x matrix.
+#'
+#' @return matrix.
+#' @export
+#'
+#' @examples
+#' msquare(t(chol(diag(3,4)+1)))
+msquare <- function(x) {
+  x %*% t(x)
+}
+
+
+crosscov <- function(a,b){
+  da <- a-matrix(colMeans(a),nrow=nrow(a),ncol=ncol(a),byrow=TRUE)
+  db <- b-matrix(colMeans(b),nrow=nrow(b),ncol=ncol(b),byrow=TRUE)
+  t(da) %*% db / (nrow(a)-1)
+  
+  # cc <- matrix(NA,nrow=nrow(a))
+  # for(i in 1:nrow(a)){
+  #   cc[i,] <- da[i,] * db[i,]
+  
+}
+
+
 
 #' ctCollapse
 #' Easily collapse an array margin using a specified function.
@@ -61,6 +108,9 @@ inv_logit<-function(x) {
 #' Used for ctsem density plots.
 #' 
 #' @param x numeric vector on which to compute density.
+#' @param bw either 'auto' or a numeric indicating bandwidth.
+#' @param plot logical to indicate whether or not to plot the output.
+#' @param ... Further args to density.
 #' 
 #' @examples
 #' y <- ctDensity(exp(rnorm(80)))
@@ -74,22 +124,82 @@ inv_logit<-function(x) {
 #' plot(density(y))
 #' @export
 
-ctDensity<-function(x){
-  xlims=stats::quantile(x,probs=c(.02,.98))
-  mid=mean(c(xlims[2],xlims[1]))
-  xlims[1] = xlims[1] - (mid-xlims[1])
-  xlims[2] = xlims[2] + (xlims[2]-mid)
-  x=x[x>xlims[1] & x<xlims[2]]
-  bw=(max(x)-min(x))^1.2 / length(x)^.4 *.4
+ctDensity<-function(x,bw='auto',plot=FALSE,...){
+  xlims=stats::quantile(x,probs=c(.05,.95),na.rm=TRUE)
+  sd=sd(xlims)
+  xlims[1] = xlims[1] - sd
+  xlims[2] = xlims[2] + sd
+  # x=x[x>xlims[1]*1.2 & x<xlims[2]*1.2]
+  # bw=(max(x)-min(x))^1.2 / length(x)^.4 *.4
+  if(bw=='auto') bw=min(sd/100,1e-4)
   
-  xlims=stats::quantile(x,probs=c(.01,.99))
-  mid=mean(c(xlims[2],xlims[1]))
-  xlims[1] = xlims[1] - (mid-xlims[1])/8
-  xlims[2] = xlims[2] + (xlims[2]-mid)/8
+  # xlims=stats::quantile(x,probs=c(.01,.99))
+  # mid=mean(c(xlims[2],xlims[1]))
+  # xlims[1] = xlims[1] - (mid-xlims[1])/8
+  # xlims[2] = xlims[2] + (xlims[2]-mid)/8
   
-  out1<-stats::density(x,bw=bw,n=5000)
-  out3=c(0,max(out1$y)*1.1)
-  return(list(density=out1,xlim=xlims,ylim=out3))
+  out1<-stats::density(x,bw=bw,n=5000,from=xlims[1]-sd,to=xlims[2]+sd)
+  ylims=c(0,max(out1$y)*1.1)
+  
+  if(plot) plot(out1$x, out1$y,type='l', xlim=xlims,ylim=ylims,ylab='Density',xlab='Par. Value',...)
+  
+  return(list(density=out1,xlim=xlims,ylim=ylims))
+}
+
+
+
+ctDensityList<-function(x,xlimsindex='all',plot=FALSE,ylab='Density',
+  xlab='Par. Value',colvec='auto',ltyvec='auto',probs=c(.05,.95),
+  legend=FALSE, legendargs=list(),...){
+  
+  if(all(xlimsindex=='all')) xlimsindex <- 1:length(x)
+  
+  for(i in xlimsindex){
+    newxlims=stats::quantile(x[[i]],probs=probs,na.rm=TRUE)
+    if(i==1) {
+      xlims=newxlims
+    } 
+    else {
+        newxlims <- range(c(xlims,newxlims))
+    }
+  }
+  sd=sd(xlims)
+  xlims[1] = xlims[1] - sd/2
+  xlims[2] = xlims[2] + sd/2
+
+  bw=abs(max( 
+    min( (sd)/length(x[[1]])^.4,sd/30),
+      1e-5))
+  
+  if(all(colvec=='auto')) colvec=1:length(x)
+  if(all(ltyvec=='auto')) ltyvec=1:length(x)
+  
+  # xlims=stats::quantile(x,probs=c(.01,.99))
+  # mid=mean(c(xlims[2],xlims[1]))
+  # xlims[1] = xlims[1] - (mid-xlims[1])/8
+  # xlims[2] = xlims[2] + (xlims[2]-mid)/8
+  denslist<-lapply(1:length(x),function(xi) stats::density(x[[xi]],bw=bw,n=5000,from=xlims[1]-sd/2,to=xlims[2]+sd/2,na.rm=TRUE))
+  ylims=c(0,max(unlist(lapply(denslist,function(li) max(li$y))))*1.1) * ifelse(legend[1]!=FALSE, 1.2,1)
+  
+  if(plot) {
+    plot(denslist[[1]]$x, denslist[[1]]$y,type='l', xlim=xlims,ylim=ylims,ylab=ylab,xlab=xlab,col=colvec[1],lty=ltyvec[1],...)
+    if(length(denslist)>1){
+      for(ci in 2:length(denslist)){
+        points(denslist[[ci]]$x, denslist[[ci]]$y,type='l', col=colvec[ci],lty=ltyvec[ci],...)
+      }
+    }
+    if(all(legend!=FALSE)) {
+      if(is.null(legendargs$col)) legendargs$col = colvec
+      if(is.null(legendargs$text.col)) legendargs$text.col = colvec
+      if(is.null(legendargs$lty)) legendargs$lty = ltyvec
+      if(is.null(legendargs$x)) legendargs$x='topright'
+      if(is.null(legendargs$bty)) legendargs$bty='n'
+      legendargs$legend = legend
+      do.call(graphics::legend,legendargs)
+    }
+  }
+
+  return(list(density=denslist,xlim=xlims,ylim=ylims))
 }
 
 
@@ -111,14 +221,14 @@ ctDensity<-function(x){
 #' ctPoly(x=0:100, y=sqrt(0:100), 
 #' yhigh=sqrt(0:100) - runif(101), 
 #' ylow=sqrt(0:100) + runif(101),
-#' col=adjustcolor('red',alpha.f=.1),border=NA)
+#' col=adjustcolor('red',alpha.f=.1))
 ctPoly <- function(x,y,ylow,yhigh,steps=20,...){
   for(i in 1:steps){
     tylow= y + (ylow-y)*i/steps
     tyhigh= y + (yhigh-y)*i/steps
-  xf <- c(x,x[length(x):1])
-  yf <- c(tylow,tyhigh[length(tyhigh):1])
-  polygon(xf,yf,...)
+    xf <- c(x,x[length(x):1])
+    yf <- c(tylow,tyhigh[length(tyhigh):1])
+    polygon(xf,yf,border=NA,...)
   }
 }
 
@@ -154,14 +264,14 @@ ctWideNames<-function(n.manifest,Tpoints,n.TDpred=0,n.TIpred=0,manifestNames='au
   
   manifestnames<-paste0(manifestNames,"_T",rep(0:(Tpoints-1),each=n.manifest))
   if(n.TDpred > 0 && Tpoints > 1) {
-      TDprednames<-paste0(TDpredNames,"_T",rep(0:(Tpoints-1),each=n.TDpred))
+    TDprednames<-paste0(TDpredNames,"_T",rep(0:(Tpoints-1),each=n.TDpred))
   } else {
-      TDprednames<-NULL
+    TDprednames<-NULL
   }
   if (Tpoints > 1) {
-      intervalnames<-paste0("dT",1:(Tpoints-1))
+    intervalnames<-paste0("dT",1:(Tpoints-1))
   } else {
-      intervalnames <- NULL
+    intervalnames <- NULL
   }
   if(n.TIpred>0) TIprednames <- paste0(TIpredNames) else TIprednames <- NULL
   return(c(manifestnames,TDprednames,intervalnames,TIprednames))

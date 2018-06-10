@@ -8,9 +8,9 @@ ctStanDiscreteParsPlot(x, indices = "all", add = FALSE, legend = TRUE,
   polygon = TRUE, quantiles = c(0.025, 0.5, 0.975), times = seq(0, 10,
   0.1), latentNames = "auto", lwdvec = "auto", colvec = "auto",
   ltyvec = "auto", plotcontrol = list(ylab = "Value", xlab =
-  "Time interval", main = "Regression coefficients", type = "l"), grid = TRUE,
-  legendcontrol = list(x = "topright", bg = "white"), polygonalpha = 0.3,
-  polygoncontrol = list(border = NA, steps = 20))
+  "Time interval", main = "Regression coefficients", type = "l", xaxs = "i"),
+  grid = FALSE, legendcontrol = list(x = "topright", bg = "white"),
+  polygonalpha = 0.1, polygoncontrol = list(steps = 20))
 }
 \arguments{
 \item{x}{list object returned from \code{\link{ctStanDiscretePars}}.}
@@ -58,8 +58,7 @@ will be ignored.}
 the fill polygon.}
 
 \item{polygoncontrol}{list of arguments to pass to ctPoly function (if polygon=TRUE).
-x,y, and col arguments will be ignored. Border is removed by default because quantile
-borders are differently, and steps specifies the number of polygons to overlay to 
+x,y, and col arguments will be ignored. Steps specifies the number of polygons to overlay to 
 create a graduated transparency. Set to 1 for a flat looking plot.}
 }
 \description{

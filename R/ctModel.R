@@ -127,6 +127,8 @@
 #' matrix for all time independent predictors.
 #' "auto" (default) freely estimates all parameters.
 #' 
+#' @param PARS for types 'stanct' and 'standt' only. May be of any structure, only needed to contain extra parameters for certain non-linear models.
+#' 
 #' @param startValues For type='omx' only. A named vector, where the names of each value must match a parameter in the specified model,
 #' and the value sets the starting value for that parameter during optimization.
 #' If not set, random starting values representing relatively stable processes with small effects and 
@@ -180,25 +182,13 @@ ctModel<-function(n.manifest, n.latent, LAMBDA, type='omx', Tpoints=NULL,
   TRAITTDPREDCOV="auto", TDTIPREDCOV='auto',
   TIPREDMEANS="auto", TIPREDEFFECT="auto", 
   T0TIPREDEFFECT="auto", TIPREDVAR="auto", 
+  PARS=NULL,
   startValues=NULL, timeVarying=NULL){
   
   
   
   #####FUNCTIONS
-  
-  
-  isx<-function(x){ #if that returns FALSE for both FALSE and NA results
-    if(is.na(x)){
-      return(FALSE)
-      break()
-    }
-    if(x==FALSE){
-      return(FALSE)
-      break()
-    }
-    if(x==TRUE){
-      return(TRUE)
-    }}
+
   
   checkSymmetry<-function(x){  #this checks the symmetry of matrix x, if not symmetric it stops and outputs an error
     if(isSymmetric(x)==F){
@@ -511,7 +501,7 @@ ctModel<-function(n.manifest, n.latent, LAMBDA, type='omx', Tpoints=NULL,
     TRAITVAR,T0TRAITEFFECT,MANIFESTTRAITVAR,
     TDPREDEFFECT, TDPREDMEANS, T0TDPREDCOV, TRAITTDPREDCOV,
     TIPREDEFFECT, TIPREDMEANS, T0TIPREDEFFECT,
-    TIPREDVAR, TDPREDVAR,TDTIPREDCOV,   
+    TIPREDVAR, TDPREDVAR,TDTIPREDCOV,  PARS, 
     startValues, timeVarying)
   
   names(completemodel)<-c("n.manifest","n.latent","n.TDpred","n.TIpred","Tpoints","LAMBDA",
@@ -520,7 +510,7 @@ ctModel<-function(n.manifest, n.latent, LAMBDA, type='omx', Tpoints=NULL,
     "TRAITVAR",'T0TRAITEFFECT',"MANIFESTTRAITVAR",
     'TDPREDEFFECT', 'TDPREDMEANS', 'T0TDPREDCOV', 'TRAITTDPREDCOV',
     'TIPREDEFFECT', 'TIPREDMEANS', 'T0TIPREDEFFECT',
-    'TIPREDVAR', 'TDPREDVAR','TDTIPREDCOV',  
+    'TIPREDVAR', 'TDPREDVAR','TDTIPREDCOV',  'PARS',
     "startValues", 'timeVarying')
   
 

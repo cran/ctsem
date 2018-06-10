@@ -4,22 +4,22 @@
 #'
 #' @param x ctStanFit object
 #' @param substrings vector of character strings, parameter names of the stan model
-#' containing any of these strings will be returned. Useful strings may be 'hmean_' for 
-#' hyper (population) means, 'hsd_' for hyper standard deviations, 'tipred_' for time
-#' independent predictors, or specific combinations such as 'hmean_drift' for the population
+#' containing any of these strings will be returned. Useful strings may be 'pop_' for 
+#' population means, 'popsd' for population standard deviations,
+#'  or specific combinations such as 'pop_DRIFT' for the population
 #' means of temporal dynamics parameters
 #' @return vector of character strings.
 #' @examples
-#' ctStanParnames(ctstantestfit,substrings=c('hmean_','hsd_'))
+#' ctStanParnames(ctstantestfit,substrings=c('pop_','popsd'))
 #' @export
-ctStanParnames <- function(x,substrings=c('hmean_','hsd_')){
+ctStanParnames <- function(x,substrings=c('pop_','popsd')){
   out<-c()
   for(subsi in substrings){
-    out<- c(out, x$stanfit@model_pars[grep(subsi,x$stanfit@model_pars)])
+    out<- c(out, x$stanfit@model_pars[grep(paste0('^',subsi),x$stanfit@model_pars)])
   }
   return(out)
 }
- 
+
 
 #'ctStanContinuousPars
 #'
@@ -52,7 +52,7 @@ ctStanContinuousPars <- function(ctstanfitobj,subjects='all',iter='all',
   
   if(class(ctstanfitobj)!='ctStanFit') stop('Not an object of class ctStanFit')
   
-  e<-rstan::extract(ctstanfitobj$stanfit) #first dim of subobjects is iter, 2nd subjects
+  e<-extract.ctStanFit(ctstanfitobj) #first dim of subobjects is iter, 2nd subjects
   niter=dim(e$DRIFT)[1]
   
   if(iter!='all') {
@@ -67,10 +67,10 @@ ctStanContinuousPars <- function(ctstanfitobj,subjects='all',iter='all',
     )
   }
   
-  nsubjects <- dim(e$indparams)[2]
-  if(is.null(nsubjects)) nsubjects=1
+  nsubjects <- ctstanfitobj$data$nsubjects #dim(e$indparams)[2]
+  # if(is.null(nsubjects)) nsubjects=1
   
-  if(subjects[1]=='all') subjects=1:nsubjects
+  # if(subjects[1]=='all') subjects=1:nsubjects
   
   collapsemargin<-c(1,2)
   # if(collapseIterations) collapsemargin=1
@@ -78,25 +78,27 @@ ctStanContinuousPars <- function(ctstanfitobj,subjects='all',iter='all',
   
   for(matname in c('DRIFT','DIFFUSION','CINT','T0MEANS', 
     'T0VAR','MANIFESTMEANS',if(!is.null(e$MANIFESTVAR)) 'MANIFESTVAR','LAMBDA', if(!is.null(e$TDPREDEFFECT)) 'TDPREDEFFECT')){
+    subindex <- ctstanfitobj$data[[paste0(matname,'subindex')]]
+    # if(dim(e[[matname]])[2] > 1) subselection <- subjects else subselection <- 1
+    if(max(subindex) > 1) subselection <- subjects else subselection <- 1
     
-    if(dim(e[[matname]])[2] > 1) subselection <- subjects else subselection <- 1
+    # vector <- FALSE
     
-    vector <- FALSE
-    
-    if(matname %in% c('T0MEANS','CINT', 'MANIFESTMEANS')) vector <- TRUE
+    # if(matname %in% c('T0MEANS','CINT', 'MANIFESTMEANS')) vector <- TRUE
     
     calcfuncargs$collapsemargin = collapsemargin
     calcfuncargs$collapsefunc=calcfunc
     
-    if(!vector) {
-      calcfuncargs$inarray = e[[matname]][,subselection,,,drop=FALSE]
-      assign(matname, array(do.call(ctCollapse,calcfuncargs),dim=dim(e[[matname]])[-c(1,2)]))
-    }
+    # if(!vector) {
+      calcfuncargs$inarray = e[[ifelse(subjects!='all', matname, paste0('pop_',matname))]]
+      if(subselection!='all') calcfuncargs$inarray  <- calcfuncargs$inarray[,subselection,,,drop=FALSE]
+      assign(matname, array(do.call(ctCollapse,calcfuncargs),dim=dim(e[[ifelse(subjects!='all', matname, paste0('pop_',matname))]])[-c(1,2)]))
+    # }
     
-    if(vector) {
-      calcfuncargs$inarray = e[[matname]][,subselection,,drop=FALSE]
-      assign(matname, array(do.call(ctCollapse,calcfuncargs),dim=c(dim(e[[matname]])[-c(1,2)],1)))
-    }
+    # if(vector) {
+    #   calcfuncargs$inarray = e[[matname]][,subselection,,drop=FALSE]
+    #   assign(matname, array(do.call(ctCollapse,calcfuncargs),dim=c(dim(e[[matname]])[-c(1,2)],1)))
+    # }
     
   }
   
@@ -112,7 +114,7 @@ ctStanContinuousPars <- function(ctstanfitobj,subjects='all',iter='all',
   rownames(CINT)=ln
   rownames(MANIFESTMEANS)=mn
   rownames(T0MEANS)=ln
-
+  
   dimnames(T0VAR)=list(ln,ln)
   dimnames(asymDIFFUSION)=list(ln,ln)
   dimnames(LAMBDA)=list(mn,ln)
@@ -153,7 +155,7 @@ ctStanContinuousPars <- function(ctstanfitobj,subjects='all',iter='all',
 #'
 #'@export
 ctDiscretePars<-function(ctpars,times=seq(0,10,.1),type='all'){
-
+  
   if(type=='all') type=c('discreteDRIFT','latentMeans') #this needs to match with ctStanDiscretePars
   nlatent=nrow(ctpars$DRIFT)
   latentNames=paste0('eta',1:nlatent)
@@ -195,7 +197,7 @@ ctDiscretePars<-function(ctpars,times=seq(0,10,.1),type='all'){
 #'@param ... additional plotting arguments to control \code{\link{ctStanDiscreteParsPlot}}
 #'@examples
 #'ctStanDiscretePars(ctstantestfit,times=seq(.5,4,.1), 
-#'plot=TRUE,indices='all')
+#'  plot=TRUE,indices='all')
 #'@export
 ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=10,by=.1), 
   quantiles = c(.025, .5, .975),nsamples=500,plot=FALSE,...){
@@ -203,9 +205,9 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
   type='discreteDRIFT'
   collapseSubjects=TRUE #consider this for a switch
   
-  e<-rstan::extract(ctstanfitobj$stanfit)
+  e<-extract.ctStanFit(ctstanfitobj)
   
- 
+  
   
   if(type=='all') type=c('discreteDRIFT','latentMeans') #must match with ctDiscretePars
   
@@ -223,7 +225,7 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
   
   if(nsamples > niter) nsamples <- niter
   samples <- sample(1:niter,nsamples)
-
+  
   
   out<-list()
   
@@ -243,7 +245,7 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
         paste0('e[[matname]][, ',
           ifelse(xdims[2] > 1, 'subjects',1),if(length(xdims)>1) paste0(rep(', ',length(xdims)-2),collapse=''),']')
     )),dim=dimout)
-     
+    
     ctpars[[matname]] <-aperm(ctpars[[matname]],c(3,if(length(dim(ctpars[[matname]]))>3) 4, 1, 2))
   }
   
@@ -251,7 +253,7 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
   
   
   for(typei in 1:length(type)){ #for all types of discrete parameter requested, compute pars
-    message('Getting ', type[typei],', may take a moment...')
+    message('Computing ', type[typei],' for ', nsamples,' samples, may take a moment...')
     matrixtype=ifelse(type[typei] %in% c('discreteDRIFT'),TRUE, FALSE) #include any matrix type outputs
     
     out[[typei]] <- plyr::aaply(1:nsamples,1,function(iterx){ #for every iteration
@@ -296,7 +298,7 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
     } ,.drop=FALSE)
     
     
-
+    
     
     if(!matrixtype) dimlist[[3]]=NULL
     
@@ -306,7 +308,7 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
   }
   
   names(out) <- type
-
+  
   dimnames(out$discreteDRIFT)$row=latentNames
   dimnames(out$discreteDRIFT)$col=latentNames
   
@@ -350,8 +352,7 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
 #'@param polygonalpha Numeric between 0 and 1 to multiply the alpha (transparency) of colvec by for 
 #'the fill polygon.
 #'@param polygoncontrol list of arguments to pass to ctPoly function (if polygon=TRUE).
-#'x,y, and col arguments will be ignored. Border is removed by default because quantile
-#'borders are differently, and steps specifies the number of polygons to overlay to 
+#'x,y, and col arguments will be ignored. Steps specifies the number of polygons to overlay to 
 #'create a graduated transparency. Set to 1 for a flat looking plot.
 #'@examples
 #'x <- ctStanDiscretePars(ctstantestfit)
@@ -363,10 +364,10 @@ ctStanDiscreteParsPlot<- function(x,indices='all',add=FALSE,legend=TRUE, polygon
   quantiles=c(.025,.5,.975), times=seq(0,10,.1),latentNames='auto',
   lwdvec='auto',colvec='auto',ltyvec='auto',
   plotcontrol=list(ylab='Value',xlab='Time interval',
-    main='Regression coefficients',type='l'),grid=TRUE,
+    main='Regression coefficients',type='l', xaxs='i'),grid=FALSE,
   legendcontrol=list(x='topright',bg='white'),
-  polygonalpha=.3,
-  polygoncontrol=list(border=NA, steps=20)){
+  polygonalpha=.1,
+  polygoncontrol=list(steps=20)){
   
   input <- x[[1]] #ctStanDiscretePars(x,type='discreteDRIFT',times=times,quantiles=quantiles,...)[[1]]
   
@@ -378,7 +379,7 @@ ctStanDiscreteParsPlot<- function(x,indices='all',add=FALSE,legend=TRUE, polygon
   if(is.null(plotcontrol$xlab)) plotcontrol$xlab  <- 'Time interval'
   if(is.null(plotcontrol$main)) plotcontrol$main  <- 'Regression coefficients'
   if(is.null(plotcontrol$type)) plotcontrol$type  <- 'l'
-
+  
   
   if(is.null(legendcontrol$x)) legendcontrol$x = 'topright'
   if(is.null(legendcontrol$bg)) legendcontrol$bg = 'white'
@@ -399,11 +400,13 @@ ctStanDiscreteParsPlot<- function(x,indices='all',add=FALSE,legend=TRUE, polygon
   
   if(colvec[1]=='auto') colvec=grDevices::rainbow(nrow(indices),alpha=.8,v=.9)
   
-  if(is.null(plotcontrol$ylim)) plotcontrol$ylim=range(plyr::aaply(input,c(3,4),function(x) 
-    x[indices]),na.rm=TRUE) #range of diagonals
-
+  if(is.null(plotcontrol$ylim)) {
+    plotcontrol$ylim=range(plyr::aaply(input,c(3,4),function(x) 
+      x[indices]),na.rm=TRUE) #range of diagonals
+    if(legend) plotcontrol$ylim[2] <- plotcontrol$ylim[2] + sd(plotcontrol$ylim)/3
+  }
   
- 
+  
   #blank plot
   blankargs=plotcontrol
   blankargs$xlim=range(times)
@@ -431,7 +434,7 @@ ctStanDiscreteParsPlot<- function(x,indices='all',add=FALSE,legend=TRUE, polygon
       polygonargs$y=input[ri,ci,,2]
       polygonargs$ylow=input[ri,ci,,1]
       polygonargs$yhigh=input[ri,ci,,length(quantiles)]
-      polygonargs$col=grDevices::adjustcolor(colvec[cc],alpha.f=max(c(.004,polygonalpha/polygonargs$steps)))
+      polygonargs$col=grDevices::adjustcolor(colvec[cc],alpha.f=max(c(.004,polygonalpha/(2*sqrt(polygonargs$steps)))))
       do.call(ctPoly,polygonargs)
     }
   }

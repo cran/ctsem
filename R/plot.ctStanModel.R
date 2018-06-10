@@ -6,79 +6,82 @@
 #' @param rows vector of integers denoting which rows of ctstanmodel$pars to plot priors for. 
 #' Character string 'all' plots all rows with parameters to be estimated.
 #' @param wait If true, user is prompted to continue before plotting next graph.
-#' @param samples Numeric. Higher values increase fidelity (smoothness / accuracy) of density plots, at cost of speed.
-#' @param hypersd Either 'marginalise' to sample from the specified (in the ctstanmodel) 
-#' prior distribution for the population standard deviation, or a numeric value to use for the population standard deviation
+#' @param nsamples Numeric. Higher values increase fidelity (smoothness / accuracy) of density plots, at cost of speed.
+#' @param rawpopsd Either 'marginalise' to sample from the specified (in the ctstanmodel) 
+#' prior distribution for the raw population standard deviation, or a numeric value to use for the raw population standard deviation
 #' for all subject level prior plots - the plots in dotted blue or red.
 #' @param ... not used.
 #' @details Plotted in black is the prior for the population mean. In red and blue are the subject level priors that result
-#' given that the population mean is estimated at 1 std deviation above the mean of the prior, or 1 std deviation below. 
-#' The distributions around these two points are then obtained by marginalising over the prior for the population std deviation - 
+#' given that the population mean is estimated as 1 std deviation above the mean of the prior, or 1 std deviation below. 
+#' The distributions around these two points are then obtained by marginalising over the prior for the raw population std deviation - 
 #' so the red and blue distributions do not represent any specific subject level prior, but rather characterise the general amount
-#' and shape of possible subject level priors at the selected points of the population mean prior.
+#' and shape of possible subject level priors at the specific points of the population mean prior.
 #' @method plot ctStanModel
 #' @export
+#' @examples
+#' model <- ctModel(type='omx', Tpoints=50,
+#' n.latent=2, n.manifest=1, 
+#' manifestNames='sunspots', 
+#' latentNames=c('ss_level', 'ss_velocity'),
+#' LAMBDA=matrix(c( 1, 'ma1' ), nrow=1, ncol=2),
+#' DRIFT=matrix(c(0, 1,   'a21', 'a22'), nrow=2, ncol=2, byrow=TRUE),
+#' MANIFESTMEANS=matrix(c('m1'), nrow=1, ncol=1),
+#' # MANIFESTVAR=matrix(0, nrow=1, ncol=1),
+#' CINT=matrix(c(0, 0), nrow=2, ncol=1),
+#' DIFFUSION=matrix(c(
+#'   0, 0,
+#'   0, "diffusion"), ncol=2, nrow=2, byrow=TRUE))
+#' 
+#' stanmodel=ctStanModel(model)
+#' plot(stanmodel,rows=8)
 
-plot.ctStanModel<-function(x,rows='all',wait=FALSE,samples=1e6, hypersd='marginalise',...){
+plot.ctStanModel<-function(x,rows='all',wait=FALSE,nsamples=1e6, rawpopsd='marginalise',...){
   if(class(x)!='ctStanModel') stop('not a ctStanModel object!')
   m<-x$pars
-  n<-5000
-   highmean=1
+  highmean=1
   lowmean=-1
   if(rows=='all') rows<-1:nrow(m)
   for(rowi in rows){
     if(is.na(m$value[rowi])){
-    
-    #hypersd
-      if(hypersd[1]=='marginalise'){
-    rawhypersd<-  stats::rnorm(samples)
-    if(!is.na(x$rawhypersdlowerbound)) rawhypersd <- rawhypersd[rawhypersd>x$rawhypersdlowerbound]
-    sdscale <- m$sdscale[rowi]
-    tform <- gsub('.*', '*',x$hypersdtransform,fixed=TRUE)
-    hypersdprior<-eval(parse(text=tform))
-    
-    samples<-length(hypersdprior) #adjust number of samples because of random n > 0
-      } else if(is.na(as.numeric(hypersd))) stop('hypersd argument is ill specified!') else {
-        hypersdprior <- rep(hypersd,samples)
+      #rawpopsd
+      if(rawpopsd[1]=='marginalise'){
+        rawpopsdbase<-  stats::rnorm(nsamples)
+        if(!is.na(x$rawpopsdbaselowerbound)) rawpopsdbase <- rawpopsdbase[rawpopsdbase>x$rawpopsdbaselowerbound]
+        sdscale <- m$sdscale[rowi]
+        sdtform <- gsub('.*', '*',x$rawpopsdtransform,fixed=TRUE)
+        rawpopsdprior<-eval(parse(text=sdtform))
+
+      } else if(is.na(as.numeric(rawpopsd))) stop('rawpopsd argument is ill specified!') else {
+        rawpopsdprior <- rep(rawpopsd,nsamples)
       }
-    
-#mean
-      param=stats::rnorm(samples)
-      xmean=eval(parse(text=paste0(m$transform[rowi])))
-      meanxlims<-stats::quantile(xmean,probs=c(.1,.9))
+      denslist<-list()
+      #mean
+
+      param=stats::rnorm(length(rawpopsdprior))
+      # xmean=eval(parse(text=paste0(m$transform[rowi])))
+      denslist[[1]]=tform(param,m$transform[rowi], m$multiplier[rowi], m$meanscale[rowi], m$offset[rowi])
+      leg <- c('Pop. mean prior')
+      colvec <- c(1)
       
+      if(m$indvarying[rowi]){
       #high
-      param=stats::rnorm(samples,highmean,hypersdprior)
-      xhigh=eval(parse(text=paste0(m$transform[rowi])))
-      highxlims <- stats::quantile(xhigh,probs=c(.1,.9))
-        
+      param=stats::rnorm(length(rawpopsdprior),highmean,rawpopsdprior)
+      denslist[[2]]=tform(param,m$transform[rowi], m$multiplier[rowi], m$meanscale[rowi], m$offset[rowi])
+      
       #low
-      param=stats::rnorm(samples,lowmean,hypersdprior)
-      xlow=eval(parse(text=paste0(m$transform[rowi])))
-      lowxlims <- stats::quantile(xlow,probs=c(.1,.9))
-      
-      
-      #combined
-      xlims=c(min(meanxlims[1],lowxlims[1],highxlims[1]),max(meanxlims[2],lowxlims[2],highxlims[2]))
-      xdistance= ( (highxlims[1]-lowxlims[1]) + (highxlims[2]-lowxlims[2]) )/2
-      
-       xmean=xmean[xmean>(xlims[1]-xdistance) & xmean < (xlims[2]+xdistance)]
-       xhigh=xhigh[xhigh>(xlims[1]-xdistance) & xhigh < (xlims[2]+xdistance)]
-       xlow=xlow[xlow>(xlims[1]-xdistance) & xlow < (xlims[2]+xdistance)]
-       
-       bw=(xlims[2]-xlims[1])/300
-       
-      densxmean=stats::density(xmean,bw=bw,n=n)
-      densxlow=stats::density(xlow,bw=bw,n=n)
-      densxhigh=stats::density(xhigh,bw=bw,n=n)
+      param=stats::rnorm(length(rawpopsdprior),lowmean,rawpopsdprior)
+      denslist[[3]]=tform(param,m$transform[rowi], m$multiplier[rowi], m$meanscale[rowi], m$offset[rowi])
 
-    ymax= max(c(densxmean$y),c(densxlow$y),c(densxhigh$y))
-    
-    graphics::plot(densxmean,main=m$param[rowi],lwd=2,xlim=c(xlims[1],xlims[2]),ylim=c(0,ymax),ylab='Par Value')
-    graphics::points(densxhigh,lwd=2,type='l',col='red',lty=3)
-    graphics::points(densxlow,lwd=2,type='l',col='blue',lty=3)
+      leg <- c('Pop. mean prior', '-1sd mean, subject prior','+1sd mean, subject prior')
+      colvec <- c(1,2,4)
+      }
+      
+        ctDensityList(denslist,plot = TRUE, lwd=2,probs=c(.05,.95),main=m$param[rowi],
+        cex=.8,cex.main=.8,cex.axis=.8,cex.lab=.8,cex.sub=.8,
+        legend = leg,
+        legendargs=list(cex=.8),
+        colvec = colvec)
 
-    graphics::legend('topright',c('pop mean prior', '-1sd mean','+1sd mean'),text.col=c('black','blue','red'),bty='n')
       if(wait==TRUE & rowi != utils::tail(rows,1)){
         message("Press [enter] to display next plot")
         readline()

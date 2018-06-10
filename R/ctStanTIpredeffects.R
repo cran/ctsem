@@ -11,6 +11,8 @@
 #' @param probs numeric vector of quantile probabilities from 0 to 1. Specify 3
 #' values if plotting, the 2nd will be drawn as a line with uncertainty polygon
 #' based on 1st and 3rd.
+#' @param includeMeanUncertainty if TRUE, output includes sampling variation in the mean parameters. If FALSE,
+#' mean parameters are fixed at their median, only uncertainty in time independent predictor effects is included.  
 #' @param whichTIpreds integer vector specifying which of the tipreds in the fit object you want to
 #' use to calculate effects. Unless quadratic / higher order versions of predictors have been 
 #' included, selecting more than one probably doesn't make sense. If for instance a squared
@@ -19,114 +21,142 @@
 #' check what predictors are in the model, run \code{fit$ctstanmodel$TIpredNames}.
 #' @param parmatrices Logical. If TRUE (default), the \code{\link{ctStanParMatrices}} function
 #' is used to return an expanded range of possible matrices of interest.
-#' @param whichpars Integer vector specifying Which of the individually varying subject
-#' level parameters to compute effects on. Only used if \code{parmatrices=FALSE} .
-#' 'all' uses all available, which is equivalent to 
-#' \code{1:sum(fit$ctstanmodel$pars$indvarying)}.
-#' The integer corresponding to specific parameters can be found as follows, replacing \code{fit} as appropriate:
-#' \code{fit$ctstanmodel$pars[fit$ctstanmodel$pars$indvarying,'param']}.
-#' @param nsamples Positive integer specifying the maximum number of samples to use. 
+#' @param whichpars if parmatrices==TRUE, character vector specifying which matrices, and potentially which 
+#' indices of the matrices, to plot. c('dtDRIFT[2,1]', 'DRIFT') would output for row 2 and column 1 of 
+#' the discrete time drift matrix, as well as all indices of the continuous time drift matrix. 
+#' If parmatrices==FALSE, integer vector specifying which of the subject
+#' level parameters to compute effects on. The integers corresponding to certain parameters can be found in the 
+#' \code{param} column of the \code{fit$setup$popsetup} object. In either case 'all' uses all available parameters.
+#' @param nsamples Positive integer specifying the maximum number of saved iterations to use. 
 #' Character string 'all' can also be used.
+#' @param nsubjects Positive integer specifying the number of subjects to compute values for.
+#' Character string 'all' can also be used. Time taken is a function of nsubjects*niterations.
 #' @param plot Logical. If TRUE, nothing is returned but instead \code{\link{ctPlotArray}}
 #' is used to plot the output instead.
 #' @param timeinterval positive numeric indicating time interval to use for discrete time parameter matrices,
 #' if \code{parmatrices=TRUE}.
+#' @param filter either NA, or a length 2 vector, where the first element contains the time independent predictor index
+#' to filter by, and the second contains the comparison operator in string form (e.g. "< 3",
+#' to only calculate effects for subjects where the tipreds of the denoted index are less than 3).
 #' @param ... arguments to pass to \code{\link{ctPlotArray}} for plotting.
 #' @return Either a three dimensional array of predictor effects, or nothing with a plot
 #' generated.
 #' @export
 #'
 #' @examples
-#' ctStanTIpredeffects(ctstantestfit,plot=TRUE)
+#' #samples reduced here for speed
+#' ctStanTIpredeffects(ctstantestfit,plot=TRUE,whichpars='CINT',nsamples=10,nsubjects=10)
 ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
-  whichTIpreds=1,parmatrices=TRUE, whichpars='all', nsamples=200,timeinterval=1,
+  includeMeanUncertainty=FALSE,
+  whichTIpreds=1,parmatrices=TRUE, whichpars='all', nsamples=100, timeinterval=1,
+  nsubjects=50,filter=NA,
   plot=FALSE,...){
+
+  ctspec <- fit$ctstanmodel$pars
   
-  if(parmatrices) whichpars <- 'all'
+  e<-extract.ctStanFit(fit)
+  rawpopmeans <- e$rawpopmeans
+  
+  niter<-dim(e$rawpopmeans)[1]
+  if(nsamples=='all' || nsamples > niter) nsamples <- niter
+  rawpopmeans <- rawpopmeans[sample(x = 1:niter, nsamples,replace = FALSE),]
+  
+  if(!includeMeanUncertainty) rawpopmeans <- matrix(apply(rawpopmeans,2,median),byrow=TRUE,nrow=nrow(rawpopmeans),ncol=ncol(rawpopmeans))
+  
+  tipreds<-ctCollapse(e$tipreds,1,mean) #maybe collapsing over sampled tipred values is not ideal?
+  
+  if(any(!is.na(filter))) tipreds <- eval(parse(text=paste0('tipreds[tipreds[,',filter[1],']',filter[2],',,drop=FALSE]')))
+  tipreds <- tipreds[,whichTIpreds,drop=FALSE]
+  if(nsubjects=='all') nsubjects = nrow(tipreds)
+  if(nsubjects > nrow(tipreds) && length(whichTIpreds)>1) nsubjects <- nrow(tipreds) #if we need to use real tipred data, no point using more subjects
+  
+  #use tipred data or generated points? latter is smoother but can't use in case of interactions.
+  if(length(whichTIpreds)>1) tipreds <- tipreds[sample(x = 1:nsubjects, nsubjects,replace = FALSE),,drop=FALSE]
+  if(length(whichTIpreds)==1) tipreds<-cbind(seq(from=min(tipreds), to = max(tipreds,na.rm=TRUE), length.out=nsubjects))
   
   
-  #drop fixed and duplicated params
-  spec_nofixed <- fit$ctstanmodel$pars[is.na(fit$ctstanmodel$pars$value),,drop=FALSE]
-  spec_nofixed_noduplicates <- spec_nofixed[!duplicated(spec_nofixed$param),]
-  
-  #get indvarying hypermeans
-  e<-extract(fit$stanfit)
-  hypermeans <- e$hypermeans
-  hypermeansindvarying <- e$hypermeans[,spec_nofixed_noduplicates$indvarying,drop=FALSE] 
-  
-  #update ctspec to only indvarying and those in whichpars
-  spec_nofixed_noduplicates_indvarying <- spec_nofixed_noduplicates[spec_nofixed_noduplicates$indvarying,]
-  if(all(whichpars=='all')) whichpars=1:sum(spec_nofixed_noduplicates_indvarying$indvarying)
-  spec_nofixed_noduplicates_indvarying <- spec_nofixed_noduplicates_indvarying[whichpars,,drop=FALSE]
-  hypermeansindvarying <- hypermeansindvarying[,whichpars,drop=FALSE]  #then just the ones in whichpars
-  
-  tieffect<-e$tipredeffect[,whichpars,whichTIpreds,drop=FALSE]
-  tipreds<-fit$data$tipreds[,whichTIpreds,drop=FALSE]
+  tieffect<-e$TIPREDEFFECT[,,whichTIpreds,drop=FALSE]
+
   tiorder<-order(tipreds[,1])
   tipreds<-tipreds[tiorder,,drop=FALSE] #order tipreds according to first one
-  npars<-length(whichpars)
-  niter<-dim(e$hypermeans)[1]
-  nsubjects <- nrow(tipreds)
-  
-  if(nsamples > niter) nsamples <- niter
-  
-  samples <- sample(x = 1:niter, nsamples,replace = FALSE)
   
   message('Calculating time independent predictor effects...')
   
-  raweffect <- aaply(samples,1,function(iterx) { #for every iter
+  raweffect <- aaply(1:nrow(rawpopmeans),1,function(iterx) { #for every iter
     aaply(tipreds,1,function(tix){ #and every distinct tipred vector
-      hypermeansindvarying[iterx,] + matrix(tieffect[iterx,,],nrow=dim(tieffect)[2]) %*% tix
+      rawpopmeans[iterx,,drop=FALSE] + t(matrix(tieffect[iterx,,,drop=FALSE],nrow=dim(tieffect)[2]) %*% tix)
     },.drop=FALSE)
   })
   
   
   if(!parmatrices) {
+    if(all(whichpars=='all')) whichpars=which(apply(tieffect,2,function(x) any(x!=0)))
+    raweffect <- raweffect[,,whichpars]
+    tieffect<-tieffect[,whichpars,,drop=FALSE] #updating...
+    npars<-length(whichpars)
     effect<-aaply(1:npars, 1,function(pari){ #for each param
       param=raweffect[,,pari]
-      out=eval(parse(text=spec_nofixed_noduplicates_indvarying$transform[pari]))
+      out=tform(param, 
+        fit$setup$popsetup$transform[whichpars[pari]], 
+        fit$setup$popvalues$multiplier[whichpars[pari]],
+        fit$setup$popvalues$meanscale[whichpars[pari]],
+        fit$setup$popvalues$offset[whichpars[pari]], fit$setup$extratforms) 
       return(out)
     })
     if(returndifference){ #if only returning differences from zero
       noeffect<-aaply(1:npars, 1,function(pari){ #for each param
-        param <- hypermeans[,pari]
-        out=eval(parse(text=spec_nofixed_noduplicates_indvarying$transform[pari]))
+        param <- rawpopmeans[,pari]
+        out=tform(param, 
+        fit$setup$popsetup$transform[whichpars[pari]], 
+        fit$setup$popvalues$multiplier[whichpars[pari]],
+        fit$setup$popvalues$meanscale[whichpars[pari]],
+        fit$setup$popvalues$offset[whichpars[pari]], fit$setup$extratforms) 
         return(out)
       })
       effect<-effect-array(noeffect,dim=dim(effect))
     }
   }
   
-
+  
   if(parmatrices)  {
-    hypermeans <- hypermeans[rep(samples,each=nsubjects),] #match rows of hypermeans and raweffect
+    rawpopmeans <- rawpopmeans[rep(1:nrow(rawpopmeans),each=nsubjects),] #match rows of rawpopmeans and raweffect
     raweffect <- matrix(raweffect,ncol=dim(raweffect)[3])
     
-    parmatlists<-lapply(1:nrow(hypermeans), function(x) { #for each param vector
-      parvec = hypermeans[x,]
-      parvec[spec_nofixed_noduplicates$indvarying] <- raweffect[x,]
-      out = ctStanParMatrices(fit,parvec,timeinterval=timeinterval)
+    #check if stanfit object can be used
+    sf <- fit$stanfit
+    npars <- try(get_num_upars(sf),silent=TRUE) #$stanmodel)
+    
+    if(class(npars)=='try-error'){ #in case R has been restarted or similar
+      standataout <- fit$data
+      standataout<-unlist(standataout)
+      standataout[is.na(standataout)] <- 99999
+      standataout <- utils::relist(standataout,skeleton=fit$data)
+      suppressOutput(sf <- suppressWarnings(sampling(fit$stanmodel,data=standataout,iter=1,control=list(max_treedepth=1),chains=1)))
+    }
+
+    parmatlists<-lapply(1:nrow(rawpopmeans), function(x) { #for each param vector
+      out = ctStanParMatrices(fit, rawpopmeans[x,] + raweffect[x,], timeinterval=timeinterval,sf = sf)
       return(out)
     })
     
     
-    # parmatlists <- apply(e$hypermeans,1,ctStanParMatrices,model=object,timeinterval=timeinterval)
+    # parmatlists <- apply(e$rawpopmeans,1,ctStanParMatrices,model=object,timeinterval=timeinterval)
     parmatarray <- array(unlist(parmatlists),dim=c(length(unlist(parmatlists[[1]])),length(parmatlists)))
     parmats <- matrix(0,nrow=0,ncol=2)
     counter=0
     for(mati in 1:length(parmatlists[[1]])){
-      for(rowi in 1:nrow(parmatlists[[1]][[mati]])){
-        for(coli in 1:ncol(parmatlists[[1]][[mati]])){
+      for(coli in 1:ncol(parmatlists[[1]][[mati]])){
+        for(rowi in 1:nrow(parmatlists[[1]][[mati]])){
           counter=counter+1
           new <- matrix(c(
             rowi,
             coli),
             nrow=1)
-          rownames(new) = names(parmatlists[[1]])[mati]
+          rownames(new) = paste0(names(parmatlists[[1]])[[mati]])
           parmats<-rbind(parmats, new)
         }}}
     colnames(parmats) <- c('Row','Col') 
-
+    
     rownames(parmatarray) <- paste0(rownames(parmats),'[',parmats[,'Row'],',',parmats[,'Col'],']')
     
     #remove certain parmatrices lines
@@ -142,13 +172,18 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
     
     effect <- array(parmatarray,dim=c(nrow(parmatarray),nsamples,nsubjects))
     rownames(effect) <- rownames(parmatarray)
+    if(any(whichpars !='all')) {
+      selection <- unlist(lapply(whichpars,function(x) grep(paste0('^\\Q',x,'\\E'),dimnames(effect)[[1]])))
+      effect <- effect[selection,,,drop=FALSE]
+    }
+    
   }    
-
+  
   
   out<-aaply(probs,1,function(x) ctCollapse(effect,2,quantile,probs=x,na.rm=TRUE),.drop=FALSE)
   
   if(!parmatrices) dimnames(out)=list(Quantile=paste0('Quantile',probs),
-    popmean=spec_nofixed_noduplicates_indvarying$param,
+    popmean=fit$setup$popsetup$parname[whichpars],
     subject=tiorder #subjects reordered because tipreds were at top
   )
   if(parmatrices) dimnames(out)=list(Quantile=paste0('Quantile',probs),
@@ -156,15 +191,16 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
     subject=tiorder #subjects reordered because tipreds were at top
   )
   
-  out <- aperm(out, c(3,2,1))
+  colnames(tipreds) <- colnames(fit$data$tipredsdata)[whichTIpreds]
+  out <- list(y=aperm(out, c(3,2,1)), x=tipreds[,1,drop=FALSE])
   
   if(!plot) return(out) else {
     dots <- list(...)
-    dots$yarray=out
-    dots$x=tipreds[,1]
+    dots$input=out
+    # dots$x=tipreds[,1]
     if(is.null(dots$plotcontrol)) dots$plotcontrol=list(
-      ylab='Effect',
-      xlab=colnames(tipreds)[whichTIpreds[1]],
+      ylab=ifelse(!returndifference,'Par. Value','Effect'),
+      xlab=colnames(tipreds)[1],
       xaxs='i')
     
     do.call(ctPlotArray,dots)

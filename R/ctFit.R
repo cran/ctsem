@@ -23,7 +23,7 @@
 #' Defaults to \code{c('T0TRAITEFFECT','T0TIPREDEFFECT')}, constraining only
 #' between person effects to stationarity. Use \code{NULL} for no constraints,
 #' or 'all' to constrain all T0 matrices.
-#' @param optimizer character string, defaults to the open-source 'SLSQP' optimizer that is distributed
+#' @param optimizer character string, defaults to the open-source 'CSOLNP' optimizer that is distributed
 #' in all versions of OpenMx. However, 'NPSOL' may sometimes perform better for these problems,
 #' though requires that you have installed OpenMx via the OpenMx web site, by running:
 #' \code{source('http://openmx.psyc.virginia.edu/getOpenMx.R')} 
@@ -182,12 +182,14 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
   TDpredNames<-ctmodelobj$TDpredNames
   TIpredNames<-ctmodelobj$TIpredNames
   
+      
+  
   if(dataform != 'wide' & dataform !='long') stop('dataform must be either "wide" or "long"!')
   if(dataform == 'long'){
     idcol='id'
     obsTpoints=max(unlist(lapply(unique(dat[,idcol]),function(x) 
       length(dat[dat[,idcol]==x, idcol]) )))
-    
+
     if(Tpoints != obsTpoints) stop(
       paste0('Tpoints in ctmodelobj = ',Tpoints,', not equal to ', obsTpoints, ', the maximum number of rows of any subject in dat'))
     
@@ -198,6 +200,11 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
       n.manifest = n.manifest,manifestNames = manifestNames,
       n.TDpred=n.TDpred,n.TIpred = n.TIpred,
       TDpredNames=TDpredNames,TIpredNames = TIpredNames))
+    
+    if(n.TDpred > 0){
+    if(any(is.na(dat[,paste0(TDpredNames)])))  message ('Missing TD predictors found - replacing NAs with zeroes')
+      datawide[,paste0(TDpredNames,'_T',rep(0:(Tpoints-1),each=n.TDpred))][is.na(datawide[,paste0(TDpredNames,'_T',rep(0:(Tpoints-1),each=n.TDpred))])] <- 0
+    }
   }
   if(dataform == 'wide') datawide = dat
   
@@ -263,7 +270,7 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
       ctmodelobj$TDPREDMEANS[,]=apply(datawide[, paste0(TDpredNames, '_T', rep(0:(Tpoints-1), each=n.TDpred))],2,mean)
       message('No missing time dependent predictors - TDPREDVAR and TDPREDMEANS fixed to observed moments for speed')
     }
-    
+
     #check for 0 variance predictors for random predictors implementation (not needed for Kalman because fixed predictors)
     ####0 variance predictor fix
     varCheck<-try(any(diag(stats::cov(datawide[, paste0(TDpredNames, '_T', rep(0:(Tpoints-1), each=n.TDpred))],
@@ -326,7 +333,6 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
     if(n.TIpred >0) message('Time independent predictors are not possible with single subject data, ignoring')  
     
     n.subjects<-nrow(datawide) 
-    
     datawide<-ctWideToLong(datawide, #if using Kalman, convert data to long format
       manifestNames=manifestNames, TDpredNames=TDpredNames, TIpredNames=TIpredNames, 
       n.manifest=n.manifest, 
@@ -673,13 +679,13 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
     #     rep(1:n.latent,each=Tpoints*n.manifest))]
     
     #trait loadings to latent
-    # browser()
+    # 
     if(!discreteTime) A$labels[cbind(rep(1:latentend,each=n.latent), (latentend+1):(latentend+n.latent))] <- paste0('discreteTRAIT_T',
       rep(0:(Tpoints-1),each=n.latent^2),'[',rep(1:n.latent,each=n.latent),',',1:n.latent,']')
     
     if(discreteTime) {
       for(i in 1:(Tpoints-1)){
-        # browser()
+        # 
         A$values[(i*n.latent+1):(i*n.latent+n.latent), (latentend+1):(latentend+n.latent)] <- diag(1,n.latent)
       }
     }
@@ -835,6 +841,7 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
       rep(predictorTDstart:predictorTDend, each=n.latent))] <- TDPREDEFFECT$ref #insert TDPREDEFFECT algebra references to A$labels    
     
     #add cov of time dependent predictors with T0
+    
     T0TDPREDCOV$ref <- paste0('T0TDPREDCOV[', 1:n.latent, ',', rep( 1:(n.TDpred*(Tpoints)), each=n.latent ), ']')
     S$values[1:n.latent, predictorTDstart:predictorTDend] <- T0TDPREDCOV$values #add starting values 
     S$values[predictorTDstart:predictorTDend, 1:n.latent] <- t(T0TDPREDCOV$values) #add starting values 
@@ -979,7 +986,7 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
     
     uniqueintervals<-c(sort(unique(c(datawide[,paste0('dT', 1:(Tpoints-1))]))))
     
-    intervalsi <- matrix(apply(datawide[,paste0('dT', 1:(Tpoints-1)),drop=F], 2, 
+    intervalsi <- matrix(apply(datawide[,paste0('dT', 1:(Tpoints-1)),drop=FALSE], 2, 
       function(x) match(x, uniqueintervals)),ncol=(Tpoints-1))
     colnames(intervalsi)<-paste0('intervalID_T',1:(Tpoints-1))
     
@@ -1404,8 +1411,12 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
   
   
   
-  
-  model  <-  OpenMx::mxModel("ctsem", #type="RAM", #begin specifying the mxModel
+
+  model  <-  OpenMx::mxModel("ctsem", #begin specifying the mxModel
+    # type="RAM",
+    # latentVars = paste0(rep(latentNames, Tpoints), "_T", rep(0:(Tpoints-1), each=n.latent)),
+      # manifestVars = FILTERnamesx, 
+      # latentVars = FILTERnamesy[!(FILTERnamesy %in% FILTERnamesx)],
     mxData(observed = datawide, type = "raw"), 
     
     mxMatrix(type = "Iden", nrow = n.latent, ncol = n.latent, free = FALSE, name = "II"), #identity matrix
@@ -1475,16 +1486,15 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
   }
   if('T0MEANS' %in% stationary & asymptotes!=TRUE) model<-OpenMx::mxModel(model, asymCINTalg)
   
-  
   if(objective!='Kalman' & objective != 'Kalmanmx') model<-OpenMx::mxModel(model, #include RAM matrices
     
-    mxMatrix(values = A$values, free = F, labels = A$labels, dimnames = list(FILTERnamesy, FILTERnamesy), name = "A"),   #directed effect matrix   
+    mxMatrix(values = A$values, free = FALSE, labels = A$labels, dimnames = list(FILTERnamesy, FILTERnamesy), name = "A"),   #directed effect matrix   
     
-    mxMatrix(values = S$values, free = F, labels = S$labels, dimnames = list(FILTERnamesy, FILTERnamesy), name = "S"),   #symmetric effect matrix
+    mxMatrix(values = S$values, free = FALSE, labels = S$labels, dimnames = list(FILTERnamesy, FILTERnamesy), name = "S"),   #symmetric effect matrix
     
     mxMatrix(values = FILTER$values, free = FALSE, dimnames = list(FILTERnamesx, FILTERnamesy), name = "F"),  #filter matrix
     
-    mxMatrix(free = F, values = t(M$values), labels = t(M$labels), dimnames = list(1, FILTERnamesy), name = "M") #mean matrix
+    mxMatrix(free = FALSE, values = t(M$values), labels = t(M$labels), dimnames = list(1, FILTERnamesy), name = "M") #mean matrix
   )
   
   
@@ -1752,13 +1762,17 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
   
   #   setobjective<-function(){
   ######### objective functions
-  
   if(objective == "mxRAM") {  
+    # browser()
     model <- OpenMx::mxModel(model, 
+      # type='RAM',
+      # manifestVars = FILTERnamesx,
+      # latentVars = FILTERnamesy[!(FILTERnamesy %in% FILTERnamesx)],
+      # mxMatrix(values = FILTER$values, free = FALSE, dimnames = list(FILTERnamesx, FILTERnamesy), name = "F"),
       #       mxAlgebra(F%*%solve(bigI - A)%*%S%*%t(solve(bigI - A))%*%t(F), name = "expCov"), 
       #       mxAlgebra(t(F%*%(solve(bigI - A))%*%t(M)), name = "expMean"), 
       #       mxMatrix(type = "Iden", nrow = nrow(A$labels), ncol = ncol(A$labels), name = "bigI"), 
-      mxExpectationRAM(M = "M"), 
+      mxExpectationRAM(M = "M",thresholds=ifelse(is.null(ctmodelobj$ordNames),NA,'thresh')),
       mxFitFunctionML(vector=FALSE)
     )
   }
@@ -1858,7 +1872,7 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
     #         mxMatrix(type = "Iden", nrow = nrow(A$labels, ncol = ncol(A$labels, name = "bigI"), 
     if(objective=='mxFIML'){
       model<-OpenMx::mxModel(model,
-        mxExpectationNormal(covariance = "expCov", means = "expMean", dimnames = FILTERnamesx), 
+        mxExpectationNormal(covariance = "expCov", means = "expMean", dimnames = FILTERnamesx,thresholds=ifelse(is.null(ctmodelobj$ordNames),NA,'thresh')), 
         mxFitFunctionML())
     }
     
@@ -1896,7 +1910,7 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
     
     meanData <- apply(datawide[,manifests,drop=FALSE],2,mean,na.rm=TRUE)
     model<-OpenMx::mxModel(model, mxData(covData, type='cov', means=meanData, numObs=nrow(datawide)),
-      mxExpectationRAM(M='M'),
+      mxExpectationRAM(M='M',thresholds=ifelse(is.null(ctmodelobj$ordNames),NA,'thresh')),
       mxFitFunctionML()
     )
   }
@@ -1991,7 +2005,8 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
       mxMatrix(name='firstObsDummy', free=FALSE, labels='data.firstObsDummy', nrow=1, ncol=1),
       
       mxExpectationStateSpace(A='discreteDRIFT', B='B', C='LAMBDA', 
-        D="D", Q='discreteDIFFUSIONwithdummy', R='MANIFESTVAR', x0='x0', P0='T0VAR', u="u"), 
+        D="D", Q='discreteDIFFUSIONwithdummy', R='MANIFESTVAR', x0='x0', P0='T0VAR', u="u",
+        thresholds=ifelse(is.null(ctmodelobj$ordNames),NA,'thresh')), 
       
       mxFitFunctionML()
       
@@ -2025,7 +2040,8 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
       mxMatrix('Full', 1, 1, name='time', labels='data.dT1'),
       
       mxExpectationSSCT(A='DRIFT', B='B', C='LAMBDA', 
-        D="D", Q='DIFFUSION', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u", t='time'), 
+        D="D", Q='DIFFUSION', R='MANIFESTVAR', x0='T0MEANS', P0='T0VAR', u="u", t='time',
+        thresholds=ifelse(is.null(ctmodelobj$ordNames),NA,'thresh')), 
       
       mxFitFunctionML(vector=FALSE)
     )
@@ -2121,6 +2137,56 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
     }
   }
   
+  
+  ###include ordinal thresholds
+  if(!is.null(ctmodelobj$ordNames[1])){
+    ordNames<-ctmodelobj$ordNames
+    ordLevels<-ctmodelobj$ordLevels
+    
+    nOrdinal <- length(ordNames)
+    ordvars <- ordNames
+    
+    if(objective!='Kalman' && objective != 'Kalmanmx') ordvars <- paste0(rep(ordNames,each=Tpoints),'_T',rep(0:(Tpoints-1),nOrdinal))
+    if(objective=='Kalman' || objective == 'Kalmanmx') Tpoints <- 1
+    maxthresholds <- max(unlist(lapply(ordLevels,length)))-1
+    nthresholds <- (unlist(lapply(ordLevels,length)))-1
+    tb <- matrix(NA,maxthresholds,length(ordvars))
+    colnames(tb) <- ordvars
+    tfree <- tb
+    tfree[,] <- FALSE
+    tvalues <- tb
+    tlabels <- tb
+    tlbound <- tb
+    tubound <- tb
+    
+    dat <- as.data.frame(model@data$observed)
+    
+    
+    for(vari in 1:length(ordNames)){
+      tfree[1:nthresholds[vari],(1+(Tpoints*(vari-1))):(Tpoints*vari)] <- TRUE
+      tvalues[1:nthresholds[vari],(1+(Tpoints*(vari-1))):(Tpoints*vari)] <- ordLevels[[vari]][-(1+nthresholds[vari])]+.5
+      tlabels[1:nthresholds[vari],(1+(Tpoints*(vari-1))):(Tpoints*vari)] <- paste0('thresh_',ordNames[vari],'_',1:nthresholds[vari])
+      tlbound[1:nthresholds[vari],(1+(Tpoints*(vari-1))):(Tpoints*vari)] <- ordLevels[[vari]][-(1+nthresholds[vari])]
+      tubound[1:nthresholds[vari],(1+(Tpoints*(vari-1))):(Tpoints*vari)] <- ordLevels[[vari]][-1]
+      dat[,ordvars[(1+(Tpoints*(vari-1))):(Tpoints*vari)]] <- mxFactor(dat[,ordvars[(1+(Tpoints*(vari-1))):(Tpoints*vari)]],levels = ordLevels[[vari]]) 
+    }
+    # browser()
+    thresh <- mxMatrix(name='thresh',
+      ncol=length(ordvars),
+      nrow=maxthresholds,
+      dimnames = list(paste0('row',1:maxthresholds),ordvars),
+      free = tfree,
+      values = tvalues,
+      labels = tlabels,
+      lbound = tlbound,
+      ubound= tubound)
+    
+    model<-mxModel(
+  model, 
+  thresh,
+  mxData(observed = dat, type = "raw"))
+    
+  }
   
   
   

@@ -5,8 +5,9 @@
 \title{Kalman}
 \usage{
 Kalman(kpars, datalong, manifestNames, latentNames, imputeMissings = FALSE,
-  TDpredNames = NULL, continuoustime = TRUE, timecol = "time",
-  diffusionindices = "all")
+  TDpredNames = NULL, continuoustime = TRUE, idcol = "id",
+  timecol = "time", diffusionindices = "all", optimize = FALSE,
+  ukf = FALSE, plotoptim = FALSE)
 }
 \arguments{
 \item{kpars}{list object containing DRIFT,T0VAR,DIFFUSION,CINT,T0MEANS,TDPREDEFFECT,
@@ -16,7 +17,7 @@ Such a list is returned by \code{\link{ctStanContinuousPars}}.}
 \item{datalong}{long format data object as used by \code{\link{ctStanFit}}, 
 but must contain only a single subjects' data and does not need an id column.}
 
-\item{manifestNames}{String vector of names of manifest variables to use from datalong.}
+\item{manifestNames}{String vector of names of manifest varifables to use from datalong.}
 
 \item{latentNames}{String vector of names of latent variables.}
 
@@ -29,13 +30,23 @@ string vector of their names in the data.}
 \item{continuoustime}{Logical, whether to use a continuous time Kalman filter or discrete time. 
 Refers only to latent states, observations are always at discrete time points.}
 
+\item{idcol}{Character string giving name of subject identification column in data.}
+
 \item{timecol}{name of time column in datalong. Note that time column must be an ascending sequence
 of numeric values from row 1 to row n. Ignored if continuoustime=FALSE.}
 
 \item{diffusionindices}{vector of integers denoting which latent variables are involved in covariance calcs.}
+
+\item{optimize}{Set to TRUE when using for optimization.}
+
+\item{ukf}{set to TRUE to use the unscented Kalman filter, only necessary for fitting non-linear models, 
+currently only for optimizing.}
+
+\item{plotoptim}{set to TRUE to plot / print optimization steps.}
 }
 \value{
-Returns a list containing matrix objects etaprior, etaupd, etasmooth, y, yprior, 
+When optimize=TRUE, returns log likelihood. Else, 
+returns a list containing matrix objects etaprior, etaupd, etasmooth, y, yprior, 
 yupd, ysmooth, prederror, time, loglik,  with values for each time point in each row. 
 eta refers to latent states and y to manifest indicators - y itself is thus just 
 the input data. 
@@ -54,9 +65,9 @@ predicted and updated latent states, likelihoods, and predicted observations usi
 kpars <- ctStanContinuousPars(ctstantestfit)
 
 #construct dummy data
-datalong <- cbind(0:9, matrix(rnorm(20,2,1),ncol=2))
-datalong[c(1:3,9:10),2:3]<-NA #missing data to pre/fore cast
-colnames(datalong) <- c('time', paste0('Y',1:2))
+datalong <- cbind(0:9, 1, matrix(rnorm(20,2,1),ncol=2))
+datalong[c(1:3,9:10),3:4]<-NA #missing data to pre/fore cast
+colnames(datalong) <- c('time', 'id', paste0('Y',1:2))
 print(datalong)
 
 #obtain Kalman filtered estimates
@@ -67,5 +78,5 @@ kout <- Kalman(kpars=kpars, datalong=datalong,
 #print and plot smoothed estimates (conditional on all states) of indicators.
 print(kout$ysmooth)
 matplot(kout$time,kout$ysmooth,type='l')
-matplot(kout$time,datalong[,2:3],type='p',add=TRUE,pch=1)
+matplot(kout$time,datalong[,3:4],type='p',add=TRUE,pch=1)
 }

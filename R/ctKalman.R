@@ -39,12 +39,12 @@
 #'   subsetindices=2, #Only plotting 2nd dimension of y and yprior
 #'   pchvec='auto', typevec='auto',grid=TRUE,legend=TRUE,
 #'   plotcontrol=list(xlim=c(0,55),main='Observations and priors'),
-#'   polygoncontrol=list(density=20))
+#'   polygoncontrol=list(steps=5))
 #' @export
 
 ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
   subjects=1, plot=FALSE,...){
-  
+
   type=NA
   if(class(fit)=='ctStanFit') type='stan' 
   if(class(fit) =='ctsemFit') type ='omx'
@@ -58,6 +58,11 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
   out<-list()
   if(timerange[1] != 'asdata' & timestep[1] == 'asdata') stop('If timerange is not asdata, a timestep must be specified!')
   
+  if(!is.null(datalong)) { #adjust ids and colnames as needed
+    datalong <- makeNumericIDs(datalong, fit$ctstanmodel$subjectIDname,fit$ctstanmodel$timeName) #ensure id's are appropriate
+    colnames(datalong)[colnames(datalong)==fit$ctstanmodel$subjectIDname] <- 'subject'
+    colnames(datalong)[colnames(datalong)==fit$ctstanmodel$timeName] <- 'time'
+  }
   
   if(is.null(datalong)) { #get relevant data
     
@@ -104,12 +109,12 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
         if(timerange[1] > min(sdat[,'time']) || timerange[2] < max(sdat[,'time']) ) stop('Specified timerange must contain all subjects time ranges!')
       }
       snewtimes <- seq(stimerange[1],stimerange[2],timestep)
-      snewdat <- array(NA,dim=c(length(snewtimes),dim(sdat)[-1]),dimnames=dimnames(sdat)) 
+      snewdat <- array(NA,dim=c(length(snewtimes),dim(sdat)[-1]),dimnames=list(c(),dimnames(sdat)[[2]]))
       snewdat[,'time'] <- snewtimes
       snewdat[,TDpredNames] <- 0
       sdat <- rbind(sdat,snewdat)
-      sdat<-sdat[!duplicated(sdat[,'time']),]
-      sdat <- sdat[order(sdat[,'time']),]
+      sdat<-sdat[!duplicated(sdat[,'time']),,drop=FALSE]
+      sdat <- sdat[order(sdat[,'time']),,drop=FALSE]
       sdat[,c(manifestNames,TDpredNames)] [sdat[,c(manifestNames,TDpredNames)]==99999] <- NA
       sdat[,'subject'] <- subjecti
     }
@@ -125,6 +130,7 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
       manifestNames=manifestNames,
       latentNames=latentNames,
       TDpredNames=TDpredNames,
+      idcol='subject',
       timecol='time',
       diffusionindices=diffusionindices)
   }
@@ -167,7 +173,7 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
 #' though lty,col,lwd,x,y, will all be ignored.
 #' @param legend Logical, whether to include a legend if plotting.
 #' @param legendcontrol List of arguments to the \code{\link{legend}} function.
-#' @param polygoncontrol List of arguments to the \code{\link{polygon}} function for filling the uncertainty region.
+#' @param polygoncontrol List of arguments to the \code{\link{ctPoly}} function for filling the uncertainty region.
 #' @param polygonalpha Numeric for the opacity of the uncertainty region.
 #' @return Nothing. Generates plots.
 #' @export
@@ -183,9 +189,9 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
 ctKalmanPlot<-function(x, subjects, kalmanvec=c('y','yprior'),
   errorvec='auto', errormultiply=1.96,
   ltyvec="auto",colvec='auto', lwdvec='auto', 
-  subsetindices=NULL,pchvec='auto', typevec='auto',grid=TRUE,add=FALSE, 
+  subsetindices=NULL,pchvec='auto', typevec='auto',grid=FALSE,add=FALSE, 
   plotcontrol=list(ylab='Value',xlab='Time',xaxs='i'),
-  polygoncontrol=list(border=NA),polygonalpha=.1,
+  polygoncontrol=list(steps=20),polygonalpha=.3,
   legend=TRUE, legendcontrol=list(x='topright',bg='white')){
   
 
@@ -230,6 +236,7 @@ ctKalmanPlot<-function(x, subjects, kalmanvec=c('y','yprior'),
             ret <- c(ret,esthigh,estlow)
         }
         return(ret)}})),na.rm=TRUE)
+    if(legend) plotcontrol$ylim[2] <- plotcontrol$ylim[2] + sd(plotcontrol$ylim)/4
   }
   
   
@@ -299,12 +306,30 @@ ctKalmanPlot<-function(x, subjects, kalmanvec=c('y','yprior'),
           
           # if(is.null(polygoncontrol$angle)) 
           # polygoncontrol$angle=stats::runif(1,0,359)
-          polygonargs<-polygoncontrol
-          polygonargs$x=c(plist$x,plist$x[backwardstimesindex])
-          polygonargs$y=c(plist$y + errormultiply * sqrt(abs(out[[subiname]][[errorvec[kveci]]][kdimi,kdimi,])), 
-            (plist$y - errormultiply * sqrt(abs(out[[subiname]][[errorvec[kveci]]][kdimi,kdimi,])))[backwardstimesindex])
-          polygonargs$col=grDevices::adjustcolor(plist$col,alpha.f=polygonalpha)
-          do.call(graphics::polygon,polygonargs)
+          
+          # polygonargs<-polygoncontrol
+          # polygonargs$x=c(plist$x,plist$x[backwardstimesindex])
+          # polygonargs$y=c(plist$y + errormultiply * sqrt(abs(out[[subiname]][[errorvec[kveci]]][kdimi,kdimi,])), 
+          #   (plist$y - errormultiply * sqrt(abs(out[[subiname]][[errorvec[kveci]]][kdimi,kdimi,])))[backwardstimesindex])
+          # polygonargs$col=grDevices::adjustcolor(plist$col,alpha.f=polygonalpha)
+          # do.call(graphics::polygon,polygonargs)
+          
+          ctpolyargs<-polygoncontrol
+          ctpolyargs$x=c(plist$x)
+          ctpolyargs$ylow=c(plist$y - errormultiply * sqrt(abs(out[[subiname]][[errorvec[kveci]]][kdimi,kdimi,])))
+          ctpolyargs$y=c(plist$y)
+          ctpolyargs$yhigh=c(plist$y + errormultiply * sqrt(abs(out[[subiname]][[errorvec[kveci]]][kdimi,kdimi,])))
+          ctpolyargs$col=grDevices::adjustcolor(plist$col,alpha.f=polygonalpha)
+          ctpolyargs$col =grDevices::adjustcolor(ctpolyargs$col,alpha.f=max(c(.004,polygonalpha/sqrt(ctpolyargs$steps))))
+          do.call(ctPoly,ctpolyargs)
+          
+          #add quantile lines
+          plist$y <- ctpolyargs$ylow
+          plist$lwd <- 1
+          # plist$col <- grDevices::adjustcolor(plist$col,alpha.f=.5)
+          do.call(points,plist)
+          plist$y <- ctpolyargs$yhigh
+          do.call(points,plist)
         }
         
         #if changing lty then legend needs lty types

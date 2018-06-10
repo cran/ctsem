@@ -2,18 +2,16 @@
 % Please edit documentation in R/ctPlotArray.R
 \name{ctPlotArray}
 \alias{ctPlotArray}
-\title{Plots a three dimensional array}
+\title{Plots three dimensional y values for quantile plots}
 \usage{
-ctPlotArray(yarray, x, grid = TRUE, colvec = "auto", lwdvec = "auto",
+ctPlotArray(input, grid = FALSE, colvec = "auto", lwdvec = "auto",
   ltyvec = "auto", typevec = "auto", plotcontrol = list(ylab =
-  "Array values", xlab = "X values", xaxs = "i"), legend = TRUE,
-  legendcontrol = list(x = "topright"), polygon = TRUE,
-  polygonalpha = 0.1, polygoncontrol = list(border = NA, steps = 50))
+  "Array values", xaxs = "i"), legend = TRUE, legendcontrol = list(),
+  polygon = TRUE, polygonalpha = 0.1, polygoncontrol = list(steps = 25))
 }
 \arguments{
-\item{yarray}{3 dimensional array to use for Y values}
-
-\item{x}{numeric vector specifying x axis}
+\item{input}{list containing 3 dimensional array to use for Y values, \code{$y}
+and vector of corresponding x values \code{$x}.}
 
 \item{grid}{Logical. Plot with a grid?}
 
@@ -42,10 +40,11 @@ uncertainty polygon.}
 Nothing. Generates plots.
 }
 \description{
-1st margin sets line values, 2nd sets variables, 3rd quantiles.
+1st margin of $Y sets line values, 2nd sets variables, 3rd quantiles.
 }
 \examples{
-y <- ctStanTIpredeffects(ctstantestfit,plot=FALSE)
-x<-ctstantestfit$data$tipreds[order(ctstantestfit$data$tipreds[,1]),1]
-ctPlotArray(y,x)
+input<-ctStanTIpredeffects(ctstantestfit, plot=FALSE, whichpars='CINT', 
+ nsamples=10,nsubjects=10)
+    
+ctPlotArray(input=input)
 }
