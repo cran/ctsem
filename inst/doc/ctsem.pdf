@@ -5,7 +5,7 @@
 stream
 2 0 3 67 4 561 5 875 6 1195 7 1238 8 1333 9 1588 10 1838 11 2045 12 2295 13 2511 14 2728 15 2876 16 3024 17 3075 18 3558 19 3931 20 4085 21 4293 22 4701 23 4961 24 5525 25 6109 26 6559 27 6887 28 7039 29 7245 30 7708 31 8040 32 8317 33 8572 34 8590 35 8692 36 8838 37 9109 38 9347 39 9711 40 10006 41 10203 42 10436 43 10584 44 11019 45 11167 46 11314 47 11461 48 11609 49 11755 50 11903 51 12051 52 12200 53 12348 54 12497 55 12646 56 12795 57 13258 58 13792 59 13941 60 14133 61 14324 62 14519 63 14719 64 14918 65 15114 66 15295 67 15475 68 15654 69 15852 70 16031 71 16220 72 16408 73 16589 74 16769 75 16787 76 16880 77 17074 78 17268 79 17449 80 17642 81 17832 82 18028 83 18223 84 18415 85 18595 86 18786 87 18867 88 19063 89 19152 90 19232 91 19344 92 19421
 << /Metadata 93 0 R /Outlines 6 0 R /Pages 4 0 R /Type /Catalog >>
-<< /Author (Charles C. Driver, Johan H. L. Oud, Manuel C. Voelkle) /CreationDate (D:20180608012653+02'00') /Creator (LaTeX with hyperref package) /Keywords (time series, longitudinal modelling, panel data, state space, structural equation modelling, continuous time, stochastic differential equation, dynamic models, Kalman filter, R) /ModDate (D:20180608012653+02'00') /Producer (GPL Ghostscript 9.23) /Subject () /Title (Continuous Time Structural Equation Modelling With R Package ctsem) >>
+<< /Author (Charles C. Driver, Johan H. L. Oud, Manuel C. Voelkle) /CreationDate (D:20180625182915+02'00') /Creator (LaTeX with hyperref package) /Keywords (time series, longitudinal modelling, panel data, state space, structural equation modelling, continuous time, stochastic differential equation, dynamic models, Kalman filter, R) /ModDate (D:20180625182915+02'00') /Producer (GPL Ghostscript 9.23) /Subject () /Title (Continuous Time Structural Equation Modelling With R Package ctsem) >>
 << /Count 36 /Kids [ 10 0 R 5 0 R 43 0 R 95 0 R 187 0 R 279 0 R 280 0 R 333 0 R 281 0 R 188 0 R 96 0 R 140 0 R 143 0 R 189 0 R 97 0 R 98 0 R 99 0 R 190 0 R 100 0 R 191 0 R 282 0 R 192 0 R 193 0 R 194 0 R 101 0 R 195 0 R 102 0 R 283 0 R 8 0 R 36 0 R 37 0 R 402 0 R 442 0 R 103 0 R 445 0 R 450 0 R ] /Type /Pages >>
 << /Annots [ 35 0 R 405 0 R 406 0 R 407 0 R 408 0 R 409 0 R 410 0 R 411 0 R 412 0 R 413 0 R 414 0 R 415 0 R 416 0 R 417 0 R 418 0 R 419 0 R ] /Contents 459 0 R /MediaBox [ 0 0 595.28 841.89 ] /Parent 4 0 R /Resources << /ExtGState 420 0 R /Font 422 0 R /ProcSet [ /PDF /ImageC /Text ] /XObject 421 0 R >> /Type /Page >>
 << /Count 12 /First 7 0 R /Last 404 0 R >>
@@ -104,14 +104,14 @@ stream
 <?adobe-xap-filters esc="CRLF"?>
 <x:xmpmeta xmlns:x='adobe:ns:meta/' x:xmptk='XMP toolkit 2.9.1-13, framework 1.6'>
 <rdf:RDF xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' xmlns:iX='http://ns.adobe.com/iX/1.0/'>
-<rdf:Description rdf:about='uuid:c29ceeac-6d05-11e8-0000-1ccf13d73dd4' xmlns:pdf='http://ns.adobe.com/pdf/1.3/'><pdf:Producer>GPL Ghostscript 9.23</pdf:Producer>
+<rdf:Description rdf:about='uuid:66514d71-7af0-11e8-0000-1ccf13d73dd4' xmlns:pdf='http://ns.adobe.com/pdf/1.3/'><pdf:Producer>GPL Ghostscript 9.23</pdf:Producer>
 <pdf:Keywords>time series, longitudinal modelling, panel data, state space, structural equation modelling, continuous time, stochastic differential equation, dynamic models, Kalman filter, R</pdf:Keywords>
 </rdf:Description>
-<rdf:Description rdf:about='uuid:c29ceeac-6d05-11e8-0000-1ccf13d73dd4' xmlns:xmp='http://ns.adobe.com/xap/1.0/'><xmp:ModifyDate>2018-06-08T01:26:53+02:00</xmp:ModifyDate>
-<xmp:CreateDate>2018-06-08T01:26:53+02:00</xmp:CreateDate>
+<rdf:Description rdf:about='uuid:66514d71-7af0-11e8-0000-1ccf13d73dd4' xmlns:xmp='http://ns.adobe.com/xap/1.0/'><xmp:ModifyDate>2018-06-25T18:29:15+02:00</xmp:ModifyDate>
+<xmp:CreateDate>2018-06-25T18:29:15+02:00</xmp:CreateDate>
 <xmp:CreatorTool>LaTeX with hyperref package</xmp:CreatorTool></rdf:Description>
-<rdf:Description rdf:about='uuid:c29ceeac-6d05-11e8-0000-1ccf13d73dd4' xmlns:xapMM='http://ns.adobe.com/xap/1.0/mm/' xapMM:DocumentID='uuid:c29ceeac-6d05-11e8-0000-1ccf13d73dd4'/>
-<rdf:Description rdf:about='uuid:c29ceeac-6d05-11e8-0000-1ccf13d73dd4' xmlns:dc='http://purl.org/dc/elements/1.1/' dc:format='application/pdf'><dc:title><rdf:Alt><rdf:li xml:lang='x-default'>Continuous Time Structural Equation Modelling With R Package ctsem</rdf:li></rdf:Alt></dc:title><dc:creator><rdf:Seq><rdf:li>Charles C. Driver, Johan H. L. Oud, Manuel C. Voelkle</rdf:li></rdf:Seq></dc:creator><dc:description><rdf:Alt><rdf:li xml:lang='x-default'></rdf:li></rdf:Alt></dc:description></rdf:Description>
+<rdf:Description rdf:about='uuid:66514d71-7af0-11e8-0000-1ccf13d73dd4' xmlns:xapMM='http://ns.adobe.com/xap/1.0/mm/' xapMM:DocumentID='uuid:66514d71-7af0-11e8-0000-1ccf13d73dd4'/>
+<rdf:Description rdf:about='uuid:66514d71-7af0-11e8-0000-1ccf13d73dd4' xmlns:dc='http://purl.org/dc/elements/1.1/' dc:format='application/pdf'><dc:title><rdf:Alt><rdf:li xml:lang='x-default'>Continuous Time Structural Equation Modelling With R Package ctsem</rdf:li></rdf:Alt></dc:title><dc:creator><rdf:Seq><rdf:li>Charles C. Driver, Johan H. L. Oud, Manuel C. Voelkle</rdf:li></rdf:Seq></dc:creator><dc:description><rdf:Alt><rdf:li xml:lang='x-default'></rdf:li></rdf:Alt></dc:description></rdf:Description>
 </rdf:RDF>
 </x:xmpmeta>
                                                                         
@@ -3942,7 +3942,7 @@ xú]O1É0‹Û
 ˇ ÄÑ∫ ∫0¥™⁄~ 8 ÄÖ0Ù˜%!tËpñŒw'üÂ0^G∂‰#8|QcYZ›ê`¢Ÿ≤®–cay‚¢ºê√M˘˜«Ï2ø´Ö‰≥mÎº™è:M´WHAÒL¢´™æ3¶ƒ˙O*Å…gsÈÃ˛SI—T‚º	∏Ö@s”‹$∞LøgºÛ);ƒ@Siendstream
 endobj
 543 0 obj
-<< /Type /XRef /Length 2720 /W [ 1 3 1 ] /Info 3 0 R /Root 2 0 R /Size 544 /ID [<088b3264213bcd59a3a2a4bfb48ea070><0021e02f2f14aabbe653b6c4a0ebd230>] >>
+<< /Type /XRef /Length 2720 /W [ 1 3 1 ] /Info 3 0 R /Root 2 0 R /Size 544 /ID [<4598c624012c129d27343a841d783d76><d844d314ce739a164acbac8fbbe56c42>] >>
 stream
                              	  
                                                !  "  #  $  %  &  '  (  )  *  +  ,  -  .  /  0  1  2  3  4  5  6  7  8  9  :  ;  <  =  >  ?  @  A  B  C  D  E  F  G  H  I  J  K  L  M  N  O  P  Q  R  S  T  U  V  W  X  Y  Z Oí  W    ^   ^  ^  ^  ^  ^  ^  ^  ^  ^	  ^
