@@ -12,6 +12,8 @@
 #' as per the mfrow argument to \code{\link[graphics]{par}}.
 #' 'auto' determines automatically, to a maximum of 4 by 4, while \code{NULL} 
 #' uses the current system setting.
+#' @param smoothness Positive numeric -- multiplier to modify smoothness of density plots, higher is smoother but
+#' can cause plots to exceed natural boundaries, such as standard deviations below zero.
 #' @param lwd line width for plotting.
 #' @param parcontrol parameters to pass to \code{\link[graphics]{par}} which temporarily
 #' change plot settings.
@@ -21,7 +23,7 @@
 #' ctStanPlotPost(ctstantestfit, rows=3:4)
 #' @export
 
-ctStanPlotPost<-function(obj, rows='all', priorwidth=TRUE, mfrow='auto',lwd=2,
+ctStanPlotPost<-function(obj, rows='all', priorwidth=TRUE, mfrow='auto',lwd=2,smoothness=1,
   parcontrol=list(mgp=c(1.3,.5,0),mar=c(3,2,2,1)+.2),wait=FALSE){
   
   if(!(class(obj) %in% c('ctStanFit','ctStanModel'))) stop('not a ctStanFit or ctStanModel object!')
@@ -58,40 +60,39 @@ ctStanPlotPost<-function(obj, rows='all', priorwidth=TRUE, mfrow='auto',lwd=2,
   
     leg <- c('Pop. mean posterior','Pop. mean prior') 
     legcol <- c('black','blue') 
-    
-    ctDensityList(list(popmeanspost,meanprior),main=paste0(pname),
+
+    ctDensityList(list(popmeanspost,meanprior),main=paste0(pname),smoothness=smoothness,
       xlimsindex=if(priorwidth) 1:2 else 1,
       xaxs='i',  yaxs='i', plot=TRUE,legend=leg,colvec=legcol,lwd=lwd)
 
     if(obj$setup$popsetup[ri,'indvarying']>0){ #then also plot sd and subject level pars
-
       sdscale <- obj$setup$popvalues[ri,'sdscale']
       sdtform <- gsub('.*', '*',obj$ctstanmodel$rawpopsdtransform,fixed=TRUE)
       
-      rawpopsdbase<-e$rawpopsdbase[,popsetup$indvarying[ri]] 
-      
-      rawpopsd <- eval(parse(text=sdtform)) 
+      # rawpopsdbase<-e$rawpopsdbase[,popsetup$indvarying[ri]] 
+      # browser()
+      rawpopsd <- e$rawpopsd[,popsetup$indvarying[ri]] #c(eval(parse(text=sdtform)) * ifelse(!is.null(obj$standata$varreg),exp(e$varregbase),1))
       
       param<-stats::rnorm(densiter,rawpopmeans,rawpopsd)
       subjectprior<-tform(param,popsetup$transform[pari],popvalues$multiplier[pari], popvalues$meanscale[pari],popvalues$offset[pari])
 
-      if(!obj$data$ukfpop) {
+      if(!obj$data$intoverpop) {
         rawindparams<-e$baseindparams[,seq(popsetup$indvarying[pari],by=obj$data$nindvarying,length.out=obj$data$nsubjects)] *
           rawpopsd + rawpopmeans
         param<-rawindparams
         indparams<-tform(param,popsetup$transform[pari],popvalues$multiplier[pari], popvalues$meanscale[pari],popvalues$offset[pari])
 
-        ctDensityList(list(indparams,subjectprior,meanprior),main=pname,
+        ctDensityList(list(indparams,subjectprior,meanprior),main=pname,smoothness=smoothness,
           colvec=c('black','red','blue'),plot=TRUE,lwd=lwd,xlimsindex=1:2,
           xaxs='i',  yaxs='i',legend=c('Subject param posterior','Subject param prior','Pop mean prior'))
       } else {
-        ctDensityList(list(subjectprior,meanprior),main=pname,
+        ctDensityList(list(subjectprior,meanprior),main=pname,smoothness=smoothness,
           colvec=c('red','blue'),plot=TRUE,lwd=lwd,xlimsindex=1,
           xaxs='i',  yaxs='i',legend=c('Subject param prior','Pop mean prior'))
       }
       
       rawpopsdbase<-  stats::rnorm(densiter,0,1)
-      rawpopsdprior <- eval(parse(text=sdtform)) #rawpopsd prior samples
+      rawpopsdprior <- c(eval(parse(text=sdtform))  * sdscale)#rawpopsd prior samples
 
       hsdpost <- e$popsd[,popsetup$param[ri]]
 
@@ -106,8 +107,8 @@ ctStanPlotPost<-function(obj, rows='all', priorwidth=TRUE, mfrow='auto',lwd=2,
       # 
       # graphics::legend('topright',leg, text.col=legcol, bty='n')
       
-      ctDensityList(list(hsdpost, hsdprior),main=paste0('Pop. sd ',pname),
-        xlimsindex=1,
+      ctDensityList(list(hsdpost, hsdprior),main=paste0('Pop. sd ',pname),smoothness=smoothness,
+        xlimsindex=if(priorwidth) 1:2 else 1,
         xaxs='i',yaxs='i',plot = TRUE, colvec=legcol, legend=leg,lwd=lwd)
       
       

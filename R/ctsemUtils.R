@@ -148,7 +148,7 @@ ctDensity<-function(x,bw='auto',plot=FALSE,...){
 
 
 
-ctDensityList<-function(x,xlimsindex='all',plot=FALSE,ylab='Density',
+ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,ylab='Density',
   xlab='Par. Value',colvec='auto',ltyvec='auto',probs=c(.05,.95),
   legend=FALSE, legendargs=list(),...){
   
@@ -160,7 +160,7 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,ylab='Density',
       xlims=newxlims
     } 
     else {
-        newxlims <- range(c(xlims,newxlims))
+        xlims <- range(c(xlims,newxlims))
     }
   }
   sd=sd(xlims)
@@ -169,7 +169,7 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,ylab='Density',
 
   bw=abs(max( 
     min( (sd)/length(x[[1]])^.4,sd/50),
-      1e-5))
+      1e-5)) * smoothness
   
   if(all(colvec=='auto')) colvec=1:length(x)
   if(all(ltyvec=='auto')) ltyvec=1:length(x)
@@ -178,7 +178,11 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,ylab='Density',
   # mid=mean(c(xlims[2],xlims[1]))
   # xlims[1] = xlims[1] - (mid-xlims[1])/8
   # xlims[2] = xlims[2] + (xlims[2]-mid)/8
-  denslist<-lapply(1:length(x),function(xi) stats::density(x[[xi]],bw=bw,n=5000,from=xlims[1]-sd/2,to=xlims[2]+sd/2,na.rm=TRUE))
+  denslist<-lapply(1:length(x),function(xi) {
+    d=stats::density(x[[xi]],bw=bw,n=5000,from=xlims[1]-sd/2,to=xlims[2]+sd/2,na.rm=TRUE)
+    d$y=d$y/ sum(d$y)/range(d$x)[2]*length(d$y)
+    return(d)
+    })
   ylims=c(0,max(unlist(lapply(denslist,function(li) max(li$y))))*1.1) * ifelse(legend[1]!=FALSE, 1.2,1)
   
   if(plot) {

@@ -9,7 +9,7 @@ Minimal output from \code{\link{ctStanFit}} from ctsem package.
 }
 \examples{
 \dontrun{#' 
-checkm<-ctModel(type='stanct',Tpoints=Tpoints,
+checkm<-ctModel(type='stanct',
   n.latent=n.latent,n.TDpred=n.TDpred,n.TIpred=n.TIpred,
   MANIFESTVAR=matrix(c('merror',0,0,'merror'),2,2),
   MANIFESTMEANS=matrix(0,nrow=n.manifest),
@@ -21,8 +21,8 @@ checkm$pars$sdscale <- .1
  
 checkm$pars[c(-1,-2, -21,-22) ,c('TI1_effect','TI2_effect','TI3_effect')] <- FALSE
 
-ctstantestfit<-ctStanFit(ctstantestdat,checkm,iter=800, warmup=780,chains=2, 
-  control=list(max_treedepth=8,adapt_delta=.8))
+ctstantestfit<-ctStanFit(ctstantestdat,checkm,iter=500, warmup=460,thin=2,chains=2,
+  control=list(max_treedepth=5,adapt_delta=.8),save_warmup=FALSE)
 summary(ctstantestfit)
 save(ctstantestfit,file='.\\\\data\\\\ctstantestfit.rda')
 paths <- sort(Sys.glob(c("data/*.rda", "data/*.RData")))

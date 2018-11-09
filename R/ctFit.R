@@ -84,6 +84,8 @@
 #' Multigroup models may be specified using \code{\link{ctMultigroupFit}}.
 #' Confidence intervals for any matrices and or parameters 
 #' may be estimated using \code{\link{ctCI}}.
+#' Difficulties during estimation can sometimes be alleviated using \code{\link{ctRefineTo}} instead of \code{\link{ctFit}} -- 
+#' this uses a multistep fit procedure.
 #' @examples 
 #' ## Examples set to 'dontrun' because they take longer than 5s.
 #' \dontrun{
@@ -96,7 +98,7 @@
 #' traitmodel <- ctModel(n.manifest=2, n.latent=2, Tpoints=6, LAMBDA=diag(2), 
 #'   manifestNames=c('LeisureTime', 'Happiness'), 
 #'   latentNames=c('LeisureTime', 'Happiness'), TRAITVAR="auto")
-#' traitfit <- ctFit(datawide=ctExample1, ctmodelobj=traitmodel)
+#' traitfit <- ctFit(dat=ctExample1, ctmodelobj=traitmodel)
 #' summary(traitfit)
 #' plot(traitfit, wait=FALSE)
 #' 
@@ -113,9 +115,10 @@
 #' data('ctExample3')
 #' model <- ctModel(n.latent = 1, n.manifest = 3, Tpoints = 100, 
 #'   LAMBDA = matrix(c(1, 'lambda2', 'lambda3'), nrow = 3, ncol = 1), 
+#'   CINT= matrix('cint'),
 #'   MANIFESTMEANS = matrix(c(0, 'manifestmean2', 'manifestmean3'), nrow = 3, 
 #'     ncol = 1))
-#' fit <- ctFit(data = ctExample3, ctmodelobj = model, objective = 'Kalman', 
+#' fit <- ctFit(dat = ctExample3, ctmodelobj = model, objective = 'Kalman', 
 #'   stationary = c('T0VAR'))
 #' 
 #' 
@@ -166,9 +169,9 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
   largeAlgebras<-TRUE
   if(nofit) fit <- FALSE
   if(fit == FALSE) carefulFit <- FALSE
-  
-  if(all(stationary %in% 'all')) stationary<-c('T0VAR','T0MEANS','T0TIPREDEFFECT','T0TRAITEFFECT')
+
   if(is.null(stationary)) stationary <- c('')
+  if(all(stationary %in% 'all')) stationary<-c('T0VAR','T0MEANS','T0TIPREDEFFECT','T0TRAITEFFECT')
   
   n.latent<-ctmodelobj$n.latent
   n.manifest<-ctmodelobj$n.manifest

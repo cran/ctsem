@@ -18,14 +18,20 @@ datalong <- cbind(id, time, sunspots)
    DIFFUSION=matrix(c(.0001, 0, 0, "diffusion"), ncol=2, nrow=2))
 
 #fit
-sm <- ctStanFit(datalong, model,fit=FALSE)$stanmodeltext
+sm <- ctStanFit(datalong, model,fit=FALSE,gendata=TRUE)$stanmodeltext
 stanc(model_code = sm,verbose = TRUE)
+smW32 <- ctStanFit(datalong, model,fit=FALSE,gendata=FALSE)$stanmodeltext
+stanc(model_code = smW32,verbose = TRUE)
 message(paste0('Updating from ',(getwd()),', continue T / F?'))
 continue <- readline()
 if(continue){
   file.rename('./src/stan_files/ctsm.stan', './src/stan_files/ctsm.bak')
+  file.rename('./src/stan_files32/ctsm.stan', './src/stan_files32/ctsm.bak')
 sink(file='./src/stan_files/ctsm.stan')
 cat(sm)
+sink()
+sink(file='./src/stan_files32/ctsm.stan')
+cat(smW32)
 sink()
 # 
 # message('All ok? finish this...')

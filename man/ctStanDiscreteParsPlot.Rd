@@ -4,13 +4,13 @@
 \alias{ctStanDiscreteParsPlot}
 \title{ctStanDiscreteParsPlot}
 \usage{
-ctStanDiscreteParsPlot(x, indices = "all", add = FALSE, legend = TRUE,
-  polygon = TRUE, quantiles = c(0.025, 0.5, 0.975), times = seq(0, 10,
-  0.1), latentNames = "auto", lwdvec = "auto", colvec = "auto",
-  ltyvec = "auto", plotcontrol = list(ylab = "Value", xlab =
-  "Time interval", main = "Regression coefficients", type = "l", xaxs = "i"),
-  grid = FALSE, legendcontrol = list(x = "topright", bg = "white"),
-  polygonalpha = 0.1, polygoncontrol = list(steps = 20))
+ctStanDiscreteParsPlot(x, indices = "all", add = FALSE,
+  legend = TRUE, polygon = TRUE, quantiles = c(0.025, 0.5, 0.975),
+  times = seq(0, 10, 0.1), latentNames = "auto", lwdvec = "auto",
+  colvec = "auto", ltyvec = "auto", plotcontrol = list(ylab =
+  "Value", xlab = "Time interval", main = "Regression coefficients", type =
+  "l", xaxs = "i"), grid = FALSE, legendcontrol = list(x = "topright",
+  bg = "white"), polygonalpha = 0.1, polygoncontrol = list(steps = 20))
 }
 \arguments{
 \item{x}{list object returned from \code{\link{ctStanDiscretePars}}.}
@@ -40,7 +40,7 @@ The default of c(.05,.5,.95) plots 95\% credible intervals and the posterior med
 'auto' specifies c(1,3,1) if there are 3 quantiles to be plotted (default), otherwise simply 3.}
 
 \item{colvec}{Either 'auto', or a vector of color values denoting colors for each index to be plotted.
-'auto' generates colors using the \code{\link[grDevices]{rainbow}} function.}
+'auto' generates colors using the \code{grDevices::rainbow} function.}
 
 \item{ltyvec}{Either 'auto', or a vector of line type integers (as for the lty parameter normally)
 denoting line types for each quantile.

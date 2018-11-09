@@ -87,9 +87,12 @@ ctStanModel<-function(ctmodelobj, type='stanct', indvarying='all'){
   for(pi in 1:length(ctspec$matrix)){
     if(freeparams[pi]){
       if(ctspec$matrix[pi] %in% c('T0MEANS','MANIFESTMEANS','TDPREDEFFECT','CINT')) {
-        ctspec$meanscale[pi] <-5
+        ctspec$meanscale[pi] <-10
       }
-      if(ctspec$matrix[pi] %in% c('LAMBDA')) ctspec$offset[pi] <- 0.5
+      if(ctspec$matrix[pi] %in% c('LAMBDA')) {
+        ctspec$offset[pi] <- 0.5
+        ctspec$meanscale[pi] <- 5
+      }
 
       if(ctspec$matrix[pi] %in% c('DIFFUSION','MANIFESTVAR', 'T0VAR')) {
         if(ctspec$row[pi] != ctspec$col[pi]){
@@ -168,10 +171,11 @@ ctStanModel<-function(ctmodelobj, type='stanct', indvarying='all'){
   # out$popsdpriorscale <- 1
   out$rawpopsdbase <- 'normal(0,1)' #'cauchy(0,1)'
   out$rawpopsdbaselowerbound <- NA
-  out$rawpopsdtransform <- 'log(1+exp(2*rawpopsdbase)) .* sdscale' #'exp(rawpopsdbase * 2 -2) .* sdscale' # 'rawpopsdbase .* sdscale' #
+  out$rawpopsdtransform <- 'exp(2*rawpopsdbase-1)' #'log(1+exp(2*rawpopsdbase)) .* sdscale' #'exp(rawpopsdbase * 2 -2) .* sdscale' # 'rawpopsdbase .* sdscale' #
   out$stationarymeanprior <- NA
   out$stationaryvarprior <- NA
   out$manifesttype <- rep(0,n.manifest)
+  out$gradient <- 'gradient = DRIFT * state + CINT[,1];'
   
   return(out)
 }

@@ -20,7 +20,7 @@ utils::globalVariables(c("invDRIFT","II","DRIFTexp","vec2diag","diag2vec",
   "TIPREDVAR","CINT","n.manifest","LAMBDA","MANIFESTMEANS","MANIFESTVAR",
   "mxFitFunctionMultigroup", "asymDIFFUSION", 'data.id',
   'filteredExpCovchol','filteredExpCovcholinv',
-  'A','M','testd',
+  'A','M','testd','ctstantestdat',
   'T0VAR','T0MEANS', 'MANIFESTTRAITVAR',
   'TDpredNames', 'TIpredNames', 'Tpoints', 'extract', 'latentNames', 'manifestNames',
   'plot', 'points','T0TRAITEFFECT',
@@ -44,8 +44,10 @@ utils::globalVariables(c("invDRIFT","II","DRIFTexp","vec2diag","diag2vec",
 #'  
 #' @docType package
 #' @name ctsem
-#' @import grDevices methods stats rstan OpenMx graphics plyr rstantools rstan Rcpp
+#' @import grDevices methods stats rstan OpenMx graphics plyr rstantools rstan Rcpp DEoptim
 #' @importFrom utils relist as.relistable tail capture.output
+#' @importFrom KernSmooth bkde2D
+#' @importFrom data.table fread
 #' @useDynLib ctsem, .registration = TRUE
 #' 
 #' @references 
