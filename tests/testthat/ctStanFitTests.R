@@ -63,9 +63,9 @@ context("knownFits")
 test_that("time calc", {
 data("Oscillating")
 
-inits <- c(-38, -.5, 1, 1, .1, 1, 0, .9)
-names(inits) <- c("crosseffect","autoeffect", "diffusion",
-  "T0var11", "T0var21", "T0var22","m1", "m2")
+# inits <- c(-39, -.5, 1, 1, .1, 1, 0, .9)
+# names(inits) <- c("crosseffect","autoeffect", "diffusion",
+#   "T0var11", "T0var21", "T0var22","m1", "m2")
 
 oscillatingm <- ctModel(n.latent = 2, n.manifest = 1, Tpoints = 11, 
   MANIFESTVAR = matrix(c(0), nrow = 1, ncol = 1), 
@@ -74,8 +74,7 @@ oscillatingm <- ctModel(n.latent = 2, n.manifest = 1, Tpoints = 11,
   T0VAR = matrix(c("T0var11", "T0var21", 0, "T0var22"), nrow = 2, ncol = 2),
   DRIFT = matrix(c(0, "crosseffect", 1, "autoeffect"), nrow = 2, ncol = 2), 
   CINT = matrix(0, ncol = 1, nrow = 2),
-  DIFFUSION = matrix(c(0, 0, 0, "diffusion"), nrow = 2, ncol = 2),
-  startValues = inits)
+  DIFFUSION = matrix(c(0, 0, 0, "diffusion"), nrow = 2, ncol = 2))
 
 oscillatingf <- ctFit(Oscillating, oscillatingm, carefulFit = FALSE,retryattempts=1)
 mxs <- summary(oscillatingf)
@@ -87,7 +86,7 @@ ld <- ctWideToLong(Oscillating,Tpoints = 11,n.manifest = 1,n.TDpred = 0,n.TIpred
 ld <- ctDeintervalise(ld)
 
 sf <- ctStanFit(datalong = ld, ctstanmodel = sm,optimize=TRUE,verbose=1,optimcontrol=list(isloops=0,deoptim=FALSE),
-  nlcontrol=list(nldynamics=FALSE),nopriors = T,chains = 1,cores=1)
+  nlcontrol=list(nldynamics=FALSE),nopriors = T,chains = 2,cores=2)
 s=summary(sf)
 
 expect_equal(-3461.936,oscillatingf$mxobj$output$Minus2LogLikelihood,tolerance=.001)
