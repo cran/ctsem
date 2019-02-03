@@ -44,8 +44,10 @@
 #' @export
 #'
 #' @examples
+#' \dontrun{
 #' #samples reduced here for speed
 #' ctStanTIpredeffects(ctstantestfit,plot=TRUE,whichpars='CINT',nsamples=10,nsubjects=10)
+#' }
 ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
   includeMeanUncertainty=FALSE,
   whichTIpreds=1,parmatrices=TRUE, whichpars='all', nsamples=100, timeinterval=1,
@@ -100,7 +102,8 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
         fit$setup$popsetup$transform[whichpars[pari]], 
         fit$setup$popvalues$multiplier[whichpars[pari]],
         fit$setup$popvalues$meanscale[whichpars[pari]],
-        fit$setup$popvalues$offset[whichpars[pari]], fit$setup$extratforms) 
+        fit$setup$popvalues$offset[whichpars[pari]], 
+        fit$setup$popvalues$inneroffset[whichpars[pari]], fit$setup$extratforms) 
       return(out)
     })
     if(returndifference){ #if only returning differences from zero
@@ -110,7 +113,8 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
         fit$setup$popsetup$transform[whichpars[pari]], 
         fit$setup$popvalues$multiplier[whichpars[pari]],
         fit$setup$popvalues$meanscale[whichpars[pari]],
-        fit$setup$popvalues$offset[whichpars[pari]], fit$setup$extratforms) 
+        fit$setup$popvalues$offset[whichpars[pari]], 
+        fit$setup$popvalues$inneroffset[whichpars[pari]], fit$setup$extratforms) 
         return(out)
       })
       effect<-effect-array(noeffect,dim=dim(effect))

@@ -79,6 +79,7 @@ ctStanModel<-function(ctmodelobj, type='stanct', indvarying='all'){
   ctspec$meanscale <- 1
   ctspec$transform <- 0
   ctspec$offset <- 0
+  ctspec$inneroffset <- 0
   scale <- c()
   shape <- c()
   offset <- c()
@@ -128,7 +129,7 @@ ctStanModel<-function(ctmodelobj, type='stanct', indvarying='all'){
     }
   }
   
-  ctspec[!is.na(ctspec$value),c('transform','multiplier','meanscale','offset')] <- NA
+  ctspec[!is.na(ctspec$value),c('transform','multiplier','meanscale','offset','inneroffset')] <- NA
   
   nparams<-sum(freeparams)
   
@@ -171,7 +172,7 @@ ctStanModel<-function(ctmodelobj, type='stanct', indvarying='all'){
   # out$popsdpriorscale <- 1
   out$rawpopsdbase <- 'normal(0,1)' #'cauchy(0,1)'
   out$rawpopsdbaselowerbound <- NA
-  out$rawpopsdtransform <- 'exp(2*rawpopsdbase-1)' #'log(1+exp(2*rawpopsdbase)) .* sdscale' #'exp(rawpopsdbase * 2 -2) .* sdscale' # 'rawpopsdbase .* sdscale' #
+  out$rawpopsdtransform <- 'exp(2*rawpopsdbase-1) .* sdscale' #'log(1+exp(2*rawpopsdbase)) .* sdscale' #'exp(rawpopsdbase * 2 -2) .* sdscale' # 'rawpopsdbase .* sdscale' #
   out$stationarymeanprior <- NA
   out$stationaryvarprior <- NA
   out$manifesttype <- rep(0,n.manifest)

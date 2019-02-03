@@ -1,8 +1,8 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 2.7.6
-Date: 2018-11-19
+Version: 2.8.2
+Date: 2019-1-31
 Authors@R: c(person("Charles", "Driver", role =
     c("aut","cre","cph"),email="driver@mpib-berlin.mpg.de"),
     person("Manuel", "Voelkle", role = c("aut","cph")),
@@ -15,7 +15,8 @@ Description: A hierarchical, multivariate, continuous (and discrete) time dynami
     allows for random effects and non-linearity over all model parameters. 
     Allows for modelling of multiple noisy measurements of multiple stochastic 
     processes, time varying input / event covariates, and time invariant 
-    covariates used to predict the parameters.
+    covariates used to predict the parameters. Bayesian formulation not available on 
+    32 bit Windows systems.
 License: GPL-3
 Depends: R (>= 3.4.0), Rcpp (>= 0.12.16), OpenMx (>= 2.3.0)
 URL: https://github.com/cdriveraus/ctsem
@@ -32,11 +33,11 @@ SystemRequirements: GNU make
 NeedsCompilation: yes
 Suggests: knitr, testthat
 VignetteBuilder: knitr
-RoxygenNote: 6.1.0
-Packaged: 2018-11-20 12:35:21 UTC; driver
+RoxygenNote: 6.1.1
+Packaged: 2019-02-01 20:48:00 UTC; driver
 Author: Charles Driver [aut, cre, cph],
   Manuel Voelkle [aut, cph],
   Han Oud [aut, cph]
 Maintainer: Charles Driver <driver@mpib-berlin.mpg.de>
 Repository: CRAN
-Date/Publication: 2018-11-20 15:20:06 UTC
+Date/Publication: 2019-02-03 16:13:16 UTC

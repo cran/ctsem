@@ -7,6 +7,19 @@ naf <-function(x){
   return(x)
 }
 
+gridplot <- function(m, maxdim=c(3,3),...){
+  d=n2mfrow(dim(m)[length(dim(m))])
+  d[d>maxdim] <-maxdim[d>maxdim]
+  oldpar<-par()
+  par(mfrow=d,mar=c(1.1,1.1,1.1,0),mgp=c(.1,.1,0))
+  for(i in 1:dim(m)[length(dim(m))]){
+    n=colnames(m)[i]
+    if(class(m)=='matrix') plot(m[,i],main=ifelse(is.null(n),i,n),col='red',xlab='',ylab='',...)
+    if(class(m)=='array') matplot(m[,,i],main=ifelse(is.null(n),i,n),type='l',xlab='',ylab='',...)
+  }
+  suppressWarnings(do.call(par,oldpar))
+}
+
 # helper function to generate an index matrix, or return unique elements of a matrix
 indexMatrix<-function(dimension,symmetrical=FALSE,upper=FALSE,lowerTriangular=FALSE, sep=NULL,starttext=NULL,endtext=NULL,
   unique=FALSE,rowoffset=0,coloffset=0,indices=FALSE,diagonal=TRUE,namesvector=NULL){
@@ -197,9 +210,10 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,ylab='Density
   # mid=mean(c(xlims[2],xlims[1]))
   # xlims[1] = xlims[1] - (mid-xlims[1])/8
   # xlims[2] = xlims[2] + (xlims[2]-mid)/8
+  # browser()
   denslist<-lapply(1:length(x),function(xi) {
     d=stats::density(x[[xi]],bw=bw,n=5000,from=xlims[1]-sd/2,to=xlims[2]+sd/2,na.rm=TRUE)
-    d$y=d$y/ sum(d$y)/range(d$x)[2]*length(d$y)
+    # d$y=d$y/ sum(d$y)/range(d$x)[2]*length(d$y)
     return(d)
   })
   ylims=c(0,max(unlist(lapply(denslist,function(li) max(li$y))))*1.1) * ifelse(legend[1]!=FALSE, 1.2,1)
