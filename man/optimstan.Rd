@@ -4,17 +4,19 @@
 \alias{optimstan}
 \title{Optimize / importance sample a stan or ctStan model.}
 \usage{
-optimstan(standata, sm, init = 0, sampleinit = NA, deoptim = TRUE,
-  estonly = FALSE, tol = 1e-12, decontrol = list(), isloops = 5,
-  isloopsize = 500, issamples = 500, verbose = 0, nopriors = FALSE,
-  cores = 1)
+optimstan(standata, sm, init = "random", sampleinit = NA,
+  deoptim = FALSE, estonly = FALSE, tol = 1e-12,
+  decontrol = list(), stochastic = TRUE, plotsgd = FALSE,
+  isloops = 0, isloopsize = 1000, finishsamples = 500, tdf = 50,
+  verbose = 0, nopriors = FALSE, cores = 1)
 }
 \arguments{
 \item{standata}{list object conforming to rstan data standards.}
 
 \item{sm}{compiled stan model object.}
 
-\item{init}{init argument conforming to rstan init standards.}
+\item{init}{vector of unconstrained parameter values, or character string 'random' to initialise with 
+random values very close to zero.}
 
 \item{sampleinit}{either NA, or an niterations * nparams matrix of samples to initialise importance sampling.}
 
@@ -27,11 +29,19 @@ minima / difficult optimization.}
 
 \item{decontrol}{List of control parameters for differential evolution step, to pass to \code{\link[DEoptim]{DEoptim.control}}.}
 
+\item{stochastic}{Logical. Use stochastic gradient descent instead of ucminf (bfgs with trust region) optimizer.
+Generally more robust, a little slower with few parameters, faster with many.}
+
+\item{plotsgd}{Logical. If TRUE, plot iteration details when using stochastic optimizer.}
+
 \item{isloops}{Number of iterations of adaptive importance sampling to perform after optimization.}
 
 \item{isloopsize}{Number of samples per iteration of importance sampling.}
 
-\item{issamples}{Number of samples to use for final results of importance sampling.}
+\item{finishsamples}{Number of samples to use for final results of importance sampling.}
+
+\item{tdf}{degrees of freedom of multivariate t distribution. Higher (more normal) generally gives more efficent 
+importance sampling, at risk of truncating tails.}
 
 \item{verbose}{Integer from 0 to 2. Higher values print more information during model fit -- for debugging.}
 
@@ -70,7 +80,7 @@ datalong <- cbind(id, time, sunspots)
 
 #fit using optimization without importance sampling
 ssfit <- ctStanFit(datalong[1:50,], #limited data for example
-  ssmodel, optimize=TRUE,optimcontrol=list(deoptim=FALSE,isloops=0,issamples=50))
+  ssmodel, optimize=TRUE,optimcontrol=list(deoptim=FALSE,isloops=0,finishsamples=50))
 
 #output
 summary(ssfit)

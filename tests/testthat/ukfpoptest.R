@@ -7,10 +7,10 @@ set.seed(1)
 context("ukfpopcheck") 
 
 test_that("ukfpopcheck1", {
-Tpoints<-10
+Tpoints<-20
 n.latent=1
 n.manifest=1
-nsubjects=50
+nsubjects=300
 burnin=30
 dtmat = matrix(exp(rnorm(burnin+Tpoints-1,-.3,.5)),1)
 par1<-rnorm(nsubjects,-.3,.8)
@@ -29,14 +29,14 @@ if(i==1) cd<-ctGenerate(gm,n.subjects=1,burnin=burnin,wide=FALSE,dtmat = dtmat) 
 }
 }
 
-cd[,gm$manifestNames]<-(cd[,gm$manifestNames]) + rnorm(length(cd[,gm$manifestNames]),0, .5^2)
+cd[,gm$manifestNames]<-(cd[,gm$manifestNames]) + rnorm(length(cd[,gm$manifestNames]),0, .9^2)
 
 
 m1<-ctModel(type='omx',n.latent=2,n.manifest=1,Tpoints=Tpoints,
   LAMBDA=matrix(c(1,1),nrow=n.manifest,ncol=2),
   MANIFESTMEANS=matrix(0,nrow=n.manifest),
-  CINT=matrix(c('cint1',0),2,1),
-  T0MEANS=matrix(c('t0m1',0),2),
+  # CINT=matrix(c('cint1',0),2,1),
+  # T0MEANS=matrix(c('t0m1',0),2),
   # T0VAR=matrix(c('t0var11',0, 0,'t0var22'),2,2),
   DIFFUSION=matrix(c('diff11',0,0,1e-5),2,2),
   DRIFT=matrix(c('dr11',0,1,-1e-5),2,2)
@@ -78,7 +78,7 @@ sm1$pars$indvarying <- FALSE
 # sink(file='../sf1.txt')
 sf1 <- ctStanFit(cd,sm1,iter=200,chains=4,cores=4,
   optimize=TRUE,verbose=1,nopriors = TRUE,
-  optimcontrol=list(deoptim = FALSE,isloops=0,isloopsize=50,issamples=50),
+  optimcontrol=list(deoptim = FALSE,isloops=0,isloopsize=50,finishsamples=50),
   derrind=1,
   nlcontrol=list(nldynamics=FALSE))
 # sink()
@@ -94,7 +94,7 @@ sm2$pars$indvarying[!(sm2$pars$matrix %in% c('CINT','T0MEANS'))] <- FALSE
 # sink(file='../sinkout.txt')
 sf2 <- ctStanFit(cd,sm2,iter=200,chains=4,cores=4,
   optimize=TRUE,verbose=1,nopriors = TRUE,intoverpop = TRUE,
-  optimcontrol=list(deoptim = FALSE,isloops=0,isloopsize=50,issamples=50),
+  optimcontrol=list(deoptim = FALSE,isloops=0,isloopsize=50,finishsamples=50),
   derrind=1)
 # sink()
 

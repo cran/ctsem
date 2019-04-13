@@ -46,7 +46,6 @@ ctDiscretePars<-function(ctpars,times=seq(0,10,.1),type='all'){
   latentNames=paste0('eta',1:nlatent)
   
   out<-list()
-  
   discreteDRIFT = array(unlist(lapply(times, function(x) 
     OpenMx::expm(ctpars$DRIFT*x))),
     dim=c(nlatent,nlatent,length(times)),
@@ -58,6 +57,8 @@ ctDiscretePars<-function(ctpars,times=seq(0,10,.1),type='all'){
     discreteDRIFT[,,x] %*% ctpars$T0MEANS)),
     dim=c(nlatent,length(times)),
     dimnames=list(latentNames,paste0('t',times)))
+  
+  # if('impulse' %in% type) out$impulse <- 
   
   return(out)
 }
@@ -77,6 +78,11 @@ ctDiscretePars<-function(ctpars,times=seq(0,10,.1),type='all'){
 #'@param nsamples Number of samples from the stanfit to use for plotting. Higher values will
 #'increase smoothness / accuracy, at cost of plotting speed. Values greater than the total
 #'number of samples will be set to total samples.
+#'@param observational Logical. If TRUE, outputs expected change in processes *conditional on observing* a 1 unit change in each -- 
+#'this change is correlated according to the DIFFUSION matrix. If FALSE, outputs expected regression values -- also interpretable as
+#'an independent 1 unit change on each process, giving the expected response under a 1 unit experimental impulse.
+#'@param standardise Logical. If TRUE, output is standardised according to expected total within subject variance, given by the 
+#'asymDIFFUSION matrix.
 #'@param plot Logical. If TRUE, plots output using \code{\link{ctStanDiscreteParsPlot}}
 #'instead of returning output. 
 #'@param ... additional plotting arguments to control \code{\link{ctStanDiscreteParsPlot}}
@@ -85,14 +91,12 @@ ctDiscretePars<-function(ctpars,times=seq(0,10,.1),type='all'){
 #'  plot=TRUE,indices='all')
 #'@export
 ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=10,by=.1), 
-  quantiles = c(.025, .5, .975),nsamples=500,plot=FALSE,...){
+  quantiles = c(.025, .5, .975),nsamples=500,observational=FALSE,standardise=FALSE, plot=FALSE,...){
   
   type='discreteDRIFT'
   collapseSubjects=TRUE #consider this for a switch
   
-  e<-extract.ctStanFit(ctstanfitobj)
-  
-  
+  e<-extract(ctstanfitobj)
   
   if(type=='all') type=c('discreteDRIFT','latentMeans') #must match with ctDiscretePars
   
@@ -101,7 +105,7 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
   
   nsubjects <- dim(e$indparams)[2]
   if(is.null(nsubjects)) nsubjects=1
-  if(subjects[1]=='all') subjects=1:nsubjects
+  if('all' %in% subjects) subjects='all' 
   
   outdims=dim(e$DRIFT)
   niter=outdims[1]
@@ -116,71 +120,98 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='all', times=seq(from=0,to=1
   
   #get all ctparameter matrices at once and remove unneeded subjects
   ctpars <- list()
-  for(matname in c('DRIFT','DIFFUSION','CINT','T0MEANS', 
-    'T0VAR','MANIFESTMEANS',if(!is.null(e$MANIFESTVAR)) 'MANIFESTVAR','LAMBDA', if(!is.null(e$TDPREDEFFECT)) 'TDPREDEFFECT')){
+  for(matname in c('DRIFT','DIFFUSION','asymDIFFUSION')){ #,'CINT','T0MEANS', 'T0VAR','MANIFESTMEANS',if(!is.null(e$MANIFESTVAR)) 'MANIFESTVAR','LAMBDA', if(!is.null(e$TDPREDEFFECT)) 'TDPREDEFFECT')){
     
-    vector <- FALSE
-    if(matname %in% c('T0MEANS','CINT', 'MANIFESTMEANS')) vector <- TRUE
-    
-    xdims=dim(e[[matname]])
-    dimout=xdims
-    dimout[2]=min(length(subjects),xdims[2])
-    
-    ctpars[[matname]] <- array(eval(parse(text=
-        paste0('e[[matname]][, ',
-          ifelse(xdims[2] > 1, 'subjects',1),if(length(xdims)>1) paste0(rep(', ',length(xdims)-2),collapse=''),']')
-    )),dim=dimout)
-    
-    ctpars[[matname]] <-aperm(ctpars[[matname]],c(3,if(length(dim(ctpars[[matname]]))>3) 4, 1, 2))
+    if('all' %in% subjects){
+      ctpars[[matname]] <- e[[paste0('pop_',matname)]]
+    } else {
+      ctpars[[matname]] <- e[[matname]][,subjects,,,drop=FALSE]
+      ctpars[[matname]]<-  array(ctpars[[matname]],dim=c(prod(dim(ctpars[[matname]])[1:2]),dim(ctpars[[matname]])[-1:-2]))
+    }
+    ctpars[[matname]] <- ctpars[[matname]][samples,,,drop=FALSE]
   }
   
+  
+  #   
+  #   xdims=dim(e[[matname]])
+  #   dimout=xdims
+  #   dimout[2]=min(length(subjects),xdims[2])
+  #   
+  #   ctpars[[matname]] <- array(eval(parse(text=
+  #       paste0('e[[matname]][, ',
+  #         ifelse(xdims[2] > 1, 'subjects',1),if(length(xdims)>1) paste0(rep(', ',length(xdims)-2),collapse=''),']')
+  #   )),dim=dimout)
+  #   
+  #   ctpars[[matname]] <-aperm(ctpars[[matname]],c(3,if(length(dim(ctpars[[matname]]))>3) 4, 1, 2))
+  # }
   nsubjects <- length(subjects)
   
   
   for(typei in 1:length(type)){ #for all types of discrete parameter requested, compute pars
     message('Computing ', type[typei],' for ', nsamples,' samples, may take a moment...')
     matrixtype=ifelse(type[typei] %in% c('discreteDRIFT'),TRUE, FALSE) #include any matrix type outputs
+    discreteDRIFT <- sapply(1:(dim(ctpars$DRIFT)[1]),function(d){
+      nl=dim(ctpars$DRIFT)[2]
+      asymDIFFUSION <- matrix(ctpars$asymDIFFUSION[d,,],nl,nl)
+      asymDIFFUSIONdiag <- diag(asymDIFFUSION)
+      asymDIFFUSIONdiag[rl(asymDIFFUSIONdiag <= 0) ] <- 1
+      DRIFT <- matrix(ctpars$DRIFT[d,,],nl,nl)
+      if(observational) {
+        g <- cov2cor(matrix(ctpars$DIFFUSION[d,,],nl,nl))^2
+        g[is.nan(g)] <- 0
+      }
+      sapply(times, function(ti){ 
+        out <-expm(DRIFT *ti) 
+        if(standardise) out <- out * matrix(rep(sqrt((asymDIFFUSIONdiag)),each=nl) / 
+            rep((sqrt(asymDIFFUSIONdiag)),times=nl),nl)
+        if(observational) out <- out %*% g
+        return(out)
+      },simplify = 'array')
+    },simplify = 'array')
     
-    out[[typei]] <- plyr::aaply(1:nsamples,1,function(iterx){ #for every iteration
-      if(collapseSubjects) subjectvec=1 else subjectvec=1:nsubjects #average over subjects before computing? much faster but answers dif question.
-      plyr::aaply(subjectvec,1,function(subjecty){ #for all subjects at once, or 1 subject at a time...
-        ctparsxy <- plyr::llply(ctpars, function(obji) { #
-          ismatrix = length(dim(obji)) > 3 #check if obji (ctparameter) is a matrix or vector
-          ctparsout=array(eval(parse(text=paste0('obji[,',
-            if(ismatrix) ',',
-            samples[iterx],',',
-            ifelse(dim(obji)[ifelse(ismatrix,4,3)] > 1, #if the parameter varies over multiple subjects,
-              ifelse(collapseSubjects, '1:nsubjects',  #and we collapse over subjects, return values for all subjects
-                'subjecty'), #if we don't collapse over subjects, just return for specified subject
-              1),#if the parameter doesn't vary over subjects then just return the only parameter
-            ']'))),dim=dim(obji)[-ifelse(ismatrix,3,2)]) #set dims to dims of par object without iterations
-          
-          if(collapseSubjects) ctparsout <- ctCollapse(ctparsout, #if we need to collapse over multiple subjects
-            collapsemargin = ifelse(ismatrix,3,2), #then collapse the subject margin
-            collapsefunc = median) #via the median function
-          
-          return(ctparsout)
-        })
-        
-        
-        
-        discreteparsxy <- ctDiscretePars(ctparsxy,
-          times=times,
-          type=type[typei])[[1]]
-        
-        return(discreteparsxy)
-      },.drop=FALSE)
-    },.drop=FALSE)
+    nr=dim(discreteDRIFT)[2]
+    out[[typei]] <- apply(get(type[typei]),c(1,2,3),quantile,probs=quantiles)
+    
+    # out[[typei]] <- plyr::aaply(1:nsamples,1,function(iterx){ #for every iteration
+    #   if(collapseSubjects) subjectvec=1 else subjectvec=1:nsubjects #average over subjects before computing? much faster but answers dif question.
+    #   plyr::aaply(subjectvec,1,function(subjecty){ #for all subjects at once, or 1 subject at a time...
+    #     ctparsxy <- plyr::llply(ctpars, function(obji) { #
+    #       ismatrix = length(dim(obji)) > 3 #check if obji (ctparameter) is a matrix or vector
+    #       ctparsout=array(eval(parse(text=paste0('obji[,',
+    #         if(ismatrix) ',',
+    #         samples[iterx],',',
+    #         ifelse(dim(obji)[ifelse(ismatrix,4,3)] > 1, #if the parameter varies over multiple subjects,
+    #           ifelse(collapseSubjects, '1:nsubjects',  #and we collapse over subjects, return values for all subjects
+    #             'subjecty'), #if we don't collapse over subjects, just return for specified subject
+    #           1),#if the parameter doesn't vary over subjects then just return the only parameter
+    #         ']'))),dim=dim(obji)[-ifelse(ismatrix,3,2)]) #set dims to dims of par object without iterations
+    #       
+    #       if(collapseSubjects) ctparsout <- ctCollapse(ctparsout, #if we need to collapse over multiple subjects
+    #         collapsemargin = ifelse(ismatrix,3,2), #then collapse the subject margin
+    #         collapsefunc = median) #via the median function
+    #       
+    #       return(ctparsout)
+    #     })
+    #     
+    #     
+    #     
+    #     discreteparsxy <- ctDiscretePars(ctparsxy,
+    #       times=times,
+    #       type=type[typei])[[1]]
+    #     
+    #     return(discreteparsxy)
+    #   },.drop=FALSE)
+    # },.drop=FALSE)
     
     dimlist<- list(quantiles=paste0('quantile_',quantiles),
-      row=dimnames(out[[typei]])[[3]],
-      col=dimnames(out[[typei]])[[4]],
+      row=dimnames(out[[typei]])[[2]],
+      col=dimnames(out[[typei]])[[3]],
       times=paste0('t',times)
     )
     
-    out[[typei]] = plyr::aaply(quantiles, 1, function(quantx) {
-      ctCollapse(inarray=out[[typei]],collapsemargin=c(1,if(collapseSubjects) 2),collapsefunc=quantile,probs=quantx)
-    } ,.drop=FALSE)
+    # out[[typei]] = plyr::aaply(quantiles, 1, function(quantx) {
+    #   ctCollapse(inarray=out[[typei]],collapsemargin=c(1,if(collapseSubjects) 2),collapsefunc=quantile,probs=quantx)
+    # } ,.drop=FALSE)
     
     
     

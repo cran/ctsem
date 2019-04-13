@@ -8,7 +8,6 @@
 #' @param digits integer denoting number of digits to report.
 #' @param parmatrices if TRUE, also return additional parameter matrices -- can be slow to compute
 #' for large models with many samples.
-#' @param parmatsamples Number of samples to use for parmatrices calculations. More is slower, but more precise.
 #' @param priorcheck Whether or not to use \code{ctsem:::priorchecking} to compare posterior mean and sd to prior mean and sd.
 #' @param ... Additional arguments to pass to \code{ctsem:::priorcheckreport}, such as \code{meanlim}, or \code{sdlim}.
 #' @return List containing summary items.
@@ -17,7 +16,7 @@
 #' @method summary ctStanFit
 #' @export
 
-summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,parmatsamples=200,priorcheck=TRUE,...){
+summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,priorcheck=TRUE,...){
   
   if(class(object) != 'ctStanFit') stop('Not a ctStanFit object!')
   
@@ -27,10 +26,10 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,par
   if(class(object$stanfit)=='stanfit'){ 
     s<-suppressWarnings(getMethod('summary','stanfit')(object$stanfit))
     if('98%' %in% colnames(s$summary)) colnames(s$summary)[colnames(s$summary)=='98%'] <- '97.5%'
-    e <- extract.ctStanFit(object) 
+    e <- extract(object) 
   }
   
-  if(class(object$stanfit)!='stanfit')  e <- extract.ctStanFit(object) 
+  if(class(object$stanfit)!='stanfit')  e <- extract(object) 
   parnames <- c()
   parindices <- c()
   # for(m in names(object$setup$matsetup)){
@@ -147,7 +146,7 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,par
     }
   }
   
-  if(priorcheck) out = c(out,priorcheckreport(object,...))
+  if(priorcheck & object$standata$nopriors==0) out = c(out,priorcheckreport(object,...))
   
   if(object$ctstanmodel$n.TIpred > 0) {
 
@@ -167,18 +166,22 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,par
   
   if(parmatrices){
     
-    #check if stanfit object can be used
-    sf <- object$stanfit
-    npars <- try(get_num_upars(sf),silent=TRUE) #$stanmodel)
-    
-    if(class(npars)=='try-error'){ #in case R has been restarted or similar
-      standataout <- object$standata
-      smf <- stan_reinitsf(object$stanmodel,standataout)
-    }
+    # #check if stanfit object can be used
+    # sf <- object$stanfit
+    # npars <- try(get_num_upars(sf),silent=TRUE) #$stanmodel)
+    # 
+    # if(class(npars)=='try-error'){ #in case R has been restarted or similar
+    #   standataout <- object$standata
+    #   smf <- stan_reinitsf(object$stanmodel,standataout)
+    # }
+  object$standata$savescores <- 0L
+  object$standata$gendata <- 0L
+  object$standata$dokalman <- 0L
+  sf <- stan_reinitsf(object$stanmodel,data=object$standata)
 
     parmatlists <- try(apply(e$rawpopmeans[
       sample(x = 1:dim(e$rawpopmeans)[1],
-        size = min(parmatsamples,dim(e$rawpopmeans)[1]), 
+        size = dim(e$rawpopmeans)[1],  #min(parmatsamples,
         replace = FALSE),],
       1,ctStanParMatrices,fit=object,timeinterval=timeinterval,sf=sf))
       
@@ -188,6 +191,7 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,par
       rownames(parmats) <- paste0('r',1:nrow(parmats))
       counter=0
       for(mati in 1:length(parmatlists[[1]])){
+        if(all(dim(parmatlists[[1]][[mati]]) > 0)){
         for(coli in 1:ncol(parmatlists[[1]][[mati]])){
           for(rowi in 1:nrow(parmatlists[[1]][[mati]])){
             counter=counter+1
@@ -200,7 +204,7 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,par
               nrow=1)
             try(rownames(parmats)[counter] <- names(parmatlists[[1]])[mati])
             try(parmats[counter,]<-new)
-          }}}
+          }}}}
       colnames(parmats) <- c('Row','Col', 'Mean','Sd','2.5%','50%','97.5%')
       
       #remove certain parmatrices lines

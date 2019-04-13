@@ -2,7 +2,7 @@ llsurface<- function(dat, ctm, range=2, nsamples=100000){
   
   fit=ctStanFit(datalong = dat,estonly=TRUE,
     ctstanmodel = ctm,optimize=TRUE,#nopriors=TRUE,
-    optimcontrol = list(estonly=F,deoptim=F,isloops=0,issamples=500),verbose=0)
+    optimcontrol = list(estonly=F,deoptim=F,isloops=0,finishsamples=500),verbose=0)
   
   np=get_num_upars(fit$stanfit$stanfit)
   
