@@ -39,14 +39,11 @@ may be simpler in many cases to access those directly. They are:
  other options.
 }
 \examples{
-\dontrun{
-plot(ctstantestfit,types=c('regression','kalman','priorcheck'))
-
-### complete example
-plot(ctstantestfit)
+\donttest{
+plot(ctstantestfit,types=c('regression','kalman','priorcheck'), wait=FALSE)
 
 #### example plot using rstan functions
 rstan::stan_trace(ctstantestfit$stanfit, 
-pars=ctStanParnames(ctstantestfit,'pop_DRIFT'))
+  pars=ctStanParnames(ctstantestfit,'pop_DRIFT'))
 }
 }

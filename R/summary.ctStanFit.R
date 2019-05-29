@@ -12,7 +12,9 @@
 #' @param ... Additional arguments to pass to \code{ctsem:::priorcheckreport}, such as \code{meanlim}, or \code{sdlim}.
 #' @return List containing summary items.
 #' @examples
+#' \donttest{
 #' summary(ctstantestfit)
+#' }
 #' @method summary ctStanFit
 #' @export
 

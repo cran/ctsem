@@ -4,19 +4,29 @@
 \alias{plot.ctsemFitMeasure}
 \title{Misspecification plot using ctCheckFit output}
 \usage{
-\method{plot}{ctsemFitMeasure}(x, indices = "all",
-  corrplotargs = list(method = "square", is.corr = FALSE, addgrid.col =
-  NA), labels = TRUE, ...)
+\method{plot}{ctsemFitMeasure}(x, indices = "all", means = TRUE,
+  separatemeans = TRUE, cov = TRUE, covtype = "MisspecRatio",
+  cov2cor = FALSE, ggcorrArgs = list(data = NULL, cor_matrix =
+  get(covtype), limits = limits, geom = "circle", max_size = 10, name =
+  covtype), ...)
 }
 \arguments{
 \item{x}{Object output from ctsemFitMeasure function.}
 
 \item{indices}{Either 'all' or a vector of integers denoting which observations to 
-include (from 1 to maximum time points).}
+include (from 1 to n.manifest * maximum number of obs for a subject, blocked by manifest).}
 
-\item{corrplotargs}{Extra arguments to pass to corrplot function.}
+\item{means}{Logical -- plot simulated means vs observed?}
 
-\item{labels}{Logical. Plot labels for each row / colummn?}
+\item{separatemeans}{Logical -- means from different variables on same or different plots?}
+
+\item{cov}{Logical -- plot simulated cov vs observed?}
+
+\item{covtype}{Column name of cstemFitMeasure object}
+
+\item{cov2cor}{Logical -- convert covariances to correlations?}
+
+\item{ggcorrArgs}{List of arguments to GGally::ggcorr .}
 
 \item{...}{not used.}
 }
@@ -27,14 +37,19 @@ Nothing, just plots.
 Misspecification plot using ctCheckFit output
 }
 \examples{
-\dontrun{
+\donttest{
 data(ctExample1)
 traitmodel <- ctModel(n.manifest=2, n.latent=2, Tpoints=6, LAMBDA=diag(2), 
   manifestNames=c('LeisureTime', 'Happiness'), 
   latentNames=c('LeisureTime', 'Happiness'), TRAITVAR="auto")
-traitfit <- ctFit(datawide=ctExample1, ctmodelobj=traitmodel)
+traitfit <- ctFit(dat=ctExample1, ctmodelobj=traitmodel)
 
-check <- ctCheckFit(traitfit,niter=5)
+check <- ctCheckFit(traitfit,niter=50)
 plot(check)
+
+
+scheck <- ctCheckFit(ctstantestfit,niter=500)
+plot(scheck)
+
 }
 }

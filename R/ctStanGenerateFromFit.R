@@ -1,18 +1,16 @@
-#' Add a $generated object to ctstanfit object, with random data generated from posterior of ctstanfit object
+#' Add a \code{$generated} object to ctstanfit object, with random data generated from posterior of ctstanfit object
 #'
 #' @param fit ctstanfit object
 #' @param nsamples Positive integer specifying number of datasets to generate. 
 #' @param fullposterior Logical indicating whether to sample from the full posterior (original nsamples) or the posterior mean.
-#'
 #' @return Matrix of generated data -- one dataset per iteration, according to original time and missingness structure.
 #' @export
-#'
 #' @examples
-#' \dontrun{
-#' gen <- ctStanGenerateData(ctstantestfit, nsamples=3,fullposterior=TRUE)
+#' \donttest{
+#' gen <- ctStanGenerateFromFit(ctstantestfit, nsamples=3,fullposterior=TRUE)
 #' plot(gen$generated$Y[,3,2],type='l') #Third random data sample, 2nd manifest var, all time points. 
 #' }
-ctStanGenerateData<-function(fit,nsamples=1,fullposterior=FALSE){
+ctStanGenerateFromFit<-function(fit,nsamples=1,fullposterior=FALSE){
   if(class(fit)!='ctStanFit') stop('Not a ctStanFit object!')
   if(class(fit$stanfit)!='stanfit') {
     umat=t(fit$stanfit$rawposterior)
@@ -24,7 +22,7 @@ ctStanGenerateData<-function(fit,nsamples=1,fullposterior=FALSE){
   umat=umat[,sample(1:ncol(umat),nsamples,replace = ifelse(nsamples > ncol(umat), TRUE, FALSE)),drop=FALSE]
   
   if(fit$setup$recompile) {
-    message('Compilation needed -- compiling (roughly 1 min)')
+    message('Compilation needed -- compiling (usually ~ 1 min)')
     genm <- rstan::stan_model(model_code = ctStanModelWriter(ctstanmodel = fit$ctstanmodel,gendata = TRUE,extratforms = fit$setup$extratforms))
   } else {
     genm <- stanmodels$ctsmgen

@@ -1,4 +1,4 @@
-#' Generates data according to the model estimated in a ctsemFit object.#' 
+#' Generates data according to the model estimated in a ctsemFit object.
 #'
 #' @param fit object of class ctsemFit as returned from \code{\link{ctFit}}
 #' @param timestep positive numeric value indicating the time interval to use for
@@ -30,7 +30,7 @@
 ctGenerateFromFit<-function(fit,timestep='asdata',n.subjects=100,timerange='asdata',
   predictorSubjects='all',...){
 
-
+if(class(fit)!='ctsemFit') stop('not a ctsemFit object')
 gm=ctModelFromFit(fit)
 
 if(!is.null(fit$mxobj$expectation$P0)) { #if fit with kalman filter then data needs rearranging

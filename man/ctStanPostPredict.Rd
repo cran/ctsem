@@ -6,7 +6,7 @@
 \usage{
 ctStanPostPredict(fit, legend = TRUE, diffsize = 1, jitter = 0.02,
   wait = TRUE, probs = c(0.025, 0.5, 0.975), shading = TRUE,
-  datarows = "all", ...)
+  datarows = "all", nsamples = 500, ...)
 }
 \arguments{
 \item{fit}{ctStanFit object.}
@@ -26,6 +26,8 @@ Shading is better for non-linearities.}
 
 \item{datarows}{integer vector specifying rows of data to plot. Otherwise 'all' uses all data.}
 
+\item{nsamples}{Number of datasets to generate for comparisons.}
+
 \item{...}{extra arguments to pass to plot function.}
 }
 \value{
@@ -39,7 +41,7 @@ This function relies on the data generated during each iteration of fitting to a
 model implied distributions -- thus, when limited iterations are available, the approximation will be worse.
 }
 \examples{
-\dontrun{
+\donttest{
 ctStanPostPredict(ctstantestfit,wait=FALSE, shading=FALSE, datarows=1:25,diffsize=2)
 }
 }

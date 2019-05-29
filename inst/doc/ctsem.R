@@ -259,7 +259,7 @@ oscillatingm <- ctModel(n.latent = 2, n.manifest = 1, Tpoints = 11,
   DRIFT = matrix(c(0, "crosseffect", 1, "autoeffect"), nrow = 2, ncol = 2),
   MANIFESTMEANS = matrix('manifestmean', nrow = 1, ncol = 1),
   DIFFUSION = matrix(c(0, 0, 0, "diffusion"), nrow = 2, ncol = 2),
- startValues=inits)
+  startValues=inits)
 
 oscillatingf <- ctFit(Oscillating, oscillatingm, carefulFit = FALSE)
 

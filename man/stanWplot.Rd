@@ -18,8 +18,11 @@ stanWplot(object, iter = 2000, chains = 4, ...)
 \description{
 Runs stan, and plots sampling information while sampling.
 }
+\details{
+On windows, requires Rtools installed and able to be found by pkgbuild::rtools_path()
+}
 \examples{
-\dontrun{
+\donttest{
 #### example 1 
 scode <- "
 parameters {

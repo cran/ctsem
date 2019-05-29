@@ -24,8 +24,9 @@ functions{
       }
     }
   return z;
-  }
-
+ }
+  
+   
   matrix expm2(matrix M){
     matrix[rows(M),rows(M)] out;
     int z[rows(out)] = checkoffdiagzero(M);
@@ -530,9 +531,9 @@ pop_asymCINT = sasymCINT;
       if(nldynamics==0){
         state[1:nlatent] = sT0MEANS[,1];
         ;
-        eta = sT0MEANS[,1]; //prior for initial latent state
-        if(ntdpred > 0) eta += sTDPREDEFFECT * tdpreds[rowi];
-        etacov =  sT0VAR;
+        eta[1:nlatent] = sT0MEANS[,1]; //prior for initial latent state
+        if(ntdpred > 0) eta[1:nlatent] += sTDPREDEFFECT * tdpreds[rowi];
+        etacov[1:nlatent,1:nlatent] =  sT0VAR;
       }
 
     } //end T0 matrices
@@ -550,7 +551,7 @@ pop_asymCINT = sasymCINT;
         
         
         if(dtchange==1 || (T0check[rowi-1]==1 && (si <= DRIFTsubindex[nsubjects] || si <= CINTsubindex[nsubjects]))){
-          discreteDRIFT = expm2(append_row(append_col(sDRIFT,sCINT),rep_matrix(0,1,nlatent+1)) * dT[rowi]);
+          discreteDRIFT = matrix_exp(append_row(append_col(sDRIFT,sCINT),rep_matrix(0,1,nlatent+1)) * dT[rowi]);
         }
     
         if(dtchange==1 || (T0check[rowi-1]==1 && (si <= DIFFUSIONsubindex[nsubjects]|| si <= DRIFTsubindex[nsubjects]))){
@@ -582,57 +583,59 @@ pop_asymCINT = sasymCINT;
       if(T0check[rowi]==0){
         matrix[nlatentpop,nlatentpop] J;
         vector[nlatent] base;
+        for(stepi in 1:integrationsteps[rowi]){
         J = rep_matrix(0,nlatentpop,nlatentpop); //dont necessarily need to loop over tdpreds here...
-        if(continuoustime==1){
-          matrix[nlatentpop,nlatentpop] Je;
-          matrix[nlatent*2,nlatent*2] dQi;
-          for(stepi in 1:integrationsteps[rowi]){
-            for(statei in 0:nlatentpop){
-              if(statei>0){
-                J[statei,statei] = 1e-6;
-                state = eta + J[,statei];
-              } else {
-                state = eta;
-              }
-              ;
+          for(statei in 0:nlatentpop){
+            if(statei>0){
+              J[statei,statei] = 1e-6;
+              state = eta + J[,statei];
+            } else {
+              state = eta;
+            }
+            ;
 ;
 
     if(intoverpop==1){ 
       for(ri in 1:size(matsetup)){ //for each row of matrix setup
-        if(matsetup[ ri,5] > 0 && ( statei == 0 || statei == nlatent + matsetup[ ri,5])){ // if individually varying
-          if(matsetup[ri, 7] == 3 || matsetup[ri, 7] == 4 || matsetup[ri, 7] == 7){ 
+        if(matsetup[ ri,5] > 0){ // && ( statei == 0 || statei == nlatent + matsetup[ ri,5])){ // if individually varying -- consider reimplementing extra check
+          if(matsetup[ri, 7] == 3 || matsetup[ri, 7] == 7){ 
           real newval;
           newval = tform(state[nlatent + matsetup[ri,5] ], matsetup[ri,4], matvalues[ri,2], matvalues[ri,3], matvalues[ri,4], matvalues[ri,6] ); 
           if(matsetup[ri, 7] == 3) sDRIFT[matsetup[ ri,1], matsetup[ri,2]] = newval; 
-          if(matsetup[ri, 7] == 4) sDIFFUSIONsqrt[matsetup[ ri,1], matsetup[ri,2]] = newval; 
           if(matsetup[ri, 7] == 7) sCINT[matsetup[ ri,1], matsetup[ri,2]] = newval;
           }
         }
       }
-    } //do we need intoverpop calcs here? and remove diffusion calcs and do elsewhere
-              if(statei== 0) {
-                base = sDRIFT * state[1:nlatent] + sCINT[,1];
-              }
-              if(statei > 0) {
-                J[1:nlatent,statei] = (( sDRIFT * state[1:nlatent] + sCINT[,1]) - base)/1e-6;
-              }
+    } 
+            if(statei== 0) {
+              base = sDRIFT * state[1:nlatent] + sCINT[,1];
             }
-            ;
- //find a way to remove this repeat
-            Je= expm2(J * dTsmall[rowi]) ;
-
-        //print("Je = ", Je,"  J = ", J, "  sDRIFT = ", sDRIFT, "  state  = ", state, "  sDIFFUSION = ", sDIFFUSION, "  sasymDIFFUSION = ", sasymDIFFUSION);
-            discreteDRIFT = expm2(append_row(append_col(sDRIFT,sCINT),rep_vector(0,nlatent+1)') * dTsmall[rowi]);
+            if(statei > 0) {
+              J[1:nlatent,statei] = (( sDRIFT * state[1:nlatent] + sCINT[,1]) - base)/1e-6;
+            }
+          }
+          ;
+ //not repeating other calcs because 1e-6 is small
+          if(continuoustime==1){
+            matrix[nlatentpop,nlatentpop] Je;
+            matrix[nlatent*2,nlatent*2] dQi;
+            Je= matrix_exp(J * dTsmall[rowi]) ;
+            discreteDRIFT = matrix_exp(append_row(append_col(sDRIFT,sCINT),rep_vector(0,nlatent+1)') * dTsmall[rowi]);
             sasymDIFFUSION = to_matrix(  -kronsum(J[1:nlatent,1:nlatent]) \ to_vector(tcrossprod(sDIFFUSIONsqrt)), nlatent,nlatent);
             discreteDIFFUSION =  sasymDIFFUSION - quad_form( sasymDIFFUSION, Je[1:nlatent,1:nlatent]' );
             etacov = quad_form(etacov, Je');
-            etacov[1:nlatent,1:nlatent] += discreteDIFFUSION;
+            etacov[1:nlatent,1:nlatent] += discreteDIFFUSION; //may need improving
             eta[1:nlatent] = (discreteDRIFT * append_row(eta[1:nlatent],1.0))[1:nlatent];
           }
+        if(continuoustime==0){ //test this
+          etacov = quad_form(etacov, J');
+          etacov[1:nlatent,1:nlatent] += sDIFFUSION; //may need improving re sDIFFUSION
+          discreteDRIFT=append_row(append_col(sDRIFT,sCINT),rep_matrix(0,1,nlatent+1));
+          discreteDRIFT[nlatent+1,nlatent+1] = 1;
+          eta[1:nlatent] = (discreteDRIFT * append_row(eta[1:nlatent],1.0))[1:nlatent];
+        }
         }
 
-        if(continuoustime==0){ //need covariance in here
-        }
       } // end of non t0 time update
   
   
@@ -658,7 +661,7 @@ pop_asymCINT = sasymCINT;
           ;
     if(intoverpop==1){ 
       for(ri in 1:size(matsetup)){ //for each row of matrix setup
-        if(matsetup[ ri,5] > 0 && ( statei == 0 || statei == nlatent + matsetup[ ri,5])){ // if individually varying
+        if(matsetup[ ri,5] > 0){ // // if individually varying
           if(matsetup[ri, 7] == 1 || matsetup[ri, 7] == 8){ 
           real newval;
           newval = tform(state[nlatent + matsetup[ri,5] ], matsetup[ri,4], matvalues[ri,2], matvalues[ri,3], matvalues[ri,4], matvalues[ri,6] ); 
@@ -673,7 +676,7 @@ pop_asymCINT = sasymCINT;
         ;
     if(intoverpop==1){ 
       for(ri in 1:size(matsetup)){ //for each row of matrix setup
-        if(matsetup[ ri,5] > 0 && ( statei == 0 || statei == nlatent + matsetup[ ri,5])){ // if individually varying
+        if(matsetup[ ri,5] > 0){ // // if individually varying
           if(matsetup[ri, 7] == 9){ 
           real newval;
           newval = tform(state[nlatent + matsetup[ri,5] ], matsetup[ri,4], matvalues[ri,2], matvalues[ri,3], matvalues[ri,4], matvalues[ri,6] ); 
@@ -745,7 +748,7 @@ if(verbose > 1) print("etaprior = ", eta, " etapriorcov = ",etacov);
           ;
     if(intoverpop==1){ 
       for(ri in 1:size(matsetup)){ //for each row of matrix setup
-        if(matsetup[ ri,5] > 0 && ( statei == 0 || statei == nlatent + matsetup[ ri,5])){ // if individually varying
+        if(matsetup[ ri,5] > 0){ // // if individually varying
           if(matsetup[ri, 7] == 2 || matsetup[ri, 7] == 5 || matsetup[ri, 7] == 6){ 
           real newval;
           newval = tform(state[nlatent + matsetup[ri,5] ], matsetup[ri,4], matvalues[ri,2], matvalues[ri,3], matvalues[ri,4], matvalues[ri,6] ); 

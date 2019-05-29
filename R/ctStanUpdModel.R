@@ -6,8 +6,9 @@
 #' @param datalong data as normally passed to \code{\link{ctStanFit}}
 #' @param ctstanmodel model as normally passed to \code{\link{ctStanFit}}
 #' @param ... extra args for \code{\link{ctStanFit}}
+#' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #'  newm<-ctModel(type='stanct',
 #'   n.latent=ctstantestfit$ctstanmodel$n.latent,
 #'   n.TDpred=ctstantestfit$ctstanmodel$n.TDpred,

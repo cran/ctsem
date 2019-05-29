@@ -6,7 +6,7 @@
 \usage{
 ctFit(dat, ctmodelobj, dataform = "wide", objective = "auto",
   stationary = c("T0TRAITEFFECT", "T0TIPREDEFFECT"),
-  optimizer = "CSOLNP", retryattempts = 15, iterationSummary = FALSE,
+  optimizer = "CSOLNP", retryattempts = 5, iterationSummary = FALSE,
   carefulFit = TRUE, carefulFitWeight = 100, showInits = FALSE,
   asymptotes = FALSE, meanIntervals = FALSE,
   plotOptimization = FALSE, crossEffectNegStarts = TRUE, fit = TRUE,
@@ -129,8 +129,8 @@ Difficulties during estimation can sometimes be alleviated using \code{\link{ctR
 this uses a multistep fit procedure.
 }
 \examples{
-## Examples set to 'dontrun' because they take longer than 5s.
-\dontrun{
+## Examples set to 'donttest' because they take longer than 5s.
+\donttest{
 mfrowOld<-par()$mfrow
 par(mfrow=c(2, 3))
 

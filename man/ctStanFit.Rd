@@ -8,7 +8,7 @@ ctStanFit(datalong, ctstanmodel, stanmodeltext = NA, iter = 1000,
   intoverstates = TRUE, binomial = FALSE, fit = TRUE,
   intoverpop = FALSE, stationary = FALSE, plot = FALSE,
   derrind = "all", optimize = FALSE, optimcontrol = list(),
-  nlcontrol = list(), nopriors = FALSE, chains = 1,
+  nlcontrol = list(), nopriors = FALSE, chains = 2,
   cores = "maxneeded", inits = NULL, forcerecompile = FALSE,
   savescores = TRUE, gendata = FALSE, control = list(),
   verbose = 0, ...)
@@ -76,9 +76,11 @@ In general, larger values may not make sense when using the default of \code{ukf
 
 \item{nopriors}{logical. If TRUE, any priors are disabled -- sometimes desirable for optimization.}
 
-\item{chains}{number of chains to sample, during HMC or post-optimization importance sampling.}
+\item{chains}{number of chains to sample, during HMC or post-optimization importance sampling. Unless the cores
+argument is also set, the number of chains determines the number of cpu cores used, up to 
+the maximum available minus one.}
 
-\item{cores}{number of cpu cores to use. Either 'maxneeded' to use as many as available,
+\item{cores}{number of cpu cores to use. Either 'maxneeded' to use as many as available minus one,
 up to the number of chains, or a positive integer.}
 
 \item{inits}{vector of parameter start values, as returned by the rstan function \code{rstan::unconstrain_pars} for instance.}
@@ -89,11 +91,11 @@ If TRUE, stan model is recompiled, regardless of apparent need for compilation.}
 \item{savescores}{Logical. If TRUE, output from the Kalman filter is saved in output. For datasets with many variables
 or time points, will increase file size substantially.}
 
-\item{gendata}{Logical -- If TRUE, uses provided data as a time and missingness structure only, and 
+\item{gendata}{Logical -- If TRUE, uses provided data for only covariates and a time and missingness structure, and 
 generates random data according to the specified model / priors. 
 Generated data is in the $Ygen subobject after running \code{extract} on the fit object.
 For datasets with many manifest variables or time points, file size may be large.
-To generate data based on the posterior of a fitted model, see \code{\link{ctStanGenerateData}}.}
+To generate data based on the posterior of a fitted model, see \code{\link{ctStanGenerateFromFit}}.}
 
 \item{control}{List of arguments sent to \code{\link[rstan]{stan}} control argument, 
 regarding warmup / sampling behaviour. Unless specified, values used are:
@@ -108,7 +110,7 @@ Fits a ctsem model specified via \code{\link{ctModel}} with type either 'stanct'
 Stan.
 }
 \examples{
-\dontrun{
+\donttest{
 #test data with 2 manifest indicators measuring 1 latent process each, 
 # 1 time dependent predictor, 3 time independent predictors
 head(ctstantestdat) 
@@ -132,10 +134,10 @@ control=list(max_treedepth=6))
 #output functions
 summary(fit) 
 
-plot(fit)
+plot(fit,wait=FALSE)
 
-
-
+}
+\dontrun{
 ###### EXTENDED EXAMPLES #######
 
 
@@ -227,7 +229,7 @@ m1$pars$indvarying[-which(m1$pars$matrix \%in\% c('T0MEANS','CINT'))] <- FALSE
 m1$pars$age_effect[-which(m1$pars$matrix \%in\% c('T0MEANS','CINT'))] <- FALSE
 
 
-plot(m1) #plot prior distributions
+plot(m1,wait=FALSE) #plot prior distributions
 
 #fit
 f1 <- ctStanFit(datalong = dat, ctstanmodel = m1, 
@@ -240,21 +242,13 @@ summary(f1)
 ctKalman(f1,timestep=.01,plot=TRUE,subjects=1:4,kalmanvec=c('y','etasmooth'))
 ctKalman(f1,timestep=.01,plot=TRUE,subjects=1,kalmanvec=c('y','ysmooth'))
 
-ctStanPlotPost(f1) #compare prior to posterior distributions 
-ctStanPlotPost(f1, priorwidth = FALSE) #rescale to width of posterior 
+ctStanPlotPost(f1, wait=FALSE) #compare prior to posterior distributions 
+ctStanPlotPost(f1, priorwidth = FALSE, wait=FALSE) #rescale to width of posterior 
 
-ctStanPostPredict(f1) #compare randomly generated data from posterior to observed data
+ctStanPostPredict(f1, wait=FALSE) #compare randomly generated data from posterior to observed data
 
 cf<-ctCheckFit(f1) #compare covariance of randomly generated data to observed cov
 plot(cf)
-
-#accessing the stan object directly 
-library(rstan)
-postsamples <- extract(f1$stanfit,pars='Ygen') #extract data generated from posterior
-plot( f1$data$time, 
-  postsamples$Ygen[1,1, ,1]) #iteration 1 (already shuffled), chain 1, all occasions, var 1.
-points(f1$data$time, f1$data$Y[,1],col='red') #1st manifest variable
-
 
 
 
@@ -287,7 +281,7 @@ ctKalman(f2,timestep=.01,plot=TRUE,subjects=1:2,kalmanvec=c('y','ysmooth'))
 
 ctStanPlotPost(f2)
 
-ctStanPostPredict(f2)
+ctStanPostPredict(f2,wait=FALSE)
 
 
 
@@ -323,9 +317,9 @@ ctKalman(f3,timestep=.01,plot=TRUE,subjects=1,kalmanvec=c('y','etaprior'))
 ctKalman(f3,timestep=.01,plot=TRUE,subjects=1:4,kalmanvec=c('y','etasmooth'))
 ctKalman(f3,timestep=.01,plot=TRUE,subjects=1:2,kalmanvec=c('y','ysmooth'))
 
-ctStanPlotPost(f3)
+ctStanPlotPost(f3,wait=FALSE)
 
-ctStanPostPredict(f3, datarows=0:100)
+ctStanPostPredict(f3, datarows=1:100, wait=FALSE)
 
 
 
@@ -375,9 +369,9 @@ ctKalman(f4,timestep=.01,plot=TRUE,subjects=1,kalmanvec=c('y','etaprior'))
 ctKalman(f4,timestep=.01,plot=TRUE,subjects=1:2,kalmanvec=c('y','etasmooth'))
 ctKalman(f4,timestep=.01,plot=TRUE,subjects=1:2,kalmanvec=c('y','ysmooth'))
 
-ctStanPlotPost(f4)
+ctStanPlotPost(f4, wait=FALSE)
 
-ctStanPostPredict(f4,wait=F)
+ctStanPostPredict(f4, wait=FALSE)
 
 
 
@@ -411,26 +405,28 @@ f3nl <- ctStanFit(datalong = dat2, ctstanmodel = m3nl,
 
 summary(f3nl)
 
+#generate data from fitted model and add to $generated subobject
+f3nl <- ctStanGenerateFromFit(f3nl,nsamples=100,fullposterior=TRUE)
+
 #plot functions need updating for non-linearities! (as of ctsem v 2.7.3)
 #extract can be used to extract samples and create own plots.
-#last index of kalaman subobject denotes element of Kalman output.
-# 1 = ll on std scale, 2= ll scale, 3=error, 4=prediction, 
-# 5= eta prior, 6= eta upd
+#ctStanKalman can be used to obtain predictions, errors, updated states etc
 
-ctStanPostPredict(f3nl, datarows=1:100)
+ctStanPostPredict(f3nl, datarows=1:100, wait=FALSE)
 
 e=extract(f3nl)
 subindex = which(f3nl$data$subject ==3) #specify subject
  
- matplot(f3nl$data$time[subindex], # Y predictions given earlier Y
+matplot(f3nl$data$time[subindex], # Y predictions given earlier Y
    t(e$kalman[,subindex,4]), 
+   ctStanKalman(fit = f3nl)$ypred[,subindex,1], #predicted y for variable 1
    type='l',lty=1,col=rgb(0,0,0,.1))
  
- points(f3nl$data$time[subindex], #actual Y
+points(f3nl$data$time[subindex], #actual Y
    f3nl$data$Y[subindex,1],type='p',col='red')
    
-  matplot(f3nl$data$time[subindex], add = TRUE, #Generated Y from model
-    t(e$Ygen[,subindex,1]), 
+matplot(f3nl$data$time[subindex], add = TRUE, #Generated Y from model
+    f3nl$generated$Y[subindex,,1], 
     type='l',lty=1,col=rgb(0,0,1,.05))
 }
 }

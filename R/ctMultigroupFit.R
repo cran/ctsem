@@ -33,7 +33,7 @@
 #' may be estimated afer fitting using \code{\link{ctCI}}.
 #' 
 #' @examples 
-#' \dontrun{
+#' \donttest{
 #' 
 #' #Two group model, all parameters except LAMBDA[3,1] constrained across groups.
 #' data(ctExample4)
@@ -59,7 +59,7 @@
 #' 
 #' multif<-ctMultigroupFit(dat=ctExample4, groupings=groups,
 #'                        ctmodelobj=basemodel, fixedmodel=fixedmodel)
-#' summary(multif) 
+#' summary(multif,group=2) 
 #'}
 #' 
 #' 
@@ -69,7 +69,7 @@
 
 ctMultigroupFit<-function(dat,groupings,ctmodelobj,dataform='wide',fixedmodel=NA,freemodel=NA,
  carefulFit=TRUE, omxStartValues=NULL,
-  retryattempts=15,showInits=FALSE,...){
+  retryattempts=5,showInits=FALSE,...){
 
   if(dataform=='wide') if(any(suppressWarnings(!is.na(as.numeric(groupings))))) stop("grouping variable must not contain purely numeric items")
   if(dataform=='wide') if(length(groupings)!= nrow(dat)) stop('length of groupings does not equal number of rows of dat')

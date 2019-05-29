@@ -21,7 +21,18 @@ $locationmeans and $sdmeans collapse across the bivariate interactions to return
 Analyse divergences in a stanfit object
 }
 \examples{
-\dontrun{
-stan_checkdivergences(myfitobj)
+\donttest{
+library(rstan)
+scode <- "
+parameters {
+  real y[2]; 
+} 
+model {
+  y[1] ~ normal(0, 1);
+  y[2] ~ double_exponential(0, y[1]);
+} 
+"
+fit1 <- stan(model_code = scode, iter = 10) 
+stan_checkdivergences(fit1)
 }
 }
