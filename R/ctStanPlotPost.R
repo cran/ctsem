@@ -25,12 +25,12 @@
 
 ctStanPlotPost<-function(obj, rows='all', priorwidth=TRUE, mfrow='auto',lwd=2,smoothness=1,
   parcontrol=list(mgp=c(1.3,.5,0),mar=c(3,2,2,1)+.2),wait=FALSE){
-  
+
   if(!(class(obj) %in% c('ctStanFit','ctStanModel'))) stop('not a ctStanFit or ctStanModel object!')
   
   densiter <- 1e5
   popsetup <- obj$setup$popsetup
-  popvalues<- obj$setup$popvalues
+  popvalues<- obj$setup$matvalues[obj$setup$matsetup$when==0 & obj$setup$matsetup$param > 0,]
   
   paroriginal<-graphics::par()[c('mfrow','mgp','mar')]
   
@@ -44,7 +44,8 @@ ctStanPlotPost<-function(obj, rows='all', priorwidth=TRUE, mfrow='auto',lwd=2,sm
     mfrow <- grDevices::n2mfrow( (length(rows)+sum(as.logical(obj$setup$popsetup$indvarying[rows]))*2))
     mfrow[mfrow > 3] <- 3
   }
-  graphics::par(mfrow=mfrow)
+
+  if(any(mfrow!=par()$mfrow)) graphics::par(mfrow=mfrow)
 
   nsubjects<-obj$data$nsubjects 
 
@@ -66,7 +67,7 @@ ctStanPlotPost<-function(obj, rows='all', priorwidth=TRUE, mfrow='auto',lwd=2,sm
       xaxs='i',  yaxs='i', plot=TRUE,legend=leg,colvec=legcol,lwd=lwd)
 
     if(obj$setup$popsetup[ri,'indvarying']>0){ #then also plot sd and subject level pars
-      sdscale <- obj$setup$popvalues[ri,'sdscale']
+      sdscale <- popvalues[ri,'sdscale']
       sdtform <- gsub('.*', '*',obj$ctstanmodel$rawpopsdtransform,fixed=TRUE)
       
       # rawpopsdbase<-e$rawpopsdbase[,popsetup$indvarying[ri]] 

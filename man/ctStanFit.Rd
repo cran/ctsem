@@ -10,7 +10,7 @@ ctStanFit(datalong, ctstanmodel, stanmodeltext = NA, iter = 1000,
   derrind = "all", optimize = FALSE, optimcontrol = list(),
   nlcontrol = list(), nopriors = FALSE, chains = 2,
   cores = "maxneeded", inits = NULL, forcerecompile = FALSE,
-  savescores = TRUE, gendata = FALSE, control = list(),
+  savescores = FALSE, gendata = FALSE, control = list(),
   verbose = 0, ...)
 }
 \arguments{
@@ -51,9 +51,9 @@ latents involved only in deterministic trends or input effects can be removed fr
 obtain no additional stochastic inputs after first observation), speeding up calculations. 
 If unsure, leave default of 'all' ! Ignored if intoverstates=FALSE.}
 
-\item{optimize}{if TRUE, use \code{\link{optimstan}} function for maximum a posteriori estimates.}
+\item{optimize}{if TRUE, use \code{\link{stanoptimis}} function for maximum a posteriori estimates.}
 
-\item{optimcontrol}{list of parameters sent to \code{\link{optimstan}} governing optimization / importance sampling.}
+\item{optimcontrol}{list of parameters sent to \code{\link{stanoptimis}} governing optimization / importance sampling.}
 
 \item{nlcontrol}{List of non-linear control parameters. 
 \code{nldynamics} defaults to "auto", but may also be a logical. Set to FALSE to use estimator that assumes linear dynamics, 
@@ -207,6 +207,7 @@ for(i in 2:nsubjects){
 
 
 
+
 #### Model fitting (from here it is good to understand!)
 
 #Specify univariate linear growth curve
@@ -225,6 +226,7 @@ m1 <- ctModel(n.manifest = 1,n.latent = 1,n.TIpred = 1, type = 'stanct',
   MANIFESTVAR=matrix(c('merror1'),nrow=1,ncol=1))
 
 #modify between subject aspects -- alternatively, run: edit(m1$pars)
+m1$pars$indvarying <- TRUE
 m1$pars$indvarying[-which(m1$pars$matrix \%in\% c('T0MEANS','CINT'))] <- FALSE
 m1$pars$age_effect[-which(m1$pars$matrix \%in\% c('T0MEANS','CINT'))] <- FALSE
 
@@ -232,23 +234,21 @@ m1$pars$age_effect[-which(m1$pars$matrix \%in\% c('T0MEANS','CINT'))] <- FALSE
 plot(m1,wait=FALSE) #plot prior distributions
 
 #fit
-f1 <- ctStanFit(datalong = dat, ctstanmodel = m1, 
-  cores = setcores,chains = setchains,plot=TRUE,
+f1 <- ctStanFit(datalong = dat, ctstanmodel = m1, optimize=TRUE,
+#cores = setcores,chains = setchains,plot=TRUE,
   control=list(max_treedepth=7),iter=150)
 
 summary(f1)
 
 #plots of individual subject models v data
-ctKalman(f1,timestep=.01,plot=TRUE,subjects=1:4,kalmanvec=c('y','etasmooth'))
-ctKalman(f1,timestep=.01,plot=TRUE,subjects=1,kalmanvec=c('y','ysmooth'))
-
+ctKalman(f1,timestep=.01,plot=TRUE,subjects=1:2,kalmanvec=c('y','yprior'))
 ctStanPlotPost(f1, wait=FALSE) #compare prior to posterior distributions 
 ctStanPlotPost(f1, priorwidth = FALSE, wait=FALSE) #rescale to width of posterior 
 
 ctStanPostPredict(f1, wait=FALSE) #compare randomly generated data from posterior to observed data
 
 cf<-ctCheckFit(f1) #compare covariance of randomly generated data to observed cov
-plot(cf)
+plot(cf,wait=FALSE)
 
 
 
@@ -265,19 +265,19 @@ m2 <- ctModel(n.manifest = 1,n.latent = 1,n.TIpred = 1, type = 'stanct',
   MANIFESTMEANS=matrix(0,ncol=1),
   MANIFESTVAR=matrix(c('merror1'),nrow=1,ncol=1))
 
+m2$pars$indvarying <- TRUE
 m2$pars$indvarying[-which(m2$pars$matrix \%in\% c('T0MEANS','CINT'))] <- FALSE
 m2$pars$age_effect[-which(m2$pars$matrix \%in\% c('T0MEANS','CINT'))] <- FALSE
 
 
-f2 <- ctStanFit(datalong = dat, ctstanmodel = m2, cores = setcores,
-  chains = setchains,plot=TRUE,
+f2 <- ctStanFit(datalong = dat, ctstanmodel = m2, optimize=TRUE,
+  cores = setcores,
+  #chains = setchains,plot=TRUE,
   control=list(max_treedepth=7),iter=150)
 
 summary(f2,parmatrices=TRUE,timeinterval=1)
 
 ctKalman(f2,timestep=.01,plot=TRUE,subjects=1,kalmanvec=c('y','etaprior'))
-ctKalman(f2,timestep=.01,plot=TRUE,subjects=1:4,kalmanvec=c('y','etasmooth'))
-ctKalman(f2,timestep=.01,plot=TRUE,subjects=1:2,kalmanvec=c('y','ysmooth'))
 
 ctStanPlotPost(f2)
 
@@ -301,21 +301,21 @@ m3 <- ctModel(n.manifest = 1,n.latent = 1,n.TIpred = 1, type = 'stanct',
   MANIFESTMEANS=matrix(0,ncol=1),
   MANIFESTVAR=matrix(c('merror1'),nrow=1,ncol=1))
 
+m3$pars$indvarying <- TRUE
 m3$pars$indvarying[-which(m3$pars$matrix \%in\% 
   c('T0MEANS','CINT','TDPREDEFFECT'))] <- FALSE
   
 m3$pars$age_effect[-which(m3$pars$matrix \%in\% 
   c('T0MEANS','CINT','TDPREDEFFECT'))] <- FALSE
 
-f3 <- ctStanFit(datalong = dat2, ctstanmodel = m3, cores = setcores,
+f3 <- ctStanFit(datalong = dat2, ctstanmodel = m3, optimize=TRUE,
+  cores = setcores,
   chains = setchains,plot=TRUE,
   control=list(max_treedepth=7),iter=150)
 
 summary(f3,parmatrices=TRUE)
 
 ctKalman(f3,timestep=.01,plot=TRUE,subjects=1,kalmanvec=c('y','etaprior'))
-ctKalman(f3,timestep=.01,plot=TRUE,subjects=1:4,kalmanvec=c('y','etasmooth'))
-ctKalman(f3,timestep=.01,plot=TRUE,subjects=1:2,kalmanvec=c('y','ysmooth'))
 
 ctStanPlotPost(f3,wait=FALSE)
 
@@ -343,6 +343,7 @@ m4 <- ctModel(n.manifest = 2,n.latent = 2,n.TIpred = 1, type = 'stanct', #no of 
   MANIFESTVAR=matrix(c('merror1',0,0,'merror2'),nrow=2,ncol=2))
 
 #restrict between subjects variation / covariate effects
+m4$pars$indvarying <- TRUE
 m4$pars$indvarying[-which(m4$pars$matrix \%in\% c('T0MEANS','CINT','TDPREDEFFECT'))] <- FALSE
 m4$pars$age_effect[-which(m4$pars$matrix \%in\% c('T0MEANS','CINT','TDPREDEFFECT'))] <- FALSE
 
@@ -354,20 +355,21 @@ m4 <- ctModel(n.manifest = 2,n.latent = 2,n.TIpred = 1, type = 'stanct',
   LAMBDA = matrix(c(1,0,0,1),nrow=2,ncol=2))
 
 #restrict between subjects variation / covariate effects
+m4$pars$indvarying <- TRUE
 m4$pars$indvarying[-which(m4$pars$matrix \%in\% c('T0MEANS','MANIFESTMEANS','TDPREDEFFECT'))] <- FALSE
 m4$pars$age_effect[-which(m4$pars$matrix \%in\% c('T0MEANS','MANIFESTMEANS','TDPREDEFFECT'))] <- FALSE
 
-f4 <- ctStanFit(datalong = dat2, ctstanmodel = m4, cores = setcores,chains = setchains,plot=TRUE,
-  optimize=TRUE,verbose=1,
+f4 <- ctStanFit(datalong = dat2, ctstanmodel = m4, cores = setcores,
+  chains = setchains,plot=TRUE,
+  optimize=TRUE,verbose=0,
   control=list(max_treedepth=7),iter=150)
 
-summary(f4,parmatrices=TRUE)
+summary(f4)
 
 ctStanDiscretePars(f4,plot=TRUE) #auto and cross regressive plots over time
 
 ctKalman(f4,timestep=.01,plot=TRUE,subjects=1,kalmanvec=c('y','etaprior'))
-ctKalman(f4,timestep=.01,plot=TRUE,subjects=1:2,kalmanvec=c('y','etasmooth'))
-ctKalman(f4,timestep=.01,plot=TRUE,subjects=1:2,kalmanvec=c('y','ysmooth'))
+ctKalman(f4,timestep=.01,plot=TRUE,subjects=1:2,kalmanvec=c('y','etaprior'))
 
 ctStanPlotPost(f4, wait=FALSE)
 
@@ -392,6 +394,7 @@ m3nl <- ctModel(n.manifest = 1,n.latent = 1,n.TIpred = 1, type = 'stanct',
   MANIFESTMEANS=matrix(0,ncol=1),
   MANIFESTVAR=matrix(c('merror1'),nrow=1,ncol=1))
 
+m3nl$pars$indvarying <- TRUE
 m3nl$pars$indvarying[-which(m3nl$pars$matrix \%in\% 
   c('T0MEANS','CINT','TDPREDEFFECT'))] <- FALSE
   
@@ -414,19 +417,6 @@ f3nl <- ctStanGenerateFromFit(f3nl,nsamples=100,fullposterior=TRUE)
 
 ctStanPostPredict(f3nl, datarows=1:100, wait=FALSE)
 
-e=extract(f3nl)
-subindex = which(f3nl$data$subject ==3) #specify subject
- 
-matplot(f3nl$data$time[subindex], # Y predictions given earlier Y
-   t(e$kalman[,subindex,4]), 
-   ctStanKalman(fit = f3nl)$ypred[,subindex,1], #predicted y for variable 1
-   type='l',lty=1,col=rgb(0,0,0,.1))
- 
-points(f3nl$data$time[subindex], #actual Y
-   f3nl$data$Y[subindex,1],type='p',col='red')
-   
-matplot(f3nl$data$time[subindex], add = TRUE, #Generated Y from model
-    f3nl$generated$Y[subindex,,1], 
-    type='l',lty=1,col=rgb(0,0,1,.05))
+ctKalman(f3nl,plot=TRUE)
 }
 }

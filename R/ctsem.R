@@ -49,10 +49,11 @@ utils::globalVariables(c("invDRIFT","II","DRIFTexp","vec2diag","diag2vec",
 #'  
 #' @docType package
 #' @name ctsem
-#' @import grDevices methods stats rstan OpenMx graphics rstantools Rcpp data.table
+#' @import grDevices methods stats rstan OpenMx graphics rstantools Rcpp data.table ggplot2
 #' @importFrom plyr aaply alply round_any
 #' @importFrom utils relist as.relistable tail capture.output
-#' @importFrom KernSmooth bkde2D
+#' @importFrom Deriv Simplify 
+#' @importFrom cOde jacobianSymb prodSymb
 #' @useDynLib ctsem, .registration = TRUE
 #' 
 #' @references 
@@ -64,3 +65,17 @@ utils::globalVariables(c("invDRIFT","II","DRIFTexp","vec2diag","diag2vec",
 #' Stan Development Team (2018). RStan: the R interface to Stan. R package version 2.17.3. http://mc-stan.org
 #' 
 NULL
+
+.onAttach <- function(libname, pkgname) {
+  # to show a startup message
+  packageStartupMessage("ctsem also changes in time, for an up to date manual run function ctDocs()")
+}
+
+ctDocs <- function(){
+  r=runif(1,0,9999999)
+  pdfpath=paste0(tempdir(),'\\ctsemManual_',r,'.pdf')
+  utils::download.file(url="https://github.com/cdriveraus/ctsem/raw/master/vignettes/hierarchicalmanual.pdf",
+    destfile=pdfpath,mode='wb')
+  try(openPDF(pdfpath))
+}
+  

@@ -39,19 +39,10 @@ sm<-ctModel(Tpoints=Tpoints,type='stanct',
   MANIFESTMEANS=matrix(0),
   LAMBDA=diag(1,n.manifest))
 
-sm$pars$indvarying[!(sm$pars$matrix %in% c('T0MEANS','CINT'))]=FALSE
-# sm$pars$transform[(sm$pars$matrix %in% c('DRIFT'))]='-exp(param)-.0001'
-# sm$pars$transform[(sm$pars$matrix %in% c('DIFFUSION','T0VAR','MANIFESTVAR'))]='log(exp(param)+1)*500'
-# sm$pars$sdscale=1
-# sm$pars$indvarying=FALSE
-
-
-# sm$pars$transform[5]='exp(param*10) +.00001'
 
 sf=ctStanFit(datalong=long,ctstanmodel=sm,nopriors=TRUE,
   control=list(max_treedepth=8),
   iter=300,chains=2,plot=FALSE,fit=TRUE,optimize=TRUE)
-# sfsum <- summary(sf)
 
 
 m<-ctModel(Tpoints=Tpoints,type='omx',
@@ -68,7 +59,7 @@ f=ctFit(dat=wide,ctmodelobj=m)
 # stantraitvar <- (-1/(sfsum$popmeans[2,1])) %*% sfsum$popsd[2,1]^2 %*% (-1/(sfsum$popmeans[2,1]))
 
 #check drift using different fit approaches
-expect_equal(mean(sf$stanfit$transformedpars$DRIFT),summary(f)$ctparameters[2,1],tolerance=1e-1)
+expect_equal(mean(sf$stanfit$transformedpars$DRIFT[,,1,1]),summary(f)$ctparameters[2,1],tolerance=1e-1)
 
 })
 

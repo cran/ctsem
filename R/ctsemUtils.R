@@ -2,6 +2,18 @@ suppressOutput <- function(...,verbose=0){
   if(verbose > 0) return(eval(...)) else return(capture.output(eval(...)))
 }
 
+  openPDF <- function(f) {
+    os <- .Platform$OS.type
+    if (os=="windows")
+      shell.exec(normalizePath(f))
+    else {
+      pdf <- getOption("pdfviewer", default='')
+      if (nchar(pdf)==0)
+        stop("The 'pdfviewer' option is not set. Use options(pdfviewer=...)")
+      system2(pdf, args=c(f))
+    }
+  }
+
 naf <-function(x){
   x[is.na(x)] <- FALSE
   return(x)
@@ -186,7 +198,7 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,ylab='Density
   legend=FALSE, legendargs=list(),...){
   
   if(all(xlimsindex=='all')) xlimsindex <- 1:length(x)
-  
+
   for(i in xlimsindex){
     newxlims=stats::quantile(x[[i]],probs=probs,na.rm=TRUE)
     if(i==1) {
@@ -206,17 +218,14 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,ylab='Density
   
   if(all(colvec=='auto')) colvec=1:length(x)
   if(all(ltyvec=='auto')) ltyvec=1:length(x)
-  
-  # xlims=stats::quantile(x,probs=c(.01,.99))
-  # mid=mean(c(xlims[2],xlims[1]))
-  # xlims[1] = xlims[1] - (mid-xlims[1])/8
-  # xlims[2] = xlims[2] + (xlims[2]-mid)/8
-  # browser()
+
   denslist<-lapply(1:length(x),function(xi) {
     d=stats::density(x[[xi]],bw=bw,n=5000,from=xlims[1]-sd/2,to=xlims[2]+sd/2,na.rm=TRUE)
     # d$y=d$y/ sum(d$y)/range(d$x)[2]*length(d$y)
     return(d)
   })
+  # browser()
+  xlims=range(sapply(denslist,function(d) d$x[d$y> .005*max(d$y)]))
   ylims=c(0,max(unlist(lapply(denslist,function(li) max(li$y))))*1.1) * ifelse(legend[1]!=FALSE, 1.2,1)
   
   if(plot) {

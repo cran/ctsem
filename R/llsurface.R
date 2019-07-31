@@ -1,23 +1,27 @@
-llsurface<- function(dat, ctm, range=2, nsamples=100000){
+llsurface<- function(fit, sd=2, pars,nsamples=10000){
+
+  np= get_num_upars(fit$stanfit$stanfit)
   
-  fit=ctStanFit(datalong = dat,estonly=TRUE,
-    ctstanmodel = ctm,optimize=TRUE,#nopriors=TRUE,
-    optimcontrol = list(estonly=F,deoptim=F,isloops=0,finishsamples=500),verbose=0)
-  
-  np=get_num_upars(fit$stanfit$stanfit)
-  
-  grid=matrix(rnorm(nsamples*np,0,range),ncol=np)
+  for(sdi in 1:10){
+  gridi=t(matrix(rnorm(ceiling(nsamples*np/10),pars,sd*(sdi/10^2)),nrow=np))
+  if(sdi ==1) grid=gridi else grid = rbind(grid,gridi)
+  }
   est=rep(NA,nrow(grid))
-  
+  colnames(grid) = rownames(fit$stanfit$transformedpars_old[1:np,])
+
   for(ri in 1:nrow(grid)){
-    est[ri] = log_prob(fit$stanfit$stanfit,grid[ri,])
+    est[ri] = log_prob(fit$stanfit$stanfit,grid[ri,],adjust_transform=TRUE,gradient=FALSE)
   }
   
   
-  col=1:ncol(grid)
-  colt=adjustcolor(col = col,alpha.f = .05)
-  matplot(log(-est),grid[,2,drop=F],pch=1,col=colt,xlab= '- log log likelihood', ylab='par value')
-  legend('topright',fit$setup$popsetup$parname[match(fit$setup$popsetup$param,1:ncol(grid))],text.col=col,bty='n')
+
+  dat=data.frame(iter=1:nrow(grid),ll=est, grid)
+  iter <- ll <- value <- NULL
+  dat=melt(dat,id.vars=c('iter','ll'))
+  
+  ggplot2::ggplot(data = dat, aes(x=value,y=ll))+ geom_smooth() + facet_wrap(. ~ variable,scales = "free")
+    
+  # legend('topright',fit$setup$popsetup$parname[match(fit$setup$popsetup$param,1:ncol(grid))],text.col=col,bty='n')
   
   # of=optimizing(object = fit$stanmodel,data= fit$standata,save_iterations=T, hessian=FALSE, iter=1e6, as_vector=FALSE,draws=0,constrained=FALSE,
   #     tol_obj=tol, tol_rel_obj=0,init_alpha=.00001, tol_grad=0,tol_rel_grad=0,tol_param=0,history_size=50)

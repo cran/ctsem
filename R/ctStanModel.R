@@ -79,9 +79,7 @@ ctStanModel<-function(ctmodelobj, type='stanct'){
   ctspec$transform <- 0
   ctspec$offset <- 0
   ctspec$inneroffset <- 0
-  scale <- c()
-  shape <- c()
-  offset <- c()
+
   
   ######### STAN parameter transforms
   for(pi in 1:length(ctspec$matrix)){
@@ -116,7 +114,7 @@ ctStanModel<-function(ctmodelobj, type='stanct'){
           }
           if(continuoustime==FALSE) {
             ctspec$transform[pi] <- 0
-            ctspec$meanscale[pi] <- 2
+            ctspec$meanscale[pi] <- 1
             ctspec$offset[pi] <- .5
           }
         }
@@ -129,6 +127,22 @@ ctStanModel<-function(ctmodelobj, type='stanct'){
   }
   
   ctspec[!is.na(ctspec$value),c('transform','multiplier','meanscale','offset','inneroffset')] <- NA
+  
+  for(ri in 1:nrow(ctspec)){ #convert back to text for new approach
+    if(!is.na(as.integer(ctspec$transform[ri]))){
+      ctspec$transform[ri] <- Simplify(tform(param = 'param',
+        transform = as.integer(ctspec$transform[ri]),
+        multiplier = ctspec$multiplier[ri],
+        meanscale = ctspec$meanscale[ri],
+        offset = ctspec$offset[ri],
+        inneroffset =ctspec$inneroffset[ri],
+        singletext = TRUE))
+    }
+  }
+ctspec$multiplier <- NULL
+ctspec$meanscale <- NULL
+ctspec$offset <- NULL
+ctspec$inneroffset <- NULL
   
   nparams<-sum(freeparams)
   
@@ -148,7 +162,9 @@ ctStanModel<-function(ctmodelobj, type='stanct'){
   ctspec$indvarying[is.na(ctspec$value)]<-indvarying
   ctspec$indvarying[!is.na(ctspec$value)]<-FALSE
   
-  ctspec$sdscale<-1
+  ctspec$sdscale<-NA
+  ctspec$sdscale[is.na(ctspec$value)]<-1
+  
   
   
   
@@ -161,6 +177,20 @@ ctStanModel<-function(ctmodelobj, type='stanct'){
       class(ctspec[,paste0(predi,'_effect')])<-'logical'
     }
     if(sum(unlist(ctspec[,paste0(TIpredNames,'_effect')]))==0) stop('TI predictors included but no effects specified!')
+  }
+  
+  for(pi in 1:nrow(ctspec)){
+  if(grepl('|',ctspec$param[pi],fixed=TRUE)){
+    split = strsplit(gsub(' ','',ctspec$param[pi]),split = '|',fixed=TRUE)[[1]]
+    # browser()
+    # ctspec$param[pi] = split[length(split)]
+    ctspec[pi,c('param','transform','indvarying','sdscale')[1:(length(split))]] <- split[1:(length(split))]
+    ctspec[pi,c('param','transform','indvarying','sdscale')[min(4,length(split)):4]] <- 
+      c(NA,ctspec$transform[pi],TRUE,1)[min(4,length(split)):4]
+    message('Custom par ',ctspec$param[pi],' found, set as: ',paste0(
+      colnames(ctspec[pi,c('param','transform','indvarying','sdscale')]),' = ',
+      ctspec[pi,c('param','transform','indvarying','sdscale')],'; '))
+  }
   }
 
   
@@ -177,10 +207,9 @@ ctStanModel<-function(ctmodelobj, type='stanct'){
   out$rawpopsdbase <- 'normal(0,1)' #'cauchy(0,1)'
   out$rawpopsdbaselowerbound <- NA
   out$rawpopsdtransform <- 'exp(2*rawpopsdbase-1) .* sdscale' #'log(1+exp(2*rawpopsdbase)) .* sdscale' #'exp(rawpopsdbase * 2 -2) .* sdscale' # 'rawpopsdbase .* sdscale' #
-  out$stationarymeanprior <- NA
-  out$stationaryvarprior <- NA
+  # out$stationarymeanprior <- NA
+  # out$stationaryvarprior <- NA
   out$manifesttype <- rep(0,n.manifest)
-  out$gradient <- 'gradient = DRIFT * state + CINT[,1];'
   
   return(out)
 }

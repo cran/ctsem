@@ -1,4 +1,4 @@
-if(Sys.getenv("NOT_CRAN")==TRUE & .Machine$sizeof.pointer != 4){
+if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
 
 library(ctsem)
 library(testthat)
@@ -46,14 +46,13 @@ MANIFESTVAR=diag(0.5,1),
  checkm$pars$indvarying <- FALSE
 
  checkm$pars[c(-1,-7) ,c('TI1_effect')] <- FALSE
- checkm$pars$meanscale[c(1,7)] <- 1
 
-tfit<-ctStanFit(tdat,checkm,iter=400, warmup=380,chains=2,optimize=T,isloops=3,nopriors=F,verbose=0)
+tfit<-ctStanFit(tdat,checkm,chains=2,optimize=T,optimcontrol=list(is=TRUE,finishsamples=200),nopriors=F,verbose=0)
 s=summary(tfit)
 
 expect_equal(s$tipreds[2,'mean'],5,tolerance=.1)
 
-tfit<-ctStanFit(tdat,checkm,iter=400, warmup=380,chains=2,optimize=T,isloops=3,nopriors=F,verbose=0,
+tfit<-ctStanFit(tdat,checkm,iter=400, warmup=380,chains=2,optimize=T,optimcontrol=list(is=FALSE),nopriors=F,verbose=0,
   nlcontrol=list(nldynamics=TRUE,nlmeasurement=TRUE))
 s=summary(tfit)
 

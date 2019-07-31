@@ -1,12 +1,9 @@
-if(Sys.getenv("NOT_CRAN")==TRUE & .Machine$sizeof.pointer != 4){
+if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
 library(ctsem)
 library(testthat)
 
 context("ctRasch") #develop some expectations here!
 
-
-
-#anomauth
 test_that("ctRasch1", {
 
 invlog=function (x) exp(x)/(1 + exp(x))
@@ -37,19 +34,17 @@ m$pars$indvarying[ m$pars$matrix %in% 'CINT' ] <- TRUE
 m$pars$indvarying[ m$pars$matrix %in% 'T0MEANS' ] <- TRUE
 m$manifesttype[]=1
 row.number <- which( m$pars$matrix %in% "MANIFESTMEANS" )[3]
-m$pars$offset[ row.number ] <- 1
-m$pars$meanscale[ row.number ] <- 2
+m$pars$transform[ m$pars$matrix %in% "MANIFESTMEANS"] <- 'param * 2 +1'
 set.seed( 1234 )
 start <- Sys.time()
 r <- ctStanFit( datalong = d,
                 ctstanmodel = m,
-                iter = 1000,
+                iter = 100,
                 chains = 1,
                 cores = 1,
                 intoverstates = FALSE,
                 stationary = FALSE )
-print( runtime <- Sys.time() - start )
-summary( r )
+
 
 })
 

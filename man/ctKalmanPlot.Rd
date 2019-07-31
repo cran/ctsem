@@ -4,7 +4,7 @@
 \alias{ctKalmanPlot}
 \title{ctKalmanPlot}
 \usage{
-ctKalmanPlot(x, subjects, kalmanvec = c("y", "yprior"),
+ctKalmanPlot(x, subjects, kalmanvec = c("y", "etaprior"),
   errorvec = "auto", errormultiply = 1.96, ltyvec = "auto",
   colvec = "auto", lwdvec = "auto", subsetindices = NULL,
   pchvec = "auto", typevec = "auto", grid = FALSE, add = FALSE,
@@ -68,6 +68,7 @@ Nothing. Generates plots.
 Plots Kalman filter output from ctKalman.
 }
 \examples{
+\donttest{
 ### Get output from ctKalman
 x<-ctKalman(ctstantestfit,subjects=2)
 
@@ -76,4 +77,5 @@ ctKalmanPlot(x, subjects=2)
 
 ###Single step procedure:
 ctKalman(ctstantestfit,subjects=2,plot=TRUE)
+}
 }

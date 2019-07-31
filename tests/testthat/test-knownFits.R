@@ -1,10 +1,8 @@
-if(Sys.getenv("NOT_CRAN")==TRUE & .Machine$sizeof.pointer != 4){
+if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
 library(ctsem)
 library(testthat)
 
 context("knownFits")
-
-message(Sys.getenv("NOT_CRAN"))
 
 #anomauth
 test_that("anomauth", {
@@ -29,14 +27,15 @@ test_that("anomauth", {
    sm <- ctStanModel(AnomAuthmodel)
   sm$pars$indvarying<- FALSE
   sf=ctStanFit(ctDeintervalise(ctWideToLong(AnomAuth,Tpoints = AnomAuthmodel$Tpoints,n.manifest = 2)),
-    ctstanmodel = sm, optimize=TRUE,verbose=0,savescores = FALSE,nopriors=TRUE,optimcontrol=list(finishsamples=10))
+    ctstanmodel = sm, optimize=TRUE,verbose=0,savescores = FALSE,cores=2,nopriors=TRUE,
+    optimcontrol=list(finishsamples=10))
   expect_equal(23415.929,-2*sf$stanfit$optimfit$value,tolerance=.01)
  }
 
 })
 
 #anomauth with trait asymptotic vs standard param comparisons
-test_that("time calc", {
+test_that("AnomAuth_traitasymptoticcheck", {
   
   data(AnomAuth)
   AnomAuthmodel<-ctModel(LAMBDA=matrix(c(1, 0, 0, 1), nrow=2, ncol=2),  
@@ -88,7 +87,8 @@ if( .Machine$sizeof.pointer != 4){
  sm <- ctStanModel(oscillatingm)
   sm$pars$indvarying<- FALSE
   sf=ctStanFit(ctDeintervalise(ctWideToLong(Oscillating,Tpoints = oscillatingm$Tpoints,n.manifest = 1)),
-    ctstanmodel = sm, optimize=TRUE,verbose=0,savescores = FALSE,nopriors=TRUE,optimcontrol=list(finishsamples=10))
+    cores=1,verbose=0,
+    ctstanmodel = sm, optimize=TRUE,savescores = FALSE,nopriors=TRUE,optimcontrol=list(finishsamples=10))
   expect_equal(-3461.936,-2*sf$stanfit$optimfit$value,tolerance=.01)
   
 }

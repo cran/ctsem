@@ -18,13 +18,13 @@
 #' @method summary ctStanFit
 #' @export
 
-summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,priorcheck=TRUE,...){
+summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,priorcheck=TRUE,...){
   
   if(class(object) != 'ctStanFit') stop('Not a ctStanFit object!')
-  
+
   out=list()
   monvars <- c('mean','sd','2.5%','50%','97.5%')
-  
+
   if(class(object$stanfit)=='stanfit'){ 
     s<-suppressWarnings(getMethod('summary','stanfit')(object$stanfit))
     if('98%' %in% colnames(s$summary)) colnames(s$summary)[colnames(s$summary)=='98%'] <- '97.5%'
@@ -32,17 +32,9 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,pri
   }
   
   if(class(object$stanfit)!='stanfit')  e <- extract(object) 
-  parnames <- c()
-  parindices <- c()
-  # for(m in names(object$setup$matsetup)){
-  #   if(dim(object$setup$matsetup[[m]])[1] > 0){
-  #     parnames <- c(parnames,rownames(object$setup$matsetup[[m]]))
-  #     parindices <- c(parindices, object$setup$matsetup[[m]][,'param'])
-  #   }
-  # }
 
-  parnames <- object$setup$popsetup$parname
-  parindices <- object$setup$popsetup$param
+  parnames <- object$setup$matsetup$parname[object$setup$matsetup$when==0 & object$setup$matsetup$param > 0]
+  parindices <- object$setup$matsetup$param[object$setup$matsetup$when==0 & object$setup$matsetup$param > 0]
   pars <- cbind(parnames,parindices)
   pars<-pars[!duplicated(pars[,1,drop=FALSE]),,drop=FALSE]
   parnames <- pars[as.numeric(pars[,2,drop=FALSE]) >0, 1]
@@ -156,11 +148,12 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,pri
       rawtieffect <- rstan::extract(object$stanfit,permuted=FALSE,pars='TIPREDEFFECT')
       tidiags <- suppressWarnings(monitor(rawtieffect,warmup=0,digits_summary = digits,print = FALSE))
     }
+
     tieffect <- array(e$linearTIPREDEFFECT,dim=c(dim(e$linearTIPREDEFFECT)[1], 1, length(parnames) * dim(e$linearTIPREDEFFECT)[3]))
     tieffectnames <- paste0('tip_',rep(object$ctstanmodel$TIpredNames,each=length(parnames)),'_',parnames)
     dimnames(tieffect)<-list(c(),c(),tieffectnames)
-    tipreds = suppressWarnings(monitor(tieffect,warmup = 0,print = FALSE)[,monvars])
-    if(class(object$stanfit)=='stanfit') tipreds <- cbind(tipreds,tidiags[,c('n_eff','Rhat')])
+    tipreds = suppressWarnings(monitor(tieffect,warmup = 0,print = FALSE)[,monvars,drop=FALSE])
+    if(class(object$stanfit)=='stanfit') tipreds <- cbind(tipreds,tidiags[,c('n_eff','Rhat'),drop=FALSE])
     tipreds <- tipreds[c(object$data$TIPREDEFFECTsetup)>0,,drop=FALSE]
     z = tipreds[,'mean'] / tipreds[,'sd'] 
     out$tipreds= round(cbind(tipreds,z),digits) #[order(abs(z)),]
@@ -207,13 +200,14 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,pri
             try(rownames(parmats)[counter] <- names(parmatlists[[1]])[mati])
             try(parmats[counter,]<-new)
           }}}}
+      
       colnames(parmats) <- c('Row','Col', 'Mean','Sd','2.5%','50%','97.5%')
       
       #remove certain parmatrices lines
       removeindices <- which(rownames(parmats) == 'MANIFESTVAR' & parmats[,'Row'] != parmats[,'Col'])
       
       removeindices <- c(removeindices,which((rownames(parmats) %in% c('MANIFESTVAR','T0VAR','DIFFUSION','dtDIFFUSION','asymDIFFUSION',
-        'T0VARcor','DIFFUSIONcor','dtDIFFUSIONcor','asymDIFFUSIONcor') &  parmats[,'Row'] < parmats[,'Col'])))
+        'T0VARcor','DIFFUSIONcor','DIFFUSIONcov','dtDIFFUSIONcor','asymDIFFUSIONcor') &  parmats[,'Row'] < parmats[,'Col'])))
       
       removeindices <- c(removeindices,which((rownames(parmats) %in% c('T0VARcor','DIFFUSIONcor','dtDIFFUSIONcor','asymDIFFUSIONcor') & 
           parmats[,'Row'] == parmats[,'Col'])))
@@ -228,7 +222,7 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=FALSE,pri
     }
     if(class(parmatlists)=='try-error') out$parmatNote = 'Could not calculate parameter matrices'
   }
-  
+
   
   if(class(object$stanfit)=='stanfit'){
     popsd=s$summary[c(grep('^popsd',rownames(s$summary),fixed=FALSE)),
