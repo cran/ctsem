@@ -22,7 +22,7 @@ flexsapply <- function(cl, X, fn,cores=1){
   if(cores > 1) parallel::parSapply(cl,X,fn) else sapply(X, fn)
 }
 
-standatact_specificsubjects <- function(standata, subjects){
+standatact_specificsubjects <- function(standata, subjects,timestep=NA){
   standata$dokalmanrows <- as.integer(standata$dokalmanrows * (standata$subject %in% subjects))
   standata2=standata
   standata2$dokalmanpriormodifier <- sum(standata$dokalmanrows)/standata$ndatapoints
@@ -32,9 +32,27 @@ standatact_specificsubjects <- function(standata, subjects){
   for(pi in c('whichcont_y','Y','whichbinary_y','whichobs_y','tdpreds')){
     standata2[[pi]] <- standata2[[pi]][standata$dokalmanrows == 1,,drop=FALSE]
   }
+
   standata2$ndatapoints=as.integer(nrow(standata2$Y))
   return(standata2)
 }  
+
+
+standatalongobjects <- function() longobjects <- c('subject','time','dokalmanrows','nobs_y','ncont_y','nbinary_y','Y','tdpreds')
+
+standatatolong <- function(standata){
+  long <- data.frame(lapply(standatalongobjects(),function(x) standata[[x]])) #,simplify=data.frame(subject=standata$subject, time=standata$time
+  colnames(long)[colnames(long) %in% 'Y'] <- 'Y.1'
+  colnames(long)[colnames(long) %in% 'tdpreds'] <- 'tdpreds.1'
+  return(long)
+}
+
+stanlongtostandata <- function(long){
+  standata <- lapply( standatalongobjects(), function(x) long[,grep(paste0('^',x),colnames(long)),drop=FALSE])
+  names(standata) <- standatalongobjects()
+  return(standata)
+}
+  
 
 parlp <- function(parm,subjects=NA){
   sm<-NULL
@@ -52,14 +70,15 @@ parlp <- function(parm,subjects=NA){
 
 
 stan_constrainsamples<-function(sm,standata, samples,cores=2){
+  # browser
   smfull <- stan_reinitsf(model = sm,data = standata)
   message('Computing quantities for ', nrow(samples),' samples...')
   est1=NA
   class(est1)<-'try-error'
   i=0
-  while(class(est1)=='try-error'){
+  while(i < nrow(samples) && class(est1)=='try-error'){
     i=i+1
-    est1=try(constrain_pars(smfull, upars=samples[i,]),silent=TRUE)
+    est1=try(constrain_pars(smfull, upars=samples[i,]))
   }
   if(class(est1)=='try-error') stop('All samples generated errors! Respecify, try stochastic optimizer, try again?')
   
@@ -718,11 +737,11 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         # hessup=hess1s(pars = est2,direction = 1,step = 1e-4,lpdifmin = 1e-4,lpdifmax = 1e-3)
         # hessdown=hess1s(pars = est2,direction = -1,step = 1e-4,lpdifmin = 1e-4,lpdifmax = 1e-3)
         # hess=(hessup+hessdown)/2
-        hess=grmat(pars=est2,step=1e-6)
+        hess=grmat(pars=est2,step=1e-12)
         if(any(is.na(hess))) warning(paste0('Hessian could not be computed for pars ', paste0(which(apply(hess,1,function(x) any(is.na(x)))),collapse=', '), ' -- standard errors will be nonsense, model adjustment may be needed.',collapse=''))
         diag(hess)[is.na(diag(hess))]<- -1
         hess[is.na(hess)] <- 0
-        hess = (hess/2) + t(hess/2)
+        hess = ((hess) + t(hess))/2
         # neghesschol = try(chol(-hess),silent=TRUE)
 
         mchol=try(t(chol(solve(-hess))),silent=TRUE)
@@ -732,7 +751,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         } else npd <- FALSE
         # if(class(mchol)=='try-error') {
         mcov=MASS::ginv(-hess) #-optimfit$hessian)
-        mcov=as.matrix(Matrix::nearPD(mcov)$mat)
+        mcov=as.matrix(Matrix::nearPD(mcov,conv.norm.type = 'F')$mat)
       }
 
       if(!is.na(sampleinit[1])){

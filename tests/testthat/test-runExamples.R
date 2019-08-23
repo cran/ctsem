@@ -1,6 +1,8 @@
 if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
-
-library(ctsem)
-  library(devtools)
-  run_examples(pkg = '../.')
+library(devtools)
+  context("allexamples")
+  
+  test_that("allexamples1", {
+    if (file.exists('../../ctsem/')) run_examples(pkg = '../../ctsem/.') else run_examples(pkg = '../../.')
+  })
 }
