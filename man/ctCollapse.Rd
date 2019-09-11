@@ -5,7 +5,7 @@
 \title{ctCollapse
 Easily collapse an array margin using a specified function.}
 \usage{
-ctCollapse(inarray, collapsemargin, collapsefunc, ...)
+ctCollapse(inarray, collapsemargin, collapsefunc, plyr = TRUE, ...)
 }
 \arguments{
 \item{inarray}{Input array of more than one dimension.}
@@ -13,6 +13,8 @@ ctCollapse(inarray, collapsemargin, collapsefunc, ...)
 \item{collapsemargin}{Integers denoting which margins to collapse.}
 
 \item{collapsefunc}{function to use over the collapsing margin.}
+
+\item{plyr}{Whether to use plyr.}
 
 \item{...}{additional parameters to pass to collapsefunc.}
 }

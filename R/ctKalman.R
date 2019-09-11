@@ -15,9 +15,8 @@
 #' but take a little more time to calculate. Currently unavailable for ctStan fits.
 #' @param subjects vector of integers denoting which subjects (from 1 to N) to plot predictions for. 
 #' @param plot Logical. If TRUE, plots output instead of returning it. 
-#' See \code{\link{ctKalmanPlot}} for the possible arguments.
-#' @param oldstyle Logical. If TRUE, use Kalman filter written in R rather than Stan based.
-#' @param ... additional arguments to pass to \code{\link{ctKalmanPlot}}.
+#' See \code{\link{plot.ctKalman}} for the possible arguments.
+#' @param ... additional arguments to pass to \code{\link{plot.ctKalman}}.
 #' @return Returns a list containing matrix objects etaprior, etaupd, etasmooth, y, yprior, 
 #' yupd, ysmooth, prederror, time, loglik,  with values for each time point in each row. 
 #' eta refers to latent states and y to manifest indicators - y itself is thus just 
@@ -47,60 +46,39 @@
 #' @export
 
 ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
-  subjects=1, plot=FALSE,oldstyle=FALSE, ...){
+  subjects=1, plot=FALSE, ...){
   
   type=NA
   if(class(fit)=='ctStanFit') type='stan' 
   if(class(fit) =='ctsemFit') type ='omx'
   if(is.na(type)) stop('fit object is not from ctFit or ctStanFit!')
   
-  if(!oldstyle && type=='stan'){
-    # if(timestep != 'asdata'){
-    #   Y<-fit$standata$Y
-    #   colnames(Y)=fit$ctstanmodel$manifestNames
-    #   td<-fit$standata$tdpreds
-    #   colnames(td)<-fit$ctstanmodel$TDpredNames
-    #   dlong<-data.frame(id=fit$standata$subject,time=fit$standata$time,Y,td,
-    #     matrix(0,nrow=nrow(td),ncol=fit$ctstanmodelbase$n.TIpred,dimnames = list(NULL,fit$ctstanmodelbase$TIpredNames)))
-    #   dlong <- ctDiscretiseData(as.matrix(dlong),timestep=timestep,
-    #     TDpredNames = fit$ctstanmodelbase$TDpredNames,TIpredNames = fit$ctstanmodelbase$TIpredNames)
-    #   # 
-    #   fit$standata$Y <- dlong[,fit$ctstanmodel$manifestNames,drop=FALSE]
-    #   fit$standata$tdpreds <- dlong[,fit$ctstanmodel$TDpredNames,drop=FALSE]
-    #   fit$standata$subject <- dlong[,'id']
-    #   fit$standata$time <- dlong[,'time']
-    #   fit$standata$savescores <- 0L
-    #   nfargs <- fit$args
-    #   nfargs=lapply(nfargs,as.character)
-    #   colnames(dlong)[1] <- fit$ctstanmodelbase$subjectIDname
-    #   colnames(dlong)[2] <- fit$ctstanmodelbase$timeName
-    #   nfargs$datalong='dlong'
-    #   nfargs$ctstanmodel = 'fit$ctstanmodelbase'
-    #   nfargs[[1]] <- NULL
-    #   nfargs$fit=FALSE
-    #   nfb=lapply(nfargs,function(x) eval(parse(text=x)))
-    #   nf=suppressMessages(do.call(ctStanFit,nfb))
-    #   fit$standata <- nf$standata
-    #   fit$data<-lapply(fit$standata,function(x){ x[x==99999] <- NA; x})
-    #   
-    # }
-    
+  if(type=='stan'){
+    if(all(timerange == 'asdata')) timerange <- range(fit$standata$time[fit$standata$subject %in% subjects])
+    if(timestep != 'asdata') {
+      times <- seq(timerange[1],timerange[2],timestep)
+      fit$standata <- standataFillTime(fit$standata,times)
+    }
+    fit$standata$dokalmanrows <- as.integer(fit$standata$subject %in% subjects)
+
     out <- ctStanKalman(fit,collapsefunc=mean) #extract state predictions
-    # out$y <- fit$data$Y #,dim=c(1,dim(fit$data$Y)))
-    # out$time <- array(fit$data$time)
-    niter <- dim(out$etaprior)[1]
+
     if(length(dim(out$llrow)) < 3) out$llrow <- array(out$llrow,dim=c(dim(out$llrow),1))
+
     out <- lapply(subjects, function(si) lapply(out, function(m) {
-      if(length(dim(m)) > 2) m=ctCollapse(inarray = m,collapsemargin = 1,collapsefunc = mean)
+      if(length(dim(m)) > 2) m=array(m,dim=dim(m)[-1],dimnames=dimnames(m)[-1]) #ctCollapse(inarray = m,collapsemargin = 1,collapsefunc = mean,plyr=FALSE)
       if(length(dim(m)) ==1) m=m[fit$standata$subject %in% si, drop=FALSE]
       if(length(dim(m)) ==2) m=m[fit$standata$subject %in% si, ,drop=FALSE]
       if(length(dim(m)) ==3) m=m[fit$standata$subject %in% si, , ,drop=FALSE]
-      
+
       return(m)
     }))
+
     
-    # 
-    for(si in subjects){
+    names(out)<-paste0(subjects)
+    
+    # browser()
+    for(si in paste0(subjects)){
       for(basei in c('y','eta')){
         for(covtypei in c('prior','upd','smooth')){
           out[[si]][[paste0(basei,covtypei,'cov')]] <- aperm(out[[si]][[paste0(basei,covtypei,'cov')]],c(2,3,1))
@@ -116,7 +94,7 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
     
   }
   
-  if(oldstyle || type !='stan'){
+  if(type !='stan'){
     
     if(type=='stan') n.TDpred <-  fit$ctstanmodel$n.TDpred else n.TDpred <- fit$ctmodelobj$n.TDpred
     if(type=='stan') TDpredNames <- fit$ctstanmodel$TDpredNames else TDpredNames <- fit$ctmodelobj$TDpredNames
@@ -208,16 +186,15 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
     }
   }
   
+  class(out) <- c('ctKalman',class(out))
   
   if(plot) {
-    ctKalmanPlot(x=out,subjects=subjects,...)
+    plot.ctKalman(x=out,subjects=subjects,...)
   } else return(out)
 }
 
 
 
-#' ctKalmanPlot
-#' 
 #' Plots Kalman filter output from ctKalman.
 #'
 #' @param x Output from \code{\link{ctKalman}}. In general it is easier to call 
@@ -250,33 +227,37 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
 #' @param legendcontrol List of arguments to the \code{\link{legend}} function.
 #' @param polygoncontrol List of arguments to the \code{\link{ctPoly}} function for filling the uncertainty region.
 #' @param polygonalpha Numeric for the opacity of the uncertainty region.
+#' @param ... not used.
 #' @return Nothing. Generates plots.
+#' @method plot ctKalman
 #' @export
 #' @examples
 #' \donttest{
 #' ### Get output from ctKalman
 #' x<-ctKalman(ctstantestfit,subjects=2)
 #' 
-#' ### Plot with ctKalmanPlot
-#' ctKalmanPlot(x, subjects=2)
+#' ### Plot with plot.ctKalman
+#' plot.ctKalman(x, subjects=2)
 #' 
 #' ###Single step procedure:
 #' ctKalman(ctstantestfit,subjects=2,plot=TRUE)
 #' }
-ctKalmanPlot<-function(x, subjects, kalmanvec=c('y','etaprior'),
+plot.ctKalman<-function(x, subjects=1, kalmanvec=c('y','ysmooth'),
   errorvec='auto', errormultiply=1.96,
   ltyvec="auto",colvec='auto', lwdvec='auto', 
   subsetindices=NULL,pchvec='auto', typevec='auto',grid=FALSE,add=FALSE, 
-  plotcontrol=list(ylab='Value',xlab='Time',xaxs='i'),
+  plotcontrol=list(ylab='Value',xlab='Time',xaxs='i',lwd=2,mgp=c(2,.8,0)),
   polygoncontrol=list(steps=20),polygonalpha=.3,
-  legend=TRUE, legendcontrol=list(x='topright',bg='white')){
+  legend=TRUE, legendcontrol=list(x='topright',bg='white',cex=.7),...){
+  
+  if(!'ctKalman' %in% class(x)) stop('not a ctKalman object')
   
   out<-x
   if(length(subjects) > 1 & colvec[1] =='auto') colvec = rainbow(length(subjects),v=.9)
   
   if(lwdvec[1] %in% 'auto') lwdvec=rep(2,length(kalmanvec))
   
-  if(is.null(plotcontrol$ylab)) plotcontrol$ylab='Value'
+  if(is.null(plotcontrol$ylab)) plotcontrol$ylab='Variable'
   if(is.null(plotcontrol$xlab)) plotcontrol$xlab='Time'
   
   if(typevec[1] %in% 'auto') typevec=c('p','l')[grepl("prior|upd|smooth|eta",kalmanvec)+1]
@@ -364,6 +345,7 @@ ctKalmanPlot<-function(x, subjects, kalmanvec=c('y','etaprior'),
         
         
         if(subjecti == subjects[1] & kveci==1 && dimi == 1 && !add) {
+  
           do.call(graphics::plot.default,plist) 
           if(grid) {
             grid()

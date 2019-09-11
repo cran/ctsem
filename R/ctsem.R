@@ -20,7 +20,7 @@ utils::globalVariables(c("invDRIFT","II","DRIFTexp","vec2diag","diag2vec",
   "TIPREDVAR","CINT","n.manifest","LAMBDA","MANIFESTMEANS","MANIFESTVAR",
   "mxFitFunctionMultigroup", "asymDIFFUSION", 'data.id',
   'filteredExpCovchol','filteredExpCovcholinv',
-  'A','M','testd','ctstantestdat',
+  'A','M','testd','ctstantestdat','smfnode',
   'T0VAR','T0MEANS', 'MANIFESTTRAITVAR',
   'TDpredNames', 'TIpredNames', 'Tpoints', 'extract', 'latentNames', 'manifestNames',
   'plot', 'points','T0TRAITEFFECT',
@@ -68,7 +68,7 @@ NULL
 
 .onAttach <- function(libname, pkgname) {
   # to show a startup message
-  packageStartupMessage("ctsem also changes in time, for an up to date manual run function ctDocs()")
+  packageStartupMessage("ctsem also changes in time, for an up to date manual run function ctDocs(), for citation info see citation('ctsem')")
 }
 
 #' Get documentation pdf for ctsem

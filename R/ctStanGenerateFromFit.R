@@ -10,7 +10,7 @@
 #' gen <- ctStanGenerateFromFit(ctstantestfit, nsamples=3,fullposterior=TRUE)
 #' plot(gen$generated$Y[,3,2],type='l') #Third random data sample, 2nd manifest var, all time points. 
 #' }
-ctStanGenerateFromFit<-function(fit,nsamples=1,fullposterior=FALSE){
+ctStanGenerateFromFit<-function(fit,nsamples=200,fullposterior=FALSE){
   if(class(fit)!='ctStanFit') stop('Not a ctStanFit object!')
   if(class(fit$stanfit)!='stanfit') {
     umat=t(fit$stanfit$rawposterior)
@@ -28,7 +28,9 @@ ctStanGenerateFromFit<-function(fit,nsamples=1,fullposterior=FALSE){
     genm <- stanmodels$ctsmgen
   }
   message('Generating data from posterior')
-  genf <- stan_reinitsf(genm,fit$standata) 
+  standata <- fit$standata
+  standata$savescores <- 0L #have to disable for data generation in same structure as original
+  genf <- stan_reinitsf(genm,standata) 
   fit$generated$Y <- array(apply(umat, 2, function(x) rstan::constrain_pars(genf,x)$Y),dim=c(nrow(fit$standata$Y),fit$ctstanmodel$n.manifest,ncol(umat)))
   fit$generated$Y <- aperm(fit$generated$Y,c(1,3,2))
   fit$generated$Y[fit$generated$Y==99999] <- NA
