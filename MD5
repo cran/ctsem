@@ -1,6 +1,6 @@
-e5b8e679944588dabd08cae858571237 *DESCRIPTION
+587132215149d767a49630c0169df72b *DESCRIPTION
 37659aecf4f25fdd0ca205977ef8c35b *NAMESPACE
-0f8440b6b439f51a3b1267a26b6ed81c *NEWS
+8848d7efbd1bc4dc34709aa19719fc3b *NEWS
 a4df97e9302cbb596cf7dace8833c507 *R/Kalman.R
 293d64a32f13548c8e78dc5fcceb7af4 *R/carefulFit.R
 389f7f4fb58cb5261d86f551e89096f2 *R/ctCI.R
@@ -17,11 +17,11 @@ e3c8e5213a69335e1d23096f13d2e1fc *R/ctGenerate.R
 f423ebd0146587cb1edad5bf95586aa2 *R/ctGenerateFromFit.R
 963a89535b5cb8ec8c4d9b8cb4639565 *R/ctIndplot.R
 8b49f1a3cd4c6e29a0d520ab09571c88 *R/ctIntervalise.R
-898de2dee7cdff9ede7fffc83c9a14c3 *R/ctJacobian.R
-54a855c43da6692b9efb43d2d1437a17 *R/ctKalman.R
+409a278eb3672ff04674ac1138d73e0d *R/ctJacobian.R
+cde1f447acc26581161c0ccc4852cd54 *R/ctKalman.R
 fd8051d05ed11c62f7063a07ca6bd0be *R/ctLabel.R
 3d84ff2b12c4c9c98ba650bb03ae55e3 *R/ctLongtowide.r
-db4f9349f5566e0c9e513470fa07cfe6 *R/ctModel.R
+037a59bcb2b87d06b832554fbd3b9f3e *R/ctModel.R
 cd63a371cc1cef830884bb08ebf7fb6f *R/ctModelFromFit.R
 fa2c67e4c53f8235849d692d4b752241 *R/ctModelLatex.R
 c55da50b3602f86b6ff7f3cf9b706db0 *R/ctMultigroupFit.R
@@ -29,11 +29,11 @@ ee4d519ef44c7373168e4e98ee038b9d *R/ctPlotArray.R
 e843dca392b3930457f5d91c70433efa *R/ctPostPredict.R
 b512d7a8fd467e4bad48f4b342ae1314 *R/ctRefineTo.R
 4f0338dccfdd4c4ad10c2888d7ddb381 *R/ctStanContinuousPars.R
-13e6b3e53b92d456656c9910b0f67d76 *R/ctStanFit.R
+4641c43e969d4f0fa4776a8f50ee934f *R/ctStanFit.R
 224de79de4151b2f7293ca659b8fc36a *R/ctStanGenerateFromFit.R
-d89ad1604db57e55bbc40bbe475c0215 *R/ctStanKalman.R
+b74b2314a5bfbbd8eb97b12cb9ff3295 *R/ctStanKalman.R
 9e8ca49c738712dab320f24cc7e1e248 *R/ctStanModel.R
-0abe391b33526387b694996a9d830403 *R/ctStanModelWriter.R
+b944fbe6ddf4b597df1c009e399a9633 *R/ctStanModelWriter.R
 f28514504011f8584ee00b7a4edc42dd *R/ctStanParMatrices.R
 777f98448cad64b3c802ce9fd5c1586a *R/ctStanPlotPost.R
 8f32b82ba5faa4f97b01505baf26e87e *R/ctStanPostPredict.R
@@ -63,8 +63,8 @@ d066cf64ff8994277156592253f0da07 *R/stan_confidenceRegion.R
 9519fcab6b4ffb61f02d3e44dd9498b3 *R/stan_postcalc.R
 6ec26fe735ecbf579b1bb6fb0809d953 *R/stan_unconstrainsamples.R
 29e1a17856937a85a0e18dcf01e49da3 *R/stanmodels.R
-b0eb01b40f15ac958868e49cb017f04a *R/stanoptimis.R
-d66610a9acc040723207d9054ce6fc3e *R/summary.ctStanFit.R
+efbbdf37a48f676ff84587b9bc424726 *R/stanoptimis.R
+1d6e46f75b8c0b663555a460eca4a166 *R/summary.ctStanFit.R
 b66e4a60538dd3f59a915be52ff76149 *R/summary.ctsemFit.R
 7e5a93dbe8a5649462be38a3b23f39da *R/tformshapes.R
 474008c6568f73bd9fa5363785dfcc06 *R/zzz.R
@@ -83,7 +83,7 @@ e6c4f5d54a6b4beae87116612a0782b5 *data/ctExample3.rda
 6381c6dad5a135fd10518b24dc89ccbd *data/longexample.rda
 efff50095c89aaaca5e85e36b39ba822 *inst/CITATION
 ad29ff348913cad912b040157079fc4b *inst/doc/ctsem.R
-14515e6847c2875ef28e8a6c8dc16f09 *inst/doc/ctsem.pdf
+b51f4bcdf9e5cff5e1fec96c069f941e *inst/doc/ctsem.pdf
 2ae1732b9015d0c09bb853175b0fb8e8 *inst/doc/ctsem.rnw
 1edc8f17e367df31dd9ac3179e60165d *man/AnomAuth.Rd
 4910dd4dbea142e0e27a749e431faafe *man/Kalman.Rd
@@ -110,7 +110,7 @@ c45b64adbb89588ff9886580824f82c7 *man/ctIndplot.Rd
 7c46963383ca5664973a3c0c6b7dad3f *man/ctIntervalise.Rd
 667516a8a448ef692c9dd0863cd87f64 *man/ctKalman.Rd
 d11c7b4e14b55591a83fc82129f90b22 *man/ctLongToWide.Rd
-a6978b8641bd4b2b0f9592e313eb00f0 *man/ctModel.Rd
+bce2b3be60c4acffb140114287f6c63b *man/ctModel.Rd
 1d78e1c72c0f06cf6dc919dfd19d67ce *man/ctModelFromFit.Rd
 593bd2f60c43df95ff7778100c2723c5 *man/ctModelLatex.Rd
 dc8f25dca8493aea57568190d613d827 *man/ctMultigroupFit.Rd
@@ -157,7 +157,7 @@ c67b007064f1bfb14141891ca38564f9 *man/stan_confidenceRegion.Rd
 9836047f87df9b6b7f3a3c274dc46f5e *man/stan_postcalc.Rd
 b0e4154d13c66e80772e6d3fcc2f015e *man/stan_reinitsf.Rd
 308263157aff4bef0ad4121a848517df *man/stan_unconstrainsamples.Rd
-67b97071e0bb08955d50543b9a796744 *man/standatact_specificsubjects.Rd
+30b88e8df170d5927788416b04bdb145 *man/standatact_specificsubjects.Rd
 9b11f9b43c2172b2bfe88fe5624250ad *man/stanoptimis.Rd
 1fd83933327e7bd92d50fff503fee943 *man/summary.ctStanFit.Rd
 8fdfb220dbe39402c2e79ae99a41b2b7 *man/summary.ctsemFit.Rd
