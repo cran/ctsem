@@ -32,16 +32,16 @@
 #' l=ctModelLatex(ctmodel,compile=FALSE, open=FALSE)
 #' cat(l)
 ctModelLatex<- function(ctmodel,matrixnames=TRUE,textsize='normalsize',folder=tempdir(),
-  filename='ctsemTex',tex=TRUE, equationonly=FALSE, compile=TRUE, open=TRUE){
+  filename=paste0('ctsemTex',as.numeric(Sys.time())),tex=TRUE, equationonly=FALSE, compile=TRUE, open=TRUE){
   
   if(class(ctmodel) == 'ctStanModel') {
     ctmodel <- c(ctmodel,listOfMatrices(ctmodel$pars)) 
     continuoustime <- ctmodel$continuoustime
-    } else {
-      if(class(ctmodel) != 'ctsemInit') stop('not a ctsem model!')
-      continuoustime <- TRUE
-    }
-
+  } else {
+    if(class(ctmodel) != 'ctsemInit') stop('not a ctsem model!')
+    continuoustime <- TRUE
+  }
+  
   if(equationonly) compile <- FALSE
   bmatrix = function(x, digits=NULL,nottext=FALSE, ...) {
     if(!is.null(x)){
@@ -73,10 +73,10 @@ ctModelLatex<- function(ctmodel,matrixnames=TRUE,textsize='normalsize',folder=te
     } else out=""
     return(out)
   }
-
+  
   
   W <- diag(1,ctmodel$n.latent)
-  if(continuoustime) diag(W) <- 'u'
+  if(continuoustime) diag(W) <- 'u-t'
   
   out <- ifelse(equationonly,"","
 \\documentclass[a4paper,landscape]{report}
@@ -85,7 +85,9 @@ ctModelLatex<- function(ctmodel,matrixnames=TRUE,textsize='normalsize',folder=te
 \\usepackage{bm}
 \\newcommand{\\vect}[1]{\\boldsymbol{\\mathbf{#1}}}
 
-\\begin{document}")
+
+\\begin{document}
+\\thispagestyle{empty}")
   out <- paste0(out, "
 \\setcounter{MaxMatrixCols}{200}
  \\begin{",textsize,"}
@@ -130,7 +132,10 @@ ctModelLatex<- function(ctmodel,matrixnames=TRUE,textsize='normalsize',folder=te
         \\underbrace{
           ",bmatrix(ctmodel$MANIFESTMEANS)," 
         ",ifelse(!matrixnames,"}_{{", "}_{\\underbrace{"),"\\vect{\\tau}}",ifelse(!matrixnames,"}","_\\textrm{MANIFESTMEANS}}")," + 
-        \\underbrace{
+              \\underbrace{
+                ",bmatrix(ctmodel$MANIFESTVAR),"  
+              ",ifelse(!matrixnames,"}_{{", "}_{\\underbrace{"),"\\vect{\\Theta}}",ifelse(!matrixnames,"}","_\\textrm{MANIFESTVAR}}"),"
+              \\underbrace{
           ",bmatrix(matrix(paste0('\\epsilon_{',1:ctmodel$n.manifest,'}')))," 
           (t)}_{\\vect{\\epsilon}(t)} \\\\ \\\\
           &\\underbrace{
@@ -138,18 +143,14 @@ ctModelLatex<- function(ctmodel,matrixnames=TRUE,textsize='normalsize',folder=te
             (t)}_{\\vect{\\epsilon}(t)} \\sim  \\mathrm{N} \\left(
               ",bmatrix(matrix(0,ctmodel$n.manifest,1)),"
               ,
-              \\underbrace{
-                ",bmatrix(ctmodel$MANIFESTVAR),"  
-              ",ifelse(!matrixnames,"}_{{", "}_{\\underbrace{"),"\\vect{\\Theta}}",ifelse(!matrixnames,"}","_\\textrm{MANIFESTVAR}}")," \\right) ", 
-    ifelse(is.null(ctmodel$PARS),"", paste0("\\\\ \\\\
-              &\\underbrace{",bmatrix(ctmodel$PARS),"}",ifelse(!matrixnames,"}","_\\textrm{PARS}"),"")),"
+                ",bmatrix(diag(1,ctmodel$n.manifest))," \\right) 
       \\end{align*}
       \\end{",textsize,"}
       ")
   
   if(!equationonly) out <- paste0(out, "\\end{document}")
   
-
+  
   
   if(tex) {
     oldwd <- getwd()
@@ -157,8 +158,18 @@ ctModelLatex<- function(ctmodel,matrixnames=TRUE,textsize='normalsize',folder=te
     on.exit(setwd(oldwd))
     write(x = out,file = paste0(filename,'.tex'))
     if(compile){
-    try(tools::texi2pdf(file=paste0(filename,'.tex'),clean=TRUE))
-    if(open) try(openPDF(paste0(filename,'.pdf')))
+      hastex <- !Sys.which('pdflatex') %in% ''
+      a=try(tools::texi2pdf(file=paste0(filename,'.tex'),quiet=FALSE, clean=TRUE))
+      if('try-error' %in% class(a) && !hastex) {
+        open <- FALSE
+        message('Tex compiler not found -- you could install the tinytex package using:\ninstall.packages("tinytex")\ntinytex::install_tinytex()')
+        # dotiny <- readline('Y/N?')
+        # if(dotiny %in% c('Y','y')){
+        #   utils::install.packages('tinytex')
+        #   if(requireNamespace('tinytex',quietly=TRUE)) tinytex::install_tinytex()
+        # }
+      }
+      if(interactive() && open) try(openPDF(paste0(filename,'.pdf')))
     }
     
   }

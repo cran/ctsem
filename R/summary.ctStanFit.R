@@ -39,6 +39,18 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,prio
     if('98%' %in% colnames(s$summary)) colnames(s$summary)[colnames(s$summary)=='98%'] <- '97.5%'
     e <- extract(object) 
   }
+
+ 
+  #cov of residuals
+  k=ctStanKalman(object,collapsefunc = mean,cores=1)
+  obscov <- cov(object$standata$Y,use='pairwise.complete.obs')
+  idobscov <- diag(1/sqrt(diag(obscov)),ncol(obscov))
+
+  out$residCovStd <- round(idobscov %*% cov(matrix(k$errprior,ncol=ncol(obscov)),use='pairwise.complete.obs') %*% idobscov ,3)
+  dimnames(out$residCovStd) <- list(object$ctstanmodel$manifestNames,object$ctstanmodel$manifestNames)
+  out$resiCovStdNote <- 'Standardised covariance of residuals'
+  
+  
   
   if(class(object$stanfit)!='stanfit')  e <- extract(object) 
   
@@ -144,13 +156,16 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,prio
       #   note='Posterior std dev. of the raw parameter population distribution covariance matrix:',
       #   rawpopcov_sd=round(rawpopcov_sd,digits)
       # )
-      out <-list()
+      # out <-list()
       
       out$rawpopcorr = round(rawpopcorrout,digits)
     }
   }
   
-  if(priorcheck & object$standata$nopriors==0) out = c(out,priorcheckreport(object,...))
+  if(priorcheck & object$standata$nopriors==0) {
+    priorcheckres <- priorcheckreport(object,...)
+    if(nrow(priorcheckres$priorcheck) > 0) out = c(out,priorcheckres)
+  }
   
   if(object$ctstanmodel$n.TIpred > 0) {
     
@@ -168,6 +183,8 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,prio
     z = tipreds[,'mean'] / tipreds[,'sd'] 
     out$tipreds= round(cbind(tipreds,z),digits) #[order(abs(z)),]
   }
+  
+
   
   if(parmatrices){
     
@@ -230,6 +247,7 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,prio
     }
     if(class(parmatlists)=='try-error') out$parmatNote = 'Could not calculate parameter matrices'
   }
+    
   
   
   if(class(object$stanfit)=='stanfit'){

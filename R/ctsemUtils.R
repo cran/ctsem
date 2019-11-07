@@ -19,6 +19,55 @@ naf <-function(x){
   return(x)
 }
 
+
+
+meltkalman <- function(l){
+if(1==99) Row <- Col <- NULL
+  Time <- data.table(l$time,Obs=1:length(l$time))
+  Subject <- data.table(Subject=factor(l$id),Obs=seq_along(l$time))
+  l$id <- NULL
+  l$time <- NULL
+  TimeSubject <- merge(Time,Subject)
+  
+  dout <- NULL
+  i=0
+  while(i < length(l)){
+    i=i+1
+    
+    while(length(dim(l[[i]])) < 3){
+      dn = c(dimnames(l[[i]]),list(NULL))
+      l[[i]] <- array(l[[i]],dim = c(dim(l[[i]]),1))
+      dimnames(l[[i]]) <- dn
+      
+    }
+      x <- melt(as.data.table(l[[i]],keep.rownames = TRUE,na.rm = FALSE),measure.vars = 'value')
+      x$Obs <- as.integer(x$Obs)
+      x <- merge(cbind(x,Element = names(l)[i]),TimeSubject,by='Obs')
+      if(grepl('(prior)|(upd)|(smooth)',names(l)[i]) &!grepl('(cov$)|(^err)',names(l)[i])){
+        # browser()
+        xsd<-melt(as.data.table(l[[ paste0(names(l)[i],'cov') ]],
+          keep.rownames = TRUE,na.rm = FALSE),measure.vars='value')
+        xsd <-subset(xsd,Row==Col)
+        xsd$value <- sqrt(xsd$value)
+        xsd$Obs <- as.integer(xsd$Obs)
+        setnames(xsd,'value','sd')
+        x<-merge(x,xsd,by=colnames(xsd)[colnames(xsd) %in% colnames(x)]) #data.table(sd=(sqrt(xsd$value))))
+      }
+      if(is.null(dout)) dout <- x else dout <- rbind(dout,x,fill=TRUE)
+  }
+  
+  # 
+  # ggplot(data=subset(dout,Element %in% 'ysmooth' & Sample == 1),aes(x=Time,y=value,colour=Subject))+
+  # # stat_quantile(quantiles=seq(.01,.99,.01),
+  # #   aes(alpha=1-(abs(.5-(..quantile..)))),method='rqss')+
+  #   geom_line()+
+  #   geom_ribbon(aes(ymin=value-sd,ymax=value+sd,fill=Subject),alpha=.2,linetype=0)+
+  #   theme_minimal()+
+  #   facet_wrap(vars(Row))
+  class(dout) <- c('ctKalmanDF',class(dout))
+return(dout)
+}
+
 gridplot <- function(m, maxdim=c(3,3),...){
   d=n2mfrow(dim(m)[length(dim(m))])
   d[d>maxdim] <-maxdim[d>maxdim]
@@ -196,9 +245,10 @@ ctDensity<-function(x,bw='auto',plot=FALSE,...){
 
 
 
-ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,ylab='Density',
-  xlab='Par. Value',colvec='auto',ltyvec='auto',probs=c(.05,.95),
-  legend=FALSE, legendargs=list(),...){
+ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,
+  grouplabels=names(x),
+  ylab='Density',
+  xlab='Par. Value',probs=c(.05,.95),main='',colvec=NA){
   
   if(all(xlimsindex=='all')) xlimsindex <- 1:length(x)
 
@@ -214,42 +264,70 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,ylab='Density
   sd=sd(xlims)
   xlims[1] = xlims[1] - sd/2
   xlims[2] = xlims[2] + sd/2
-  
-  bw=abs(max( 
-    min( (sd)/length(x[[1]])^.4,sd/50),
-    1e-5)) * smoothness
-  
-  if(all(colvec=='auto')) colvec=1:length(x)
-  if(all(ltyvec=='auto')) ltyvec=1:length(x)
+
+  bw=sapply(x,function(d) bw.SJ(na.omit(c(d))))
+  bw = mean(bw) + ifelse(length(bw) > 1,sd(bw),0)
 
   denslist<-lapply(1:length(x),function(xi) {
-    d=stats::density(x[[xi]],bw=bw,n=5000,from=xlims[1]-sd/2,to=xlims[2]+sd/2,na.rm=TRUE)
+    d=stats::density(x[[xi]],bw=bw,n=5000,from=xlims[1],to=xlims[2],na.rm=TRUE)
     # d$y=d$y/ sum(d$y)/range(d$x)[2]*length(d$y)
     return(d)
   })
-  # browser()
-  xlims=range(sapply(denslist,function(d) d$x[d$y> .005*max(d$y)]))
-  ylims=c(0,max(unlist(lapply(denslist,function(li) max(li$y))))*1.1) * ifelse(legend[1]!=FALSE, 1.2,1)
+
+  xlims=range(sapply(denslist,function(d) d$x[d$y> (.05*max(d$y))]))
+  xlims <- xlims +c(-1,1)*sd(xlims)
+  ylims=c(0,max(unlist(lapply(denslist,function(li) max(li$y))))*1.1)
+
+  denslist <- lapply(denslist,function(d){
+    o<-list()
+    o$y <- d$y[between(d$x,xlims[1],xlims[2]) & d$y > .001*max(d$y)]
+    o$x <- d$x[between(d$x,xlims[1],xlims[2])& d$y > .001*max(d$y)]
+    return(o)
+  })
   
   if(plot) {
-    plot(denslist[[1]]$x, denslist[[1]]$y,type='l', xlim=xlims,ylim=ylims,ylab=ylab,xlab=xlab,col=colvec[1],lty=ltyvec[1],...)
+   if(is.null(names(x))) names(x) <- paste0('var ', 1:length(x))
+    
+    pd <- data.table(Source=names(x)[1],denslist[[1]]$x,denslist[[1]]$y)
     if(length(denslist)>1){
-      for(ci in 2:length(denslist)){
-        points(denslist[[ci]]$x, denslist[[ci]]$y,type='l', col=colvec[ci],lty=ltyvec[ci],...)
+      for(di in 2:length(denslist)){
+      pd <- rbind(pd,data.table(Source=names(x)[di],denslist[[di]]$x,denslist[[di]]$y))
       }
     }
-    if(all(legend!=FALSE)) {
-      if(is.null(legendargs$col)) legendargs$col = colvec
-      if(is.null(legendargs$text.col)) legendargs$text.col = colvec
-      if(is.null(legendargs$lty)) legendargs$lty = ltyvec
-      if(is.null(legendargs$x)) legendargs$x='topright'
-      if(is.null(legendargs$bty)) legendargs$bty='n'
-      legendargs$legend = legend
-      do.call(graphics::legend,legendargs)
-    }
+    names(pd)[3] <- 'y'
+    names(pd)[2] <- 'x'
+    # pd$Source <- factor(pd$Source)
+    
+    if(1==99) x <- y <- Source <- NULL
+    # plot(denslist[[1]]$x, denslist[[1]]$y,type='l', xlim=xlims,ylim=ylims,ylab=ylab,xlab=xlab,col=colvec[1],lty=ltyvec[1],...)
+
+    plots<- ggplot(pd,aes(x=x,y=y,group=Source,colour=Source)) +
+      geom_line() +
+      coord_cartesian(xlim = xlims, ylim = ylims) +
+      theme_minimal()+
+      labs(y=ylab,x=xlab)+
+      theme(legend.title = element_blank())
+    if(!all(is.na(colvec))) plots <- plots + scale_colour_manual(values=setNames(colvec, names(x)))
+
+  #     
+  #   if(length(denslist)>1){
+  #     for(ci in 2:length(denslist)){
+  #       points(denslist[[ci]]$x, denslist[[ci]]$y,type='l', col=colvec[ci],lty=ltyvec[ci],...)
+  #     }
+  #   }
+  #   if(all(legend!=FALSE)) {
+  #     if(is.null(legendargs$col)) legendargs$col = colvec
+  #     if(is.null(legendargs$text.col)) legendargs$text.col = colvec
+  #     if(is.null(legendargs$lty)) legendargs$lty = ltyvec
+  #     if(is.null(legendargs$x)) legendargs$x='topright'
+  #     if(is.null(legendargs$bty)) legendargs$bty='n'
+  #     legendargs$legend = legend
+  #     do.call(graphics::legend,legendargs)
+  #   }
+    
   }
   
-  return(list(density=denslist,xlim=xlims,ylim=ylims))
+  if(plot) return(plots) else return(list(density=denslist,xlim=xlims,ylim=ylims))
 }
 
 

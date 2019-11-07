@@ -1,8 +1,8 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 3.0.4
-Date: 2019-9-12
+Version: 3.0.8
+Date: 2019-11-04
 Authors@R: c(person("Charles", "Driver", role =
     c("aut","cre","cph"),email="driver@mpib-berlin.mpg.de"),
     person("Manuel", "Voelkle", role = c("aut","cph")),
@@ -29,7 +29,7 @@ URL: https://github.com/cdriveraus/ctsem
 Imports: rstan (>= 2.19.0), rstantools (>= 1.5.0), plyr, tools,
         data.table, Matrix, datasets, stats, graphics, grDevices,
         parallel, MASS, methods, utils, ggplot2, mvtnorm, mize,
-        pkgbuild, cOde, Deriv
+        pkgbuild, cOde, Deriv, quantreg
 Encoding: UTF-8
 LazyData: true
 ByteCompile: true
@@ -37,14 +37,14 @@ LinkingTo: StanHeaders (>= 2.18.0), rstan (>= 2.18.1), BH (>=
         1.66.0-1), Rcpp (>= 0.12.16), RcppEigen (>= 0.3.3.4.0)
 SystemRequirements: GNU make
 NeedsCompilation: yes
-Suggests: knitr, testthat, devtools, DEoptim, GGally, shiny
+Suggests: knitr, testthat, devtools, DEoptim, GGally, shiny, gridExtra
 VignetteBuilder: knitr
 RoxygenNote: 6.1.1
-Packaged: 2019-09-12 15:31:52 UTC; Driver
+Packaged: 2019-11-07 17:18:23 UTC; driver
 Author: Charles Driver [aut, cre, cph],
   Manuel Voelkle [aut, cph],
   Han Oud [aut, cph],
   Trustees of Columbia University [cph]
 Maintainer: Charles Driver <driver@mpib-berlin.mpg.de>
 Repository: CRAN
-Date/Publication: 2019-09-12 22:40:15 UTC
+Date/Publication: 2019-11-07 23:00:12 UTC

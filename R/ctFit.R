@@ -145,7 +145,7 @@
 #' @import OpenMx
 #' @export
 
-ctFit  <- function(dat, ctmodelobj, dataform='wide',
+ctFit  <- function(dat, ctmodelobj, dataform='auto',
   objective='auto', 
   stationary=c('T0TRAITEFFECT','T0TIPREDEFFECT'), 
   optimizer='CSOLNP', 
@@ -158,18 +158,23 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
   omxStartValues=NULL, transformedParams=TRUE,
   datawide=NA){
   
-  if(length(datawide) > 1 || !is.na(datawide)) {
+  args <- match.call()
+  
+  if(!is.null(args$datawide)) {
     warning('ctsem now uses the dat argument instead of the datawide argument, and the form (wide or long) may be specified via the dataform argument.')
     if(class(try(length(dat),silent = TRUE)) == 'try-error') {
       message ('dat not specified, using datawide')
       dat <- datawide
     }
   }
+  
+  
+  
   # transformedParams<-TRUE
   largeAlgebras<-TRUE
   if(nofit) fit <- FALSE
   if(fit == FALSE || !is.null(omxStartValues)) carefulFit <- FALSE
-
+  
   if(is.null(stationary)) stationary <- c('')
   if(all(stationary %in% 'all')) stationary<-c('T0VAR','T0MEANS','T0TIPREDEFFECT','T0TRAITEFFECT')
   
@@ -185,14 +190,24 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
   TDpredNames<-ctmodelobj$TDpredNames
   TIpredNames<-ctmodelobj$TIpredNames
   
-      
   
-  if(dataform != 'wide' & dataform !='long') stop('dataform must be either "wide" or "long"!')
+  if(!dataform %in% c('auto','wide','long')) stop('dataform must be "auto", "wide", or "long"!')
+  if(dataform %in% 'auto'){
+    if(all(is.na(match(paste0(manifestNames, "_T0"), colnames(dat))))){
+      message('long format data detected')
+      dataform <- 'long' 
+    } else {
+      message('wide format data detected')
+      dataform <- 'wide'
+    }
+  }
+  
+  
   if(dataform == 'long'){
     idcol='id'
     obsTpoints=max(unlist(lapply(unique(dat[,idcol]),function(x) 
       length(dat[dat[,idcol]==x, idcol]) )))
-
+    
     if(Tpoints != obsTpoints) stop(
       paste0('Tpoints in ctmodelobj = ',Tpoints,', not equal to ', obsTpoints, ', the maximum number of rows of any subject in dat'))
     
@@ -205,7 +220,7 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
       TDpredNames=TDpredNames,TIpredNames = TIpredNames))
     
     if(n.TDpred > 0){
-    if(any(is.na(dat[,paste0(TDpredNames)])))  message ('Missing TD predictors found - replacing NAs with zeroes')
+      if(any(is.na(dat[,paste0(TDpredNames)])))  message ('Missing TD predictors found - replacing NAs with zeroes')
       datawide[,paste0(TDpredNames,'_T',rep(0:(Tpoints-1),each=n.TDpred))][is.na(datawide[,paste0(TDpredNames,'_T',rep(0:(Tpoints-1),each=n.TDpred))])] <- 0
     }
   }
@@ -273,7 +288,7 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
       ctmodelobj$TDPREDMEANS[,]=apply(datawide[, paste0(TDpredNames, '_T', rep(0:(Tpoints-1), each=n.TDpred))],2,mean)
       message('No missing time dependent predictors - TDPREDVAR and TDPREDMEANS fixed to observed moments for speed')
     }
-
+    
     #check for 0 variance predictors for random predictors implementation (not needed for Kalman because fixed predictors)
     ####0 variance predictor fix
     varCheck<-try(any(diag(stats::cov(datawide[, paste0(TDpredNames, '_T', rep(0:(Tpoints-1), each=n.TDpred))],
@@ -1414,12 +1429,12 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
   
   
   
-
+  
   model  <-  OpenMx::mxModel("ctsem", #begin specifying the mxModel
     # type="RAM",
     # latentVars = paste0(rep(latentNames, Tpoints), "_T", rep(0:(Tpoints-1), each=n.latent)),
-      # manifestVars = FILTERnamesx, 
-      # latentVars = FILTERnamesy[!(FILTERnamesy %in% FILTERnamesx)],
+    # manifestVars = FILTERnamesx, 
+    # latentVars = FILTERnamesy[!(FILTERnamesy %in% FILTERnamesx)],
     mxData(observed = datawide, type = "raw"), 
     
     mxMatrix(type = "Iden", nrow = n.latent, ncol = n.latent, free = FALSE, name = "II"), #identity matrix
@@ -2185,9 +2200,9 @@ ctFit  <- function(dat, ctmodelobj, dataform='wide',
       ubound= tubound)
     
     model<-mxModel(
-  model, 
-  thresh,
-  mxData(observed = dat, type = "raw"))
+      model, 
+      thresh,
+      mxData(observed = dat, type = "raw"))
     
   }
   

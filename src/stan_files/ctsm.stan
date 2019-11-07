@@ -71,10 +71,11 @@ functions{
   matrix makesym(matrix mat, int verbose, int pd){
     matrix[rows(mat),cols(mat)] out;
     for(coli in 1:cols(mat)){
-      if(pd ==1){ // && mat[coli,coli] < 1e-5
+      out[coli,coli] = mat[coli,coli]; 
+      if(pd ==1 && out[coli,coli] < 1e-5){
         //if(verbose > 0) print("diagonal too low (",mat[coli,coli],") during makesym row ", coli, " col ", coli);
-        out[coli,coli] = mat[coli,coli] + 1e-5;
-      } else out[coli,coli] = mat[coli,coli]; 
+        out[coli,coli] = 1e-5 + fmin(0.0,out[coli,coli]);
+      }  
       for(rowi in coli:rows(mat)){
         if(rowi > coli) {
           out[rowi,coli] = mat[rowi,coli]; //(mat[coli,rowi] + ) *.5;
@@ -251,6 +252,8 @@ parameters {
 transformed parameters{
   vector[nindvarying] rawpopsd; //population level std dev
   matrix[nindvarying, nindvarying] rawpopcovsqrt; 
+  matrix[nindvarying,nindvarying] rawpopcorr;
+  matrix[nindvarying,nindvarying] rawpopcov;
 
   real ll = 0;
   vector[nmanifest+nmanifest+ (savescores ? nmanifest*2+nlatent*2 : 0)] kalman[savescores ? ndatapoints : 0];
@@ -334,8 +337,9 @@ matrix[nlatent, nlatent] pop_DIFFUSIONcov;
         }
       }
     }
- rawpopcovsqrt = cholesky_decompose(makesym(tcrossprod(diag_pre_multiply(rawpopsd, 
-      constraincorsqrt(rawpopcovsqrt))),verbose,1)); 
+    rawpopcorr = tcrossprod( constraincorsqrt(rawpopcovsqrt));
+    rawpopcov = makesym(quad_form_diag(rawpopcorr, rawpopsd),verbose,1);
+    rawpopcovsqrt = cholesky_decompose(rawpopcov); 
   }//end indvarying par setup
 
   {
@@ -477,46 +481,43 @@ matrix[nlatent, nlatent] sDIFFUSIONcov;
     sDIFFUSIONcov = sdcovsqrt2cov(sDIFFUSION,nldynamics);
   }
   if(subi <= (asymDIFFUSIONsubindex ? nsubjects : 0)) {
-      if(ndiffusion < nlatent) sasymDIFFUSION = to_matrix(rep_vector(0,nlatent * nlatent),nlatent,nlatent);
+    if(ndiffusion < nlatent) sasymDIFFUSION = to_matrix(rep_vector(0,nlatent * nlatent),nlatent,nlatent);
 
-      if(continuoustime==1) sasymDIFFUSION[ derrind, derrind] = to_matrix( 
-      -kronsum(sDRIFT[ derrind, derrind ]) \  to_vector( 
-           sDIFFUSIONcov[ derrind, derrind ]), ndiffusion,ndiffusion);
+    if(continuoustime==1) sasymDIFFUSION[ derrind, derrind] = to_matrix( 
+    -kronsum(sDRIFT[ derrind, derrind ]) \  to_vector( 
+         sDIFFUSIONcov[ derrind, derrind ]), ndiffusion,ndiffusion);
 
-      if(continuoustime==0) sasymDIFFUSION[ derrind, derrind ] = to_matrix( (IIlatent2 - 
-        sqkron_prod(sDRIFT[ derrind, derrind ], sDRIFT[ derrind, derrind ])) \  to_vector(sDIFFUSIONcov[ derrind, derrind ]), ndiffusion, ndiffusion);
-    } //end asymdiffusion loops
+    if(continuoustime==0) sasymDIFFUSION[ derrind, derrind ] = to_matrix( (IIlatent2 - 
+      sqkron_prod(sDRIFT[ derrind, derrind ], sDRIFT[ derrind, derrind ])) \  to_vector(sDIFFUSIONcov[ derrind, derrind ]), ndiffusion, ndiffusion);
+  } //end asymdiffusion loops
 
-      if(subi <= (MANIFESTVARsubindex ? nsubjects : 0)) {
-         for(ri in 1:nmanifest) sMANIFESTVAR[ri,ri] = square(sMANIFESTVAR[ri,ri]);
-      }
-         
-    if(subi <= (T0VARsubindex ? nsubjects : 0)) {
-    if(intoverpop){
-      sT0VAR[intoverpopindvaryingindex, intoverpopindvaryingindex] = rawpopcovsqrt;
-    }
+ // if(subi <= (MANIFESTVARsubindex ? nsubjects : 0)) {
+   //  for(ri in 1:nmanifest) sMANIFESTVAR[ri,ri] = square(sMANIFESTVAR[ri,ri]);
+  //}
+     if(subi <= (T0VARsubindex ? nsubjects : 0)) {
+      if(intoverpop) sT0VAR[intoverpopindvaryingindex, intoverpopindvaryingindex] = rawpopcovsqrt;
       sT0VAR = makesym(sdcovsqrt2cov(sT0VAR,nldynamics),verbose,1);
-    if(intoverpop){ //adjust cov matrix for transforms
-      for(ri in 1:size(matsetup)){
-        if(matsetup[ri,7]==1){ //if t0means
-          if(matsetup[ri,5]) { //and indvarying
-            sT0VAR[matsetup[ri,1], ] = sT0VAR[matsetup[ri,1], ] * matvalues[ri,2] * matvalues[ri,3]* matvalues[ri,5]; //multiplier meanscale sdscale
-            sT0VAR[, matsetup[ri,1] ] = sT0VAR[, matsetup[ri,1] ] * matvalues[ri,2] * matvalues[ri,3]* matvalues[ri,5]; //multiplier meanscale sdscale
-          }
-        }
-      }
-    }
       if(nt0varstationary > 0) {
         for(ri in 1:nt0varstationary){ 
           sT0VAR[t0varstationary[ri,1],t0varstationary[ri,2] ] =  sasymDIFFUSION[t0varstationary[ri,1],t0varstationary[ri,2] ];
         }
       }
+      if(intoverpop){ //adjust cov matrix for transforms
+        for(ri in 1:size(matsetup)){
+          if(matsetup[ri,7]==1){ //if t0means
+            if(matsetup[ri,5]) { //and indvarying
+              sT0VAR[matsetup[ri,1], ] = sT0VAR[matsetup[ri,1], ] * matvalues[ri,2] * matvalues[ri,3]* matvalues[ri,5]; //multiplier meanscale sdscale
+              sT0VAR[, matsetup[ri,1] ] = sT0VAR[, matsetup[ri,1] ] * matvalues[ri,2] * matvalues[ri,3]* matvalues[ri,5]; //multiplier meanscale sdscale
+            }
+          }
+        }
+      }
     }
     
-      if(subi <= (asymCINTsubindex ? nsubjects : 0)){
-        if(continuoustime==1) sasymCINT =  -sDRIFT[1:nlatent,1:nlatent] \ sCINT[ ,1 ];
-        if(continuoustime==0) sasymCINT =  (IIlatent - sDRIFT[1:nlatent,1:nlatent]) \ sCINT[,1 ];
-      }
+    if(subi <= (asymCINTsubindex ? nsubjects : 0)){
+      if(continuoustime==1) sasymCINT =  -sDRIFT[1:nlatent,1:nlatent] \ sCINT[ ,1 ];
+      if(continuoustime==0) sasymCINT =  (IIlatent - sDRIFT[1:nlatent,1:nlatent]) \ sCINT[,1 ];
+    }
     
     if(nt0meansstationary > 0){
       if(subi <= (T0MEANSsubindex ? nsubjects : 0)) {
@@ -631,11 +632,11 @@ if(verbose > 1) print ("below t0 row ", rowi);
   } 
    
       if(statei > 0) {
-        sJAx[sJAxfinite,statei] =  (sDRIFT[sJAxfinite, ] * state + append_row(sCINT[,1],rep_vector(0,nlatentpop-nlatent)))[sJAxfinite]; //compute new change
+        sJAx[sJAxfinite,statei] =  sDRIFT[sJAxfinite, ] * state + append_row(sCINT[,1],rep_vector(0,nlatentpop-nlatent))[sJAxfinite]; //compute new change
          if(verbose>1) print("sJAx ",sJAx);
       }
       if(statei== 0 && size(sJAxfinite) ) { //only need these calcs if there are finite differences to do -- otherwise loop just performs system calcs.
-        base[sJAxfinite] = (sDRIFT[sJAxfinite, ] * state + append_row(sCINT[,1],rep_vector(0,nlatentpop-nlatent)))[sJAxfinite];
+        base[sJAxfinite] = sDRIFT[sJAxfinite, ] * state + append_row(sCINT[,1],rep_vector(0,nlatentpop-nlatent))[sJAxfinite];
         if(verbose>1) print("base = ",base,"    sjaxinit= ",sJAx);
         for(fi in sJAxfinite){
         //print("fi!!!!! ",fi);
@@ -729,7 +730,7 @@ if(verbose > 1) print ("below t0 row ", rowi);
     ;
     
       state = sT0MEANS[,1];
-      etacov= quad_form(sT0VAR, sJ0');
+      etacov = quad_form(sT0VAR, sJ0');
     if(verbose > 1) print("rowi = ",rowi,"  state = ",sT0MEANS);
     if(verbose > 1) print("sJ0 = ",sJ0);
     if(verbose > 1) print("etacov = ",etacov);
@@ -823,8 +824,9 @@ if(verbose > 1) print ("below t0 row ", rowi);
           if(verbose > 1) print ("sMANIFESTVAR[o,o] = ",sMANIFESTVAR[o,o])
           if(verbose > 1) print ("etacov[1:nlatent,1:nlatent] = ",etacov[1:nlatent,1:nlatent])
           if(verbose > 1) print ("sJy[o,]' = ",sJy[o,]');
-          ycov[o,o] = quad_form(etacov, sJy[o,]') + sMANIFESTVAR[o,o];
+          ycov[o,o] = quad_form(etacov, sJy[o,]'); // + sMANIFESTVAR[o,o]; shifted measurement error down
           for(wi in 1:nmanifest){ 
+            if(Y[rowi,wi] != 99999) ycov[wi,wi] += square(sMANIFESTVAR[wi,wi]);
             if(manifesttype[wi]==1 && Y[rowi,wi] != 99999) ycov[wi,wi] += fabs((yprior[wi] - 1) .* (yprior[wi]));
             if(manifesttype[wi]==2 && Y[rowi,wi] != 99999) ycov[wi,wi] += square(fabs((yprior[wi] - round(yprior[wi])))); 
           }
@@ -833,7 +835,7 @@ if(verbose > 1) print ("below t0 row ", rowi);
         if(intoverstates==0) { //sampled states
           if(ncont_y[rowi] > 0) {
             yprior[o0] = sMANIFESTMEANS[o0,1] + sJy[o0,] * state;
-            ypriorcov_sqrt[o0,o0] = sqrt(sMANIFESTVAR[o0,o0]);
+            ypriorcov_sqrt[o0,o0] = sMANIFESTVAR[o0,o0];
           }
           if(nbinary_y[rowi] > 0) yprior[o1] = to_vector(inv_logit(to_array_1d(sMANIFESTMEANS[o1,1] +sLAMBDA[o1,] * state[1:nlatent])));
         }
@@ -974,8 +976,6 @@ model{
 generated quantities{
   vector[nparams] popmeans;
   vector[nparams] popsd = rep_vector(0,nparams);
-  matrix[nindvarying,nindvarying] rawpopcov = tcrossprod(rawpopcovsqrt);
-  matrix[nindvarying,nindvarying] rawpopcorr = quad_form_diag(rawpopcov,inv_sqrt(diagonal(rawpopcov)));
   matrix[nparams,ntipred] linearTIPREDEFFECT;
 
 

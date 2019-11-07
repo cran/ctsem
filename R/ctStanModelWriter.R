@@ -1,3 +1,40 @@
+ctModel0DRIFT <- function(ctm,continuoustime){
+      repval <- ifelse(continuoustime,-1e-50, 1-1e-10)
+    checkval <- ifelse(continuoustime,0, 1)
+  if(any(ctm$pars$value %in% checkval & ctm$pars$matrix %in% 'DRIFT' & ctm$pars$row == ctm$pars$col)) {
+    message('Setting DRIFT diagonals of ',checkval,' to approximate ', checkval,' of ',repval)
+  ctm$pars$value[ctm$pars$value %in% checkval & ctm$pars$matrix %in% 'DRIFT' & ctm$pars$row == ctm$pars$col] <- repval
+  }
+  return(ctm)
+}
+
+
+ctModelStatesAndPARS <- function(ctm){
+  #detect state refs
+  ln <- ctm$latentNames
+  
+  for(li in c(1:length(ln))){
+    for(ri in grep(paste0('\\b(',ln[li],')\\b'),ctm$pars$param)){
+      ctm$pars$param[ri] <- gsub(paste0('\\b(',ln[li],')\\b'),paste0('state[',li,']'),ctm$pars$param[ri])
+    }
+  }
+  
+  #expand pars
+  ln <- ctm$pars$param[ctm$pars$matrix %in% 'PARS' & !is.na(ctm$pars$param)] #get extra pars
+  
+  for(li in seq_along(ln)){
+    for(ri in grep(paste0('\\b(',ln[li],')\\b'),ctm$pars$param)){ #wherever there are extra pars
+      if(!ctm$pars$matrix[ri] %in% 'PARS'){ #except in PARS itself
+        parmatch <- which(ctm$pars$param %in% ln[li])
+        ctm$pars$param[ri] <- gsub(paste0('\\b(',ln[li],')\\b'), #replace with PARS reference...
+          paste0('PARS[',ctm$pars$row[parmatch],',',ctm$pars$col[parmatch],']'),ctm$pars$param[ri])
+      }
+    }
+  }
+  
+  return(ctm)
+}
+
 ctModelTransformsToNum<-function(ctm){
   
   
@@ -80,7 +117,7 @@ ctModelTransformsToNum<-function(ctm){
           max_iter=500,abs_tol=1e-5,rel_tol=1e-6,
           method='BFGS'))
       }
-
+      
       formula.types$offset[i] = fit$par[2] #round(coef(fit)[["offset"]])
       formula.types$multiplier[i] = fit$par[1] #round(coef(fit)[["multiplier"]])
       if(!is.na(formula.types$meanscale[i])) {
@@ -105,7 +142,7 @@ ctModelTransformsToNum<-function(ctm){
   eqs <- ctm$pars$transform[newrows]
   uniqueeqs <- unique(eqs)
   
-    
+  
   l=lapply(uniqueeqs,fit.eqs)
   eqmatch <- match(eqs, uniqueeqs)
   df=data.frame(do.call(rbind,l))
@@ -119,14 +156,14 @@ ctModelTransformsToNum<-function(ctm){
   rownames(df) <- newrows
   
   ctm$pars$transform <- NULL
-   # nctspec <- cbind(ctm$pars[newrows,,drop=FALSE],df)
-   # nctspec <- 
-     nctspec <- merge(ctm$pars,df,by=0,all=TRUE,no.dups = FALSE)
-     nctspec <- nctspec[order(as.numeric(nctspec$Row.names)),]
-     nctspec <- nctspec[,c('matrix','row','col','param','value','transform','multiplier',
-     'offset','meanscale','inneroffset','indvarying','sdscale',
-     colnames(ctm$pars)[grep('_effect',colnames(ctm$pars),fixed=TRUE)]) ]
-   ctm$pars <- nctspec
+  # nctspec <- cbind(ctm$pars[newrows,,drop=FALSE],df)
+  # nctspec <- 
+  nctspec <- merge(ctm$pars,df,by=0,all=TRUE,no.dups = FALSE)
+  nctspec <- nctspec[order(as.numeric(nctspec$Row.names)),]
+  nctspec <- nctspec[,c('matrix','row','col','param','value','transform','multiplier',
+    'offset','meanscale','inneroffset','indvarying','sdscale',
+    colnames(ctm$pars)[grep('_effect',colnames(ctm$pars),fixed=TRUE)]) ]
+  ctm$pars <- nctspec
   return(ctm)
   
 }
@@ -140,7 +177,7 @@ ctStanModelIntOverPop <- function(m){
     m$pars=ctStanModelCleanctspec(m$pars)
     
     t0mvaryingsimple <- m$pars$row[m$pars$indvarying & m$pars$matrix %in% 'T0MEANS' & m$pars$transform==0] #which t0means are indvarying and not transformed
-    t0mvaryingnames <- m$pars$param[m$pars$indvarying & m$pars$matrix %in% 'T0MEANS'& m$pars$transform==0] #which t0means are indvarying
+    t0mvaryingnames <- m$pars$param[m$pars$indvarying & m$pars$matrix %in% 'T0MEANS'& m$pars$transform==0] #names of t0means that are indvarying
     t0mnotvarying <- m$pars$row[!m$pars$indvarying & m$pars$matrix %in% 'T0MEANS']
     # m$pars$indvarying[m$pars$matrix %in% 'T0MEANS'] <- FALSE 
     
@@ -149,89 +186,93 @@ ctStanModelIntOverPop <- function(m){
     ivnamesfull <- c(t0mvaryingnames,ivnames) #for t0var naming
     nindvaryingsmall <- length(ivnames)
     
-    #new t0means
-    t0m <- m$pars[m$pars$param %in% ivnames,]
-    t0m$matrix <- 'T0MEANS'
-    t0m$col <- 1
-    t0m$row <- (m$n.latent+1):(m$n.latent+nindvaryingsmall)
-    t0m$transform <- 0
-    t0m$multiplier <- 1
-    t0m$meanscale <- 1
-    t0m$offset <- 0
-    t0m$inneroffset <- 0
-    t0m$indvarying <- TRUE
-    
-    #new t0var 
-    t0v <- m$pars[m$pars$matrix %in% 'T0VAR' & m$pars$row==1 & m$pars$col==1,,drop=FALSE]
-    for(ri in 1:(m$n.latent+nindvaryingsmall)){
-      for(ci in 1:(m$n.latent+nindvaryingsmall)){
-        if(!(ri %in% t0mnotvarying && ci %in% t0mnotvarying)){
-          
-          t0v <- rbind(t0v,c('T0VAR',ri,ci,
-            NA, #ifelse(ci > ri, NA, paste0('popcov_',ivnamesfull[ri],'_',ivnamesfull[ci])), #param
-            0, #ifelse(ci > ri,0, NA), #value
-            NA, #ifelse(ci == ri,1, 0), #transform,
-            NA, #ifelse(ri > m$n.latent || ci > m$n.latent, 1,m$pars$sdscale[(m$pars$matrix %in% 'T0VAR' & m$pars$row==ri & m$pars$col==ci)]), #multiplier (sdscale)
-            NA,#2,
-            NA,#ifelse(ci == ri,0, 0), #offset
-            NA,#0
-            FALSE,1,rep(FALSE,m$n.TIpred)))
-          m$pars <- m$pars[!(m$pars$matrix %in% 'T0VAR' & m$pars$row==ri & m$pars$col==ci),,drop=FALSE] #remove old t0var line
-        }
-      }}
-    t0v=t0v[-1,,drop=FALSE] #remove initialisation row
-    
-    # #remove T0VAR lines where we will replace with rawpopcovsqrt
-    # for(ri in 1:(m$n.latent+nindvaryingsmall)){
-    #   for(ci in 1:(m$n.latent+nindvaryingsmall)){
-    #     if(!(ri %in% t0mnotvarying && ci %in% t0mnotvarying)){
-    #       m$pars[(m$pars$matrix %in% 'T0VAR' & m$pars$row==ri & m$pars$col==ci),]  <-
-    #         c('T0VAR',ri,ci,NA,99999,0,99999,99999,99999,99999,FALSE,1,rep(FALSE,m$n.TIpred))
-    #     }
-    #   }}
-    
-    
-    #new drift
-    drift <- m$pars[m$pars$matrix %in% 'DRIFT' & m$pars$row==1 & m$pars$col==1,]
-    for(ri in 1:(m$n.latent+nindvaryingsmall)){
-      for(ci in 1:(m$n.latent+nindvaryingsmall)){
-        newrow <- list('DRIFT',ri,ci,NA,ifelse(m$continuoustime,0,1),0,1,1,0,0,FALSE,1)
-        if(m$n.TIpred > 0) newrow<-c(newrow,rep(FALSE,m$n.TIpred))
-        drift[nrow(drift)+1,] <- newrow
-      }}
-    drift=drift[-1,,drop=FALSE]
-    drift=subset(drift,drift$row > m$n.latent | drift$col > m$n.latent)
-    # JAx <- drift
-    # JAx$matrix <- 'JAx'
-    
-    #reference new states
-    for(ivi in ivnames){
-      #jacobian pre compute
-      # jcol = m$n.latent+match(ivi,ivnames)
-      # jrow = m$pars$row[m$pars$param %in% ivi]
-      # jtform = suppressWarnings(as.integer(m$pars$transform[m$pars$param %in% ivi]))
-      # if(!is.na(jtform)){ #if using a basic transform not custom
-      # newj = list(matrix='JAx',row=jrow,col=jcol,param=
-      # }
+    if(length(ivnames) > 0){
       
-      # m$pars$param[m$pars$param %in% ivi] <- tform( #transferring full transform state as per here not necessary, doesn't influence jacobian?
-      #   param = paste0( 'state[',m$n.latent+match(ivi,ivnames),']'),
-      #   transform = m$pars$transform[m$pars$param %in% ivi],
-      #   multiplier = m$pars$multiplier[m$pars$param %in% ivi],
-      #   meanscale = m$pars$meanscale[m$pars$param %in% ivi],
-      #   offset = m$pars$offset[m$pars$param %in% ivi],
-      #   inneroffset = m$pars$inneroffset[m$pars$param %in% ivi],singletext=TRUE)
-      m$pars$indvarying[m$pars$param %in% ivi] <- FALSE
-      m$pars[m$pars$param %in% ivi,paste0(m$TIpredNames,rep('_effect',m$n.TIpred))] <- FALSE
-      m$pars$param[m$pars$param %in% ivi] <- paste0( 'state[',m$n.latent+match(ivi,ivnames),']')
-    }
-    
-    # m$pars$indvarying  <-FALSE
-    
-    m$pars <- rbind(m$pars, t0m,t0v,drift) #
-    m$pars[] <- lapply(m$pars, utils::type.convert, as.is = TRUE)
-    
-    m$intoverpopindvaryingindex <- c(t0mvaryingsimple,(m$n.latent+1):(m$n.latent+length(ivnames)))
+      #new t0means
+      t0m <- m$pars[m$pars$param %in% ivnames,,drop=FALSE]
+      t0m$matrix <- 'T0MEANS'
+      t0m$col <- 1
+      t0m$row <- (m$n.latent+1):(m$n.latent+nindvaryingsmall)
+      t0m$transform <- 0
+      t0m$multiplier <- 1
+      t0m$meanscale <- 1
+      t0m$offset <- 0
+      t0m$inneroffset <- 0
+      t0m$indvarying <- TRUE
+      
+      #new t0var 
+      t0v <- m$pars[m$pars$matrix %in% 'T0VAR' & m$pars$row==1 & m$pars$col==1,,drop=FALSE]
+      for(ri in 1:(m$n.latent+nindvaryingsmall)){
+        for(ci in 1:(m$n.latent+nindvaryingsmall)){
+          if(!(ri %in% t0mnotvarying && ci %in% t0mnotvarying)){
+            
+            t0v <- rbind(t0v,c('T0VAR',ri,ci,
+              NA, #ifelse(ci > ri, NA, paste0('popcov_',ivnamesfull[ri],'_',ivnamesfull[ci])), #param
+              0, #ifelse(ci > ri,0, NA), #value
+              NA, #ifelse(ci == ri,1, 0), #transform,
+              NA, #ifelse(ri > m$n.latent || ci > m$n.latent, 1,m$pars$sdscale[(m$pars$matrix %in% 'T0VAR' & m$pars$row==ri & m$pars$col==ci)]), #multiplier (sdscale)
+              NA,#2,
+              NA,#ifelse(ci == ri,0, 0), #offset
+              NA,#0
+              FALSE,1,rep(FALSE,m$n.TIpred)))
+            m$pars <- m$pars[!(m$pars$matrix %in% 'T0VAR' & m$pars$row==ri & m$pars$col==ci),,drop=FALSE] #remove old t0var line
+          }
+        }}
+      t0v=t0v[-1,,drop=FALSE] #remove initialisation row
+      
+      # #remove T0VAR lines where we will replace with rawpopcovsqrt
+      # for(ri in 1:(m$n.latent+nindvaryingsmall)){
+      #   for(ci in 1:(m$n.latent+nindvaryingsmall)){
+      #     if(!(ri %in% t0mnotvarying && ci %in% t0mnotvarying)){
+      #       m$pars[(m$pars$matrix %in% 'T0VAR' & m$pars$row==ri & m$pars$col==ci),]  <-
+      #         c('T0VAR',ri,ci,NA,99999,0,99999,99999,99999,99999,FALSE,1,rep(FALSE,m$n.TIpred))
+      #     }
+      #   }}
+      
+      
+      #new drift
+      drift <- m$pars[m$pars$matrix %in% 'DRIFT' & m$pars$row==1 & m$pars$col==1,]
+      for(ri in 1:(m$n.latent+nindvaryingsmall)){
+        for(ci in 1:(m$n.latent+nindvaryingsmall)){
+          newrow <- list('DRIFT',ri,ci,NA,ifelse(m$continuoustime,0,ifelse(ri==ci,1,0)),0,1,1,0,0,FALSE,1)
+          if(m$n.TIpred > 0) newrow<-c(newrow,rep(FALSE,m$n.TIpred))
+          drift[nrow(drift)+1,] <- newrow
+        }}
+      drift=drift[-1,,drop=FALSE]
+      drift=subset(drift,drift$row > m$n.latent | drift$col > m$n.latent)
+      # JAx <- drift
+      # JAx$matrix <- 'JAx'
+      
+      #reference new states
+      for(ivi in ivnames){
+        #jacobian pre compute
+        # jcol = m$n.latent+match(ivi,ivnames)
+        # jrow = m$pars$row[m$pars$param %in% ivi]
+        # jtform = suppressWarnings(as.integer(m$pars$transform[m$pars$param %in% ivi]))
+        # if(!is.na(jtform)){ #if using a basic transform not custom
+        # newj = list(matrix='JAx',row=jrow,col=jcol,param=
+        # }
+        
+        # m$pars$param[m$pars$param %in% ivi] <- tform( #transferring full transform state as per here not necessary, doesn't influence jacobian?
+        #   param = paste0( 'state[',m$n.latent+match(ivi,ivnames),']'),
+        #   transform = m$pars$transform[m$pars$param %in% ivi],
+        #   multiplier = m$pars$multiplier[m$pars$param %in% ivi],
+        #   meanscale = m$pars$meanscale[m$pars$param %in% ivi],
+        #   offset = m$pars$offset[m$pars$param %in% ivi],
+        #   inneroffset = m$pars$inneroffset[m$pars$param %in% ivi],singletext=TRUE)
+        m$pars$indvarying[m$pars$param %in% ivi] <- FALSE
+        m$pars[m$pars$param %in% ivi,paste0(m$TIpredNames,rep('_effect',m$n.TIpred))] <- FALSE
+        m$pars$param[m$pars$param %in% ivi] <- paste0( 'state[',m$n.latent+match(ivi,ivnames),']')
+      }
+      
+      # m$pars$indvarying  <-FALSE
+      
+      m$pars <- rbind(m$pars, t0m,t0v,drift) #
+      m$pars[] <- lapply(m$pars, utils::type.convert, as.is = TRUE)
+      
+    } #finish loop for non simple t0means indvarying
+    extralatents <- seq.int(m$n.latent+1,m$n.latent+length(ivnames),length.out=length(ivnames))
+    m$intoverpopindvaryingindex <- c(t0mvaryingsimple,extralatents)
     return(m)
   }
 }
@@ -240,7 +281,7 @@ ctStanModelIntOverPop <- function(m){
 
 
 simplifystanfunction<-function(bcalc){ #input text of list of computations, output simplified form
-  
+  if(length(bcalc)==0) return('')
   # bcalcs=paste0(paste0(c(ctm$calcs$driftcint,ctm$calcs$diffusion),';\n',collapse=' '),
   #           jacobianelements(ctm$jacobian$JAx,ntdpred=ctm$n.TDpred,matsetup=matsetup,
   #              textadd=paste0('    sJAx[',rep(1:nlatentpop,nlatentpop),', ',rep(1:nlatentpop,each=nlatentpop),'] = '),
@@ -288,7 +329,7 @@ simplifystanfunction<-function(bcalc){ #input text of list of computations, outp
     # cat(ec)
     scalcs2=gsub('\\}','',scalcs2)
     scalcs2=gsub('\\)$','',scalcs2)
-    scalcs2=gsub('\\.','',scalcs2)
+    # scalcs2=gsub('\\.','',scalcs2)
     
     scalcs2[1] = gsub('^\\s*(\\S{1})',' = \\1',scalcs2[1])
     scalcs2 = strsplit(scalcs2,';')[[1]]
@@ -685,6 +726,7 @@ ctStanModelWriter <- function(ctm, gendata, extratforms,matsetup){
   }
   
   
+  simplifystanfunction(paste0(paste0(c(ctm$calcs$diffusion))))
   finiteJ<-function(){
     paste0('
     {
@@ -697,11 +739,11 @@ ctStanModelWriter <- function(ctm, gendata, extratforms,matsetup){
       ',simplestatedependencies(when=2,mlist=c(mats$driftcint,mats$diffusion,mats$jacobian[2])),'
       ',simplifystanfunction(paste0(paste0(c(ctm$calcs$driftcint,ctm$calcs$diffusion),';\n',collapse=' '))),' 
       if(statei > 0) {
-        sJAx[sJAxfinite,statei] =  (sDRIFT[sJAxfinite, ] * state + append_row(sCINT[,1],rep_vector(0,nlatentpop-nlatent)))[sJAxfinite]; //compute new change
+        sJAx[sJAxfinite,statei] =  sDRIFT[sJAxfinite, ] * state + append_row(sCINT[,1],rep_vector(0,nlatentpop-nlatent))[sJAxfinite]; //compute new change
          if(verbose>1) print("sJAx ",sJAx);
       }
       if(statei== 0 && size(sJAxfinite) ) { //only need these calcs if there are finite differences to do -- otherwise loop just performs system calcs.
-        base[sJAxfinite] = (sDRIFT[sJAxfinite, ] * state + append_row(sCINT[,1],rep_vector(0,nlatentpop-nlatent)))[sJAxfinite];
+        base[sJAxfinite] = sDRIFT[sJAxfinite, ] * state + append_row(sCINT[,1],rep_vector(0,nlatentpop-nlatent))[sJAxfinite];
         if(verbose>1) print("base = ",base,"    sjaxinit= ",sJAx);
         for(fi in sJAxfinite){
         //print("fi!!!!! ",fi);
@@ -713,8 +755,6 @@ ctStanModelWriter <- function(ctm, gendata, extratforms,matsetup){
     }
     ')
   }
-  
-  
   
   
   ukfilterfunc<-function(ppchecking){
@@ -916,7 +956,7 @@ if(verbose > 1) print ("below t0 row ", rowi);
       textadd=paste0('    sJ0[',rep(1:nlatentpop,nlatentpop),', ',rep(1:nlatentpop,each=nlatentpop),'] = '),
       when = 1,remove = c('fixed')),'
       state = sT0MEANS[,1];
-      etacov= quad_form(sT0VAR, sJ0\');
+      etacov = quad_form(sT0VAR, sJ0\');
     if(verbose > 1) print("rowi = ",rowi,"  state = ",sT0MEANS);
     if(verbose > 1) print("sJ0 = ",sJ0);
     if(verbose > 1) print("etacov = ",etacov);
@@ -998,8 +1038,9 @@ if(verbose > 1) print ("below t0 row ", rowi);
           if(verbose > 1) print ("sMANIFESTVAR[o,o] = ",sMANIFESTVAR[o,o])
           if(verbose > 1) print ("etacov[1:nlatent,1:nlatent] = ",etacov[1:nlatent,1:nlatent])
           if(verbose > 1) print ("sJy[o,]\' = ",sJy[o,]\');
-          ycov[o,o] = quad_form(etacov, sJy[o,]\') + sMANIFESTVAR[o,o];
+          ycov[o,o] = quad_form(etacov, sJy[o,]\'); // + sMANIFESTVAR[o,o]; shifted measurement error down
           for(wi in 1:nmanifest){ 
+            if(Y[rowi,wi] != 99999) ycov[wi,wi] += square(sMANIFESTVAR[wi,wi]);
             if(manifesttype[wi]==1 && Y[rowi,wi] != 99999) ycov[wi,wi] += fabs((yprior[wi] - 1) .* (yprior[wi]));
             if(manifesttype[wi]==2 && Y[rowi,wi] != 99999) ycov[wi,wi] += square(fabs((yprior[wi] - round(yprior[wi])))); 
           }
@@ -1008,7 +1049,7 @@ if(verbose > 1) print ("below t0 row ", rowi);
         if(intoverstates==0) { //sampled states
           if(ncont_y[rowi] > 0) {
             yprior[o0] = sMANIFESTMEANS[o0,1] + sJy[o0,] * state;
-            ypriorcov_sqrt[o0,o0] = sqrt(sMANIFESTVAR[o0,o0]);
+            ypriorcov_sqrt[o0,o0] = sMANIFESTVAR[o0,o0];
           }
           if(nbinary_y[rowi] > 0) yprior[o1] = to_vector(inv_logit(to_array_1d(sMANIFESTMEANS[o1,1] +sLAMBDA[o1,] * state[1:nlatent])));
         }
@@ -1236,46 +1277,43 @@ subjectparscalc2 <- function(popmats=FALSE,subjmats=TRUE){
     sDIFFUSIONcov = sdcovsqrt2cov(sDIFFUSION,nldynamics);
   }
   if(subi <= (asymDIFFUSIONsubindex ? nsubjects : 0)) {
-      if(ndiffusion < nlatent) sasymDIFFUSION = to_matrix(rep_vector(0,nlatent * nlatent),nlatent,nlatent);
+    if(ndiffusion < nlatent) sasymDIFFUSION = to_matrix(rep_vector(0,nlatent * nlatent),nlatent,nlatent);
 
-      if(continuoustime==1) sasymDIFFUSION[ derrind, derrind] = to_matrix( 
-      -kronsum(sDRIFT[ derrind, derrind ]) \\  to_vector( 
-           sDIFFUSIONcov[ derrind, derrind ]), ndiffusion,ndiffusion);
+    if(continuoustime==1) sasymDIFFUSION[ derrind, derrind] = to_matrix( 
+    -kronsum(sDRIFT[ derrind, derrind ]) \\  to_vector( 
+         sDIFFUSIONcov[ derrind, derrind ]), ndiffusion,ndiffusion);
 
-      if(continuoustime==0) sasymDIFFUSION[ derrind, derrind ] = to_matrix( (IIlatent2 - 
-        sqkron_prod(sDRIFT[ derrind, derrind ], sDRIFT[ derrind, derrind ])) \\  to_vector(sDIFFUSIONcov[ derrind, derrind ]), ndiffusion, ndiffusion);
-    } //end asymdiffusion loops
+    if(continuoustime==0) sasymDIFFUSION[ derrind, derrind ] = to_matrix( (IIlatent2 - 
+      sqkron_prod(sDRIFT[ derrind, derrind ], sDRIFT[ derrind, derrind ])) \\  to_vector(sDIFFUSIONcov[ derrind, derrind ]), ndiffusion, ndiffusion);
+  } //end asymdiffusion loops
 
-      if(subi <= (MANIFESTVARsubindex ? nsubjects : 0)) {
-         for(ri in 1:nmanifest) sMANIFESTVAR[ri,ri] = square(sMANIFESTVAR[ri,ri]);
-      }
-         
-    if(subi <= (T0VARsubindex ? nsubjects : 0)) {
-    if(intoverpop){
-      sT0VAR[intoverpopindvaryingindex, intoverpopindvaryingindex] = rawpopcovsqrt;
-    }
+ // if(subi <= (MANIFESTVARsubindex ? nsubjects : 0)) {
+   //  for(ri in 1:nmanifest) sMANIFESTVAR[ri,ri] = square(sMANIFESTVAR[ri,ri]);
+  //}
+     if(subi <= (T0VARsubindex ? nsubjects : 0)) {
+      if(intoverpop) sT0VAR[intoverpopindvaryingindex, intoverpopindvaryingindex] = rawpopcovsqrt;
       sT0VAR = makesym(sdcovsqrt2cov(sT0VAR,nldynamics),verbose,1);
-    if(intoverpop){ //adjust cov matrix for transforms
-      for(ri in 1:size(matsetup)){
-        if(matsetup[ri,7]==1){ //if t0means
-          if(matsetup[ri,5]) { //and indvarying
-            sT0VAR[matsetup[ri,1], ] = sT0VAR[matsetup[ri,1], ] * matvalues[ri,2] * matvalues[ri,3]* matvalues[ri,5]; //multiplier meanscale sdscale
-            sT0VAR[, matsetup[ri,1] ] = sT0VAR[, matsetup[ri,1] ] * matvalues[ri,2] * matvalues[ri,3]* matvalues[ri,5]; //multiplier meanscale sdscale
-          }
-        }
-      }
-    }
       if(nt0varstationary > 0) {
         for(ri in 1:nt0varstationary){ 
           sT0VAR[t0varstationary[ri,1],t0varstationary[ri,2] ] =  sasymDIFFUSION[t0varstationary[ri,1],t0varstationary[ri,2] ];
         }
       }
+      if(intoverpop){ //adjust cov matrix for transforms
+        for(ri in 1:size(matsetup)){
+          if(matsetup[ri,7]==1){ //if t0means
+            if(matsetup[ri,5]) { //and indvarying
+              sT0VAR[matsetup[ri,1], ] = sT0VAR[matsetup[ri,1], ] * matvalues[ri,2] * matvalues[ri,3]* matvalues[ri,5]; //multiplier meanscale sdscale
+              sT0VAR[, matsetup[ri,1] ] = sT0VAR[, matsetup[ri,1] ] * matvalues[ri,2] * matvalues[ri,3]* matvalues[ri,5]; //multiplier meanscale sdscale
+            }
+          }
+        }
+      }
     }
     
-      if(subi <= (asymCINTsubindex ? nsubjects : 0)){
-        if(continuoustime==1) sasymCINT =  -sDRIFT[1:nlatent,1:nlatent] \\ sCINT[ ,1 ];
-        if(continuoustime==0) sasymCINT =  (IIlatent - sDRIFT[1:nlatent,1:nlatent]) \\ sCINT[,1 ];
-      }
+    if(subi <= (asymCINTsubindex ? nsubjects : 0)){
+      if(continuoustime==1) sasymCINT =  -sDRIFT[1:nlatent,1:nlatent] \\ sCINT[ ,1 ];
+      if(continuoustime==0) sasymCINT =  (IIlatent - sDRIFT[1:nlatent,1:nlatent]) \\ sCINT[,1 ];
+    }
     
     if(nt0meansstationary > 0){
       if(subi <= (T0MEANSsubindex ? nsubjects : 0)) {
@@ -1384,10 +1422,11 @@ functions{
   matrix makesym(matrix mat, int verbose, int pd){
     matrix[rows(mat),cols(mat)] out;
     for(coli in 1:cols(mat)){
-      if(pd ==1){ // && mat[coli,coli] < 1e-5
+      out[coli,coli] = mat[coli,coli]; 
+      if(pd ==1 && out[coli,coli] < 1e-5){
         //if(verbose > 0) print("diagonal too low (",mat[coli,coli],") during makesym row ", coli, " col ", coli);
-        out[coli,coli] = mat[coli,coli] + 1e-5;
-      } else out[coli,coli] = mat[coli,coli]; 
+        out[coli,coli] = 1e-5 + fmin(0.0,out[coli,coli]);
+      }  
       for(rowi in coli:rows(mat)){
         if(rowi > coli) {
           out[rowi,coli] = mat[rowi,coli]; //(mat[coli,rowi] + ) *.5;
@@ -1545,6 +1584,8 @@ parameters {
 transformed parameters{
   vector[nindvarying] rawpopsd; //population level std dev
   matrix[nindvarying, nindvarying] rawpopcovsqrt; 
+  matrix[nindvarying,nindvarying] rawpopcorr;
+  matrix[nindvarying,nindvarying] rawpopcov;
 ',if(!gendata) paste0('
   real ll = 0;
   vector[nmanifest+nmanifest+ (savescores ? nmanifest*2+nlatent*2 : 0)] kalman[savescores ? ndatapoints : 0];
@@ -1603,8 +1644,9 @@ transformed parameters{
         }
       }
     }
- rawpopcovsqrt = cholesky_decompose(makesym(tcrossprod(diag_pre_multiply(rawpopsd, 
-      constraincorsqrt(rawpopcovsqrt))),verbose,1)); 
+    rawpopcorr = tcrossprod( constraincorsqrt(rawpopcovsqrt));
+    rawpopcov = makesym(quad_form_diag(rawpopcorr, rawpopsd),verbose,1);
+    rawpopcovsqrt = cholesky_decompose(rawpopcov); 
   }//end indvarying par setup
 
   {',
@@ -1643,8 +1685,6 @@ model{
 generated quantities{
   vector[nparams] popmeans;
   vector[nparams] popsd = rep_vector(0,nparams);
-  matrix[nindvarying,nindvarying] rawpopcov = tcrossprod(rawpopcovsqrt);
-  matrix[nindvarying,nindvarying] rawpopcorr = quad_form_diag(rawpopcov,inv_sqrt(diagonal(rawpopcov)));
   matrix[nparams,ntipred] linearTIPREDEFFECT;
 ',if(gendata) paste0('
   real ll = 0;

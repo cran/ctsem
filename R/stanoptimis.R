@@ -57,7 +57,7 @@ parallelStanFunctionCreator <- function(cl, verbose){
       out=-1e100
       attributes(out) <- list(gradient=rep(0,length(parm)))
     }
-    assign('storedPars', parm,pos= sys.frame(4))
+    try(assign('storedPars', parm,pos= sys.frame(4)))
     if(verbose > 0) print(paste('lp= ',out,' ,    iter time = ',b-a))
     return(-out)
   }
@@ -324,13 +324,17 @@ sgd <- function(init,fitfunc,ndatapoints,plotsgd=FALSE,stepbase=1e-4,gmeminit=if
   oldlp <- -Inf
   converged <- FALSE
   nrows <- ifelse(is.na(startnrows),ndatapoints, min(ndatapoints, startnrows))
-  
   while(!converged && i < maxiter){
-    print
     i = i + 1
     accepted <- FALSE
     lproughnesstarget2 = ifelse(nrows==ndatapoints,lproughnesstarget,.49)
+    notacceptedcount <- 0
     while(!accepted){
+      notacceptedcount <- notacceptedcount+1
+      if(notacceptedcount > 50) {
+        stop('Cannot optimize! Problematic model, or bug?')
+      print(lpg)
+      }
       newpars = bestpars
       delta =   step  * (gsmooth*(gsmoothness) + g*(1-(gsmoothness))) * exp((rnorm(length(g),0,.01)))
       delta[abs(delta) > maxparchange] <- maxparchange*sign(delta[abs(delta) > maxparchange])
@@ -345,7 +349,6 @@ sgd <- function(init,fitfunc,ndatapoints,plotsgd=FALSE,stepbase=1e-4,gmeminit=if
       
       # lpg = try(smf$log_prob(upars=newpars,adjust_transform=TRUE,gradient=TRUE),silent = FALSE)
       lpg= -fitfunc(newpars)
-      
       if(lpg > -1e99 && class(lpg) !='try-error' && !is.nan(lpg[1]) && all(!is.nan(attributes(lpg)$gradient))){
         accepted <- TRUE
       } 
@@ -486,6 +489,7 @@ sgd <- function(init,fitfunc,ndatapoints,plotsgd=FALSE,stepbase=1e-4,gmeminit=if
     }
     
     #check convergence
+    
     if(i > 30){
       if(max(tail(lp,nconvergeiter)) - min(tail(lp,nconvergeiter)) < itertol) converged <- TRUE
       # print(max(tail(lp,nconvergeiter)) - min(tail(lp,nconvergeiter)))
@@ -658,11 +662,10 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         } else stop(paste0('use install.packages(\"DEoptim\") to use deoptim')) #end require deoptim
       }
       
-      # if(optimcores > 1){ #check if parallel helps optimizing
-      #   a <- Sys.time()
-      #   # a=log_prob(smf,init)
-      #   if( (Sys.time() - a) < .2) optimcores <- 1
-      # }
+      if(optimcores > 1){ #check if parallel helps optimizing
+        a=system.time(log_prob(smf,init))
+        if( a[1] < .3) optimcores <- 1
+      }
       
       
       
@@ -723,8 +726,8 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       if(carefulfit && !deoptim & standata$nopriors == 1 ){ #init using priors
         message('carefulfit=TRUE , doing 1st pass with priors')
         standata$nopriors <- as.integer(0)
-        tipredscale <- standata$tipredscale
-        standata$tipredscale <- .0001
+        tipredeffectscale <- standata$tipredeffectscale
+        standata$tipredeffectscale <- .0001
         if(optimcores > 1) parallelStanSetup(cl = cl,sm = sm,standata = standata)
         if(optimcores==1) smf<-stan_reinitsf(sm,standata)
         if(!stochastic) {
@@ -739,7 +742,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         standata$nopriors <- as.integer(1)
         # smf<-stan_reinitsf(sm,standata)
         init = optimfit$par #+ rnorm(length(optimfit$par),0,abs(init/8)+1e-3)#rstan::constrain_pars(object = smf, optimfit$par)
-        standata$tipredscale <- tipredscale
+        standata$tipredeffectscale <- tipredeffectscale
       } #end carefulfit
       
       
@@ -770,7 +773,6 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       
       est2=optimfit$par #unconstrain_pars(smf, est1)
     }
-    
     
     if(!estonly){
       
@@ -976,10 +978,24 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
           neglpgf <- parallelStanFunctionCreator(cl=cl,verbose = 0)$neglpgf
           parallel::clusterExport(cl,'samples',envir = environment())
           }
-          target_dens[[j]] <- flexsapply(cl = cl, split(1:isloopsize, sort((1:isloopsize)%%cores)), function(x){
+
+          if(cores==1) parlp <- function(parm){ #remove this duplication somehow
+            out <- try(log_prob(smf,upars=parm,adjust_transform=TRUE,gradient=TRUE),silent = FALSE)
+            if(class(out)=='try-error') {
+              out[1] <- -1e100
+              attributes(out)$gradient <- rep(NaN, length(parm))
+            }
+            if(is.null(attributes(out)$gradient)) attributes(out)$gradient <- rep(NaN, length(parm))
+            attributes(out)$gradient[is.nan(attributes(out)$gradient)] <- 
+              rnorm(length(attributes(out)$gradient[is.nan(attributes(out)$gradient)]),0,100)
+            return(out)
+          }
+          
+          target_dens[[j]] <- unlist(flexlapply(cl = cl, split(1:isloopsize, sort((1:isloopsize)%%cores)), function(x){
             # future(globals=c('x','samples','isloopsize'),expr={
-              eval(parse(text='apply(tail(samples,isloopsize)[x,],1,parlp)'))
-            },cores=cores)
+            eval(parse(text='apply(tail(samples,isloopsize)[x,],1,parlp)'))
+          },cores=cores))
+          
           
           
           
@@ -1039,7 +1055,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
           #check max resample probability and drop earlier samples if too high
           dropuntil <- ceiling(max(c(0,which(sample_prob > (chancethreshold / isloopsize)) / isloopsize),na.rm=TRUE))*isloopsize
           if((isloopsize - dropuntil) > isloopsize) dropuntil <- dropuntil -isloopsize
-          # 
+          if(nrow(samples)-dropuntil < isloopsize*2) dropuntil <- nrow(samples)-isloopsize*2
           if(length(unique(resample_i)) < 200) dropuntil <- 0 
           if(nrow(samples) < isloopsize *2) dropuntil <- 0
           
@@ -1064,7 +1080,11 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
   if(!estonly){
     if(!is) lpsamples <- NA else lpsamples <- unlist(target_dens)[resample_i]
     
+    sdtemp <- standata #only computing 1 row per subject for parameter uncertainty
+    sdtemp$dokalmanrows[] <- 0L
+    sdtemp$dokalmanrows[match(unique(sdtemp$subject),sdtemp$subject )] <- 1L
     transformedpars=stan_constrainsamples(sm = sm,standata = standata,samples=resamples,cores=cores)
+
     
     # quantile(sapply(transformedpars, function(x) x$rawpopcorr[3,2]),probs=c(.025,.5,.975))
     # quantile(sapply(transformedpars, function(x) x$DRIFT[1,2,2]),probs=c(.025,.5,.975))
