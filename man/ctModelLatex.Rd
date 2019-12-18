@@ -4,13 +4,21 @@
 \alias{ctModelLatex}
 \title{Generate and optionally compile latex equation of subject level ctsem model.}
 \usage{
-ctModelLatex(ctmodel, matrixnames = TRUE, textsize = "normalsize",
-  folder = tempdir(), filename = paste0("ctsemTex",
-  as.numeric(Sys.time())), tex = TRUE, equationonly = FALSE,
-  compile = TRUE, open = TRUE)
+ctModelLatex(
+  x,
+  matrixnames = TRUE,
+  textsize = "normalsize",
+  folder = tempdir(),
+  filename = paste0("ctsemTex", as.numeric(Sys.time())),
+  tex = TRUE,
+  equationonly = FALSE,
+  compile = TRUE,
+  open = TRUE,
+  minimal = FALSE
+)
 }
 \arguments{
-\item{ctmodel}{ctsem model object}
+\item{x}{ctsem model object or ctStanFit object.}
 
 \item{matrixnames}{Logical. If TRUE, includes ctsem matrix names such as DRIFT and DIFFUSION under the matrices.}
 
@@ -29,6 +37,8 @@ Useful if output overflows page.}
 \item{compile}{Compile to .pdf? (Depends on \code{tex = TRUE})}
 
 \item{open}{Open after compiling? (Depends on \code{compile = TRUE})}
+
+\item{minimal}{if TRUE, outputs reduced form version displaying matrix dimensions and equation structure only.}
 }
 \value{
 character string of latex code. Side effects include saving a .tex, .pdf, and displaying the pdf.

@@ -4,14 +4,33 @@
 \alias{ctStanFit}
 \title{ctStanFit}
 \usage{
-ctStanFit(datalong, ctstanmodel, stanmodeltext = NA, iter = 1000,
-  intoverstates = TRUE, binomial = FALSE, fit = TRUE,
-  intoverpop = FALSE, stationary = FALSE, plot = FALSE,
-  derrind = "all", optimize = FALSE, optimcontrol = list(),
-  nlcontrol = list(), nopriors = FALSE, chains = 2,
-  cores = "maxneeded", inits = NULL, forcerecompile = FALSE,
-  savescores = FALSE, savesubjectmatrices = TRUE, gendata = FALSE,
-  control = list(), verbose = 0, ...)
+ctStanFit(
+  datalong,
+  ctstanmodel,
+  stanmodeltext = NA,
+  iter = 1000,
+  intoverstates = TRUE,
+  binomial = FALSE,
+  fit = TRUE,
+  intoverpop = FALSE,
+  stationary = FALSE,
+  plot = FALSE,
+  derrind = "all",
+  optimize = FALSE,
+  optimcontrol = list(),
+  nlcontrol = list(),
+  nopriors = FALSE,
+  chains = 2,
+  cores = ifelse(optimize, getOption("mc.cores", 2L), "maxneeded"),
+  inits = NULL,
+  forcerecompile = FALSE,
+  savescores = FALSE,
+  savesubjectmatrices = TRUE,
+  gendata = FALSE,
+  control = list(),
+  verbose = 0,
+  ...
+)
 }
 \arguments{
 \item{datalong}{long format data containing columns for subject id (numeric values, 1 to max subjects), manifest variables, 
@@ -43,8 +62,8 @@ the parameters are instead fixed to long run expectations. More control over thi
 by instead setting parameter names of T0MEANS and T0VAR matrices in the input model to 'stationary', for
 elements that should be fixed to stationarity.}
 
-\item{plot}{if TRUE, a Shiny program is launched upon fitting to interactively plot samples. 
-May struggle with many (e.g., > 5000) parameters, and may leave sample files in working directory if sampling is terminated.}
+\item{plot}{if TRUE, for sampling, a Shiny program is launched upon fitting to interactively plot samples. 
+May struggle with many (e.g., > 5000) parameters. For optimizing, various optimization details are plotted -- in development.}
 
 \item{derrind}{vector of integers denoting which latent variables are involved in dynamic error calculations.
 latents involved only in deterministic trends or input effects can be removed from matrices (ie, that
@@ -63,17 +82,12 @@ otherwise nonlinear -- nonlinear is slower.
 \code{nlmeasurement} defaults to "auto", but may also be a logical. Set to TRUE to use non linear measurement model estimator, 
 FALSE to use linear model. "auto" selects linear if appropriate, otherwise nonlinear. Non-linear methods are slower but applicable to both linear
 and non linear cases.
-\code{ukffull} may be TRUE or FALSE. If FALSE, nonlinear filtering via the unscented filter uses a minimal number of sigma points,
-that does not capture skew in the resulting distribution. 
 \code{maxtimestep} must be a positive numeric,  specifying the largest time
 span covered by the numerical integration. The large default ensures that for each observation time interval, 
 only a single step of exponential integration is used. When \code{maxtimestep} is smaller than the observation time interval, 
 the integration is nested within an Euler like loop. 
 Smaller values may offer greater accuracy, but are slower and not always necessary. Given the exponential integration,
-linear model elements are fit exactly with only a single step. 
-\code{ukfspread} should be a small positive numeric value, indicating what fraction of a standard deviation to 
-use for unscented sigma points. Values between 1e-4 and 2 have tended to be reasonable, in our experience. 
-In general, larger values may not make sense when using the default of \code{ukffull=FALSE}.}
+linear model elements are fit exactly with only a single step.}
 
 \item{nopriors}{logical. If TRUE, any priors are disabled -- sometimes desirable for optimization.}
 
@@ -230,7 +244,7 @@ m1 <- ctModel(type = 'stanct',
 ctModelLatex(m1)
 
 #fit
-f1 <- ctStanFit(datalong = dat2, ctstanmodel = m1, optimize=TRUE, nopriors=TRUE,verbose=1)
+f1 <- ctStanFit(datalong = dat2, ctstanmodel = m1, optimize=TRUE, nopriors=TRUE)
 
 summary(f1)
 
@@ -273,9 +287,9 @@ ctStanPostPredict(f2, datarows=1:100, wait=FALSE)
 #Individual differences in intervention, Bayesian estimation, covariates
 m2i <- ctModel(type = 'stanct',
   manifestNames = c('Y1'), latentNames=c('eta1'),
-  n.TIpred = 1, TIpredNames = 'age',
-  n.TDpred=1,TDpredNames = 'TD1', #this line includes the intervention
-  TDPREDEFFECT=matrix(c('tdpredeffect'),nrow=1,ncol=1), #intervention effect
+  TIpredNames = 'age',
+  TDpredNames = 'TD1', #this line includes the intervention
+  TDPREDEFFECT=matrix(c('tdpredeffect||TRUE'),nrow=1,ncol=1), #intervention effect
   DRIFT=matrix(-1e-5,nrow=1,ncol=1),
   DIFFUSION=matrix(0,nrow=1,ncol=1),
   CINT=matrix(c('cint1'),ncol=1),
@@ -284,13 +298,11 @@ m2i <- ctModel(type = 'stanct',
   LAMBDA = diag(1),
   MANIFESTMEANS=matrix(0,ncol=1),
   MANIFESTVAR=matrix(c('merror'),nrow=1,ncol=1))
-
-m2i$pars$indvarying[m2i$pars$matrix \%in\% 'TDPREDEFFECT'] <- TRUE
-
+  
 plot(m2i)
 
-f2i <- ctStanFit(datalong = dat2, ctstanmodel = m2i,
-  iter=300,chains=3,control=list(max_treedepth=7))
+f2i <- ctStanFit(datalong = dat2, ctstanmodel = m2i,intoverpop=TRUE,
+  iter=300,chains=2,control=list(max_treedepth=7))
 summary(f2i)
 ctStanPlotPost(f2i)
 ctKalman(f2i,kalmanvec=c('y','ysmooth'),subjects=2:4,plot=TRUE,errorvec=NA)
@@ -364,7 +376,7 @@ m3n <- ctModel(type = 'stanct',
 
 ctModelLatex(m3n)
 
-f3n <- ctStanFit(datalong = dat2, ctstanmodel = m3n, optimize=TRUE,cores=4)
+f3n <- ctStanFit(datalong = dat2, ctstanmodel = m3n, optimize=TRUE)
 
 summary(f3n)
 
@@ -390,7 +402,7 @@ m4 <- ctModel(n.manifest = 2,n.latent = 2, type = 'stanct',
   MANIFESTMEANS=matrix(c(0,0),nrow=2,ncol=1),
   MANIFESTVAR=matrix(c('merror1',0,0,'merror2'),nrow=2,ncol=2))
 
-f4 <- ctStanFit(datalong = dat2, ctstanmodel = m4,optimize=TRUE,cores=1)
+f4 <- ctStanFit(datalong = dat2, ctstanmodel = m4,optimize=TRUE)
 
 summary(f4)
 

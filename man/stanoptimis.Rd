@@ -4,13 +4,29 @@
 \alias{stanoptimis}
 \title{Optimize / importance sample a stan or ctStan model.}
 \usage{
-stanoptimis(standata, sm, init = "random", initsd = 0.01,
-  sampleinit = NA, deoptim = FALSE, estonly = FALSE, tol = 1e-14,
-  decontrol = list(), stochastic = FALSE, nopriors = FALSE,
-  carefulfit = TRUE, plotsgd = FALSE, is = FALSE,
-  isloopsize = 1000, finishsamples = 500, tdf = 10,
-  chancethreshold = 100, finishmultiply = 5, verbose = 0,
-  cores = 2)
+stanoptimis(
+  standata,
+  sm,
+  init = "random",
+  initsd = 0.01,
+  sampleinit = NA,
+  deoptim = FALSE,
+  estonly = FALSE,
+  tol = 1e-14,
+  decontrol = list(),
+  stochastic = FALSE,
+  nopriors = FALSE,
+  carefulfit = TRUE,
+  plot = FALSE,
+  is = FALSE,
+  isloopsize = 1000,
+  finishsamples = 500,
+  tdf = 10,
+  chancethreshold = 100,
+  finishmultiply = 5,
+  verbose = 0,
+  cores = 2
+)
 }
 \arguments{
 \item{standata}{list object conforming to rstan data standards.}
@@ -42,7 +58,7 @@ the stan model uses this value.}
 
 \item{carefulfit}{Logical. If TRUE, priors are always used for a rough first pass to obtain starting values when nopriors=TRUE.}
 
-\item{plotsgd}{Logical. If TRUE, plot iteration details when using stochastic optimizer.}
+\item{plot}{Logical. If TRUE, plot iteration details. Probably slower.}
 
 \item{is}{Logical. Use importance sampling, or just return map estimates?}
 
@@ -87,7 +103,7 @@ fit <- sampling(sm, iter = 10000)
 summary(fit)$summary
 
 ## extract samples as a list of arrays
-e <- extract(fit, permuted = TRUE)
+e <- ctExtract(fit, permuted = TRUE)
 
 #for ml or map estimates
 optimis <- stanoptimis(standata = list(),sm = sm,finishsamples = 3000,cores=2)

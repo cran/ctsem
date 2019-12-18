@@ -14,6 +14,9 @@
 #' indicating the time step to use for interpolating values. Lower values give a more accurate / smooth representation,
 #' but take a little more time to calculate. Currently unavailable for ctStan fits.
 #' @param subjects vector of integers denoting which subjects (from 1 to N) to plot predictions for. 
+#' @param removeObs Logical. If TRUE, observations (but not covariates)
+#' are set to NA, so only expectations based on
+#' parameters and covariates are returned. 
 #' @param plot Logical. If TRUE, plots output instead of returning it. 
 #' See \code{\link{plot.ctKalman}} for the possible arguments.
 #' @param ... additional arguments to pass to \code{\link{plot.ctKalman}}.
@@ -34,23 +37,18 @@
 #' ctKalman(ctstantestfit, timerange=c(0,60), timestep=.1, plot=TRUE,
 #'   subjects=2:3, 
 #'   kalmanvec=c('y','yprior'),
-#'   errorvec=c(NA,'ypriorcov'), #'auto' would also have achieved this
-#'   ltyvec="auto",
-#'   colvec='auto', 
-#'   lwdvec='auto', 
-#'   subsetindices=2, #Only plotting 2nd dimension of y and yprior
-#'   pchvec='auto', typevec='auto',grid=TRUE,legend=TRUE,
-#'   plotcontrol=list(xlim=c(0,55),main='Observations and priors'),
-#'   polygoncontrol=list(steps=5))
+#'   errorvec=c(NA,'ypriorcov')) #'auto' would also have achieved this
 #'   }
 #' @export
 
-ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
-  subjects=1, plot=FALSE, ...){
+ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep=sd(fit$standata$time,na.rm=TRUE)/50,
+  subjects=1, removeObs = FALSE, plot=FALSE, ...){
   type=NA
-  if(class(fit)=='ctStanFit') type='stan' 
-  if(class(fit) =='ctsemFit') type ='omx'
+  if('ctStanFit' %in% class(fit)) type='stan' 
+  if('ctsemFit' %in% class(fit)) type ='omx'
   if(is.na(type)) stop('fit object is not from ctFit or ctStanFit!')
+  
+  subjects <- sort(subjects) #in case not entered in ascending order
   
   if(type=='stan'){
     if(all(timerange == 'asdata')) timerange <- range(fit$standata$time[fit$standata$subject %in% subjects])
@@ -59,12 +57,24 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
       times <- seq(timerange[1],timerange[2],timestep)
       fit$standata <- standataFillTime(fit$standata,times)
     } 
-    
-    fit$standata <- standatact_specificsubjects(fit$standata, subjects = subjects)
-    
+    idstore <- fit$standata$subject
+    if(!class(fit$stanfit) %in% 'stanfit') {
+      fit$standata <- standatact_specificsubjects(fit$standata, subjects = subjects)
+      idstore <- as.integer(subjects[fit$standata$subject])
+    }
+    if(class(fit$stanfit) %in% 'stanfit') fit$standata$dokalmanrows <-
+        as.integer(fit$standata$subject %in% subjects |
+            as.logical(match(unique(fit$standata$subject),fit$standata$subject)))
+
+    if(removeObs){
+      sapply(c('nobs_y','nbinary_y','ncont_y','whichobs_y','whichbinary_y','whichcont_y'),
+        function(x) fit$standata[[x]][] <<- 0L)
+      fit$standata$Y[] <- 99999
+    }
     out <- ctStanKalman(fit,collapsefunc=mean) #extract state predictions
-    
+    out$id <- idstore #as.integer(subjects[out$id]) #get correct subject indicators
     out <- meltkalman(out)
+    out=out[!(out$Subject %in% subjects) %in% FALSE,]
   }
   
   if(type !='stan'){
@@ -123,7 +133,7 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
       }
       
       #get parameter matrices
-      # browser()
+      # 
       model <- summary(fit)
       # model <- model$
       
@@ -192,12 +202,12 @@ ctKalman<-function(fit, datalong=NULL, timerange='asdata', timestep='asdata',
 #' AnomAuthfit <- ctFit(AnomAuth, AnomAuthmodel)
 #' ctKalman(AnomAuthfit,subjects=1,plot=TRUE)
 #' }
-plot.ctKalman<-function(x, subjects=1, kalmanvec=c('y','ysmooth'),
+plot.ctKalman<-function(x, subjects=1, kalmanvec=c('y','yprior'),
   errorvec='auto', errormultiply=1.96,
   ltyvec="auto",colvec='auto', lwdvec='auto', 
   subsetindices=NULL,pchvec='auto', typevec='auto',grid=FALSE,add=FALSE, 
   plotcontrol=list(ylab='Value',xlab='Time',xaxs='i',lwd=2,mgp=c(2,.8,0)),
-  polygoncontrol=list(steps=20),polygonalpha=.3,
+  polygoncontrol=list(steps=20),polygonalpha=.1,
   legend=TRUE, legendcontrol=list(x='topright',bg='white',cex=.7),...){
   
   if(!'ctKalman' %in% class(x)) stop('not a ctKalman object')
@@ -391,7 +401,8 @@ plot.ctKalman<-function(x, subjects=1, kalmanvec=c('y','ysmooth'),
 #' }
 plot.ctKalmanDF<-function(x, subjects=1, kalmanvec=c('y','ysmooth'),
   errorvec='auto', errormultiply=1.96,plot=TRUE,elementNames=NA,
-  polygonsteps=20,polygonalpha=.3,...){
+  polygonsteps=10,polygonalpha=.1,...){
+  
   
   if(!'ctKalmanDF' %in% class(x)) stop('not a ctKalmanDF object')
   
@@ -404,36 +415,32 @@ plot.ctKalmanDF<-function(x, subjects=1, kalmanvec=c('y','ysmooth'),
   klines <- kalmanvec[grep('(prior)|(upd)|(smooth)',kalmanvec)]
   # kpoints<- kalmanvec[-grep('(prior)|(upd)|(smooth)',kalmanvec)]
   colvec=ifelse(length(subjects) > 1, 'Subject', 'Variable')
-  ltyvec = setNames(1:length(klines),klines)
-  if(length(kalmanvec) > length(klines)) ltyvec <- 
-    c(setNames(rep(0,length(kalmanvec)-length(klines)),kalmanvec[!kalmanvec %in% klines]),
-      ltyvec)
+  ltyvec <- setNames( rep(NA,length(kalmanvec)),kalmanvec)
+  ltyvec[kalmanvec %in% klines] = setNames(1:length(klines),klines)
+  # if(length(kalmanvec) > length(klines)) ltyvec <- 
+  #   c(setNames(rep(0,length(kalmanvec)-length(klines)),kalmanvec[!kalmanvec %in% klines]),
+  #     ltyvec)
   shapevec<-ltyvec
-  shapevec[shapevec==0] <- 19
-  shapevec[shapevec==1] <- NA
+  shapevec[shapevec>0] <- NA
+  shapevec[is.na(ltyvec)] <- 19
+  # 
   d<-subset(x,Element %in% kalmanvec)
   
   g <- ggplot(d,
-    aes_string(x='Time',y='Value',colour=colvec,linetype='Element',shape='Element'))+
-    # stat_quantile(quantiles=seq(.01,.99,.01),
-    #   aes(alpha=1-(abs(.5-(..quantile..)))),method='rqss')+
-    geom_line()+
-    geom_point()+
+    aes_string(x='Time',y='Value',colour=colvec,linetype='Element',shape='Element')) +
     scale_linetype_manual(breaks=names(ltyvec),values=ltyvec)+
     scale_shape_manual(breaks=names(shapevec),values=shapevec) +
     # labs(linetype='Element',shape='Element',colour='Element',fill='Element')+
-    scale_fill_discrete(guide='none') +
-    theme_minimal()
+    scale_fill_discrete(guide='none')
   
   if(length(subjects) > 1 && length(unique(subset(x,Element %in% kalmanvec)$Variable)) > 1){
     g <- g+ facet_wrap(vars(Variable),scales = 'free') 
   }
   
   polysteps <- seq(errormultiply,0,-errormultiply/(polygonsteps+1))[c(-polygonsteps+1)]
-  
-  alphasum <- 0
+
   for(si in polysteps){
-    alphasum <- alphasum + polygonalpha/polygonsteps
+    # alphasum <- alphasum + polygonalpha/polygonsteps
     
     d2 <- subset(d,Element %in% klines)
     d2$sd <- d2$sd *si
@@ -451,13 +458,16 @@ plot.ctKalmanDF<-function(x, subjects=1, kalmanvec=c('y','ysmooth'),
       g <- g+ 
         geom_ribbon(data=d2,aes(ymin=(Value-sd),x=Time,
           ymax=(Value+sd),fill=(Subject)),inherit.aes = FALSE,
-          alpha=ifelse(alphasum < .05,.05,polygonalpha/polygonsteps),linetype=0)
+          alpha=polygonalpha/polygonsteps,linetype=0)
       if(si== polysteps[1]) g <- g + 
           geom_line(data=d2,aes(y=(Value-sd),colour=Subject),linetype='dotted',alpha=.7) + 
           geom_line(data=d2,aes(y=(Value+sd),colour=Subject),linetype='dotted',alpha=.7)
     }
     
-    # print(g)
+    g <- g + 
+      geom_line()+
+      geom_point()+
+      theme_minimal()
   }
   if(plot) suppressWarnings(print(g))
   return(invisible(g))

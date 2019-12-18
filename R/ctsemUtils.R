@@ -1,3 +1,37 @@
+testall<- function(cores=4,folder = '/tests/testthat'){
+  Sys.setenv(NOT_CRAN='true')
+  pdf(NULL)
+  tests <- dir(paste0('.',folder))
+  tests <- tests[grepl('^test',tests)]
+  runex <- grep('runExamples',tests)
+  tests <- c(tests[runex],tests[-runex]) #do examples first
+
+  if(cores > 1){
+    cl <- parallel::makeCluster(cores,outfile='')
+    on.exit(parallel::stopCluster(cl))
+    out <- parallel::parLapplyLB(cl,paste0(getwd(),folder,'/',tests),function(x){
+      pdf(NULL)
+    out<-testthat::test_file(x, reporter = "minimal")
+    dev.off()
+    return(out)
+  })
+  }
+  if(cores==1){
+    out <- lapply(paste0(getwd(),folder,'/',tests),function(x){
+      cat(x)
+      out<-testthat::test_file(x, reporter = "minimal")
+      print(out)
+      return(out)
+    })
+  }
+  out2 <- do.call(what = rbind,lapply(out,as.data.frame))
+  dev.off()
+  print(out2[,colnames(out2)!='result'])
+  return(invisible(out2))
+}
+  
+
+
 suppressOutput <- function(...,verbose=0){
   if(verbose > 0) return(eval(...)) else return(capture.output(eval(...)))
 }
@@ -48,7 +82,7 @@ if(1==99) Row <- Col <- NULL
         xsd<-melt(as.data.table(l[[ paste0(names(l)[i],'cov') ]],
           keep.rownames = TRUE,na.rm = FALSE),measure.vars='value')
         xsd <-subset(xsd,Row==Col)
-        xsd$value <- sqrt(xsd$value)
+        xsd$value <- sqrt(xsd$value+1e-8)
         xsd$Obs <- as.integer(xsd$Obs)
         setnames(xsd,'value','sd')
         x<-merge(x,xsd,by=colnames(xsd)[colnames(xsd) %in% colnames(x)]) #data.table(sd=(sqrt(xsd$value))))
@@ -75,8 +109,8 @@ gridplot <- function(m, maxdim=c(3,3),...){
   par(mfrow=d,mar=c(1.1,1.1,1.1,0),mgp=c(.1,.1,0))
   for(i in 1:dim(m)[length(dim(m))]){
     n=colnames(m)[i]
-    if(class(m)=='matrix') plot(m[,i],main=ifelse(is.null(n),i,n),col='red',xlab='',ylab='',...)
-    if(class(m)=='array') matplot(m[,,i],main=ifelse(is.null(n),i,n),type='l',xlab='',ylab='',...)
+    if('matrix' %in% class(m)) plot(m[,i],main=ifelse(is.null(n),i,n),col='red',xlab='',ylab='',...)
+    if('array' %in% class(m)) matplot(m[,,i],main=ifelse(is.null(n),i,n),type='l',xlab='',ylab='',...)
   }
   suppressWarnings(do.call(par,oldpar))
 }
@@ -264,17 +298,24 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,
   sd=sd(xlims)
   xlims[1] = xlims[1] - sd/2
   xlims[2] = xlims[2] + sd/2
-
-  bw=sapply(x,function(d) bw.SJ(na.omit(c(d))))
-  bw = mean(bw) + ifelse(length(bw) > 1,sd(bw),0)
-
+# browser()
+  logbw=log(sapply(x,function(d) {
+    out<-try(bw.SJ(na.omit(c(d))),silent=TRUE)
+    if('try-error' %in% class(out)) out <- bw.nrd0(na.omit(c(d)))
+    return(out)
+    }))
+  # browser()
+  logbwmean = mean(logbw + ifelse(length(logbw) > 1,sd(logbw),0))
+# browser()
   denslist<-lapply(1:length(x),function(xi) {
-    d=stats::density(x[[xi]],bw=bw,n=5000,from=xlims[1],to=xlims[2],na.rm=TRUE)
+    bw=sqrt(exp(mean(logbwmean))) #logbw[xi]+
+    # print(bw)
+    d=stats::density(x[[xi]],bw=bw/2,n=5000,from=xlims[1],to=xlims[2],na.rm=TRUE)
     # d$y=d$y/ sum(d$y)/range(d$x)[2]*length(d$y)
     return(d)
   })
 
-  xlims=range(sapply(denslist,function(d) d$x[d$y> (.05*max(d$y))]))
+  xlims=range(sapply(denslist,function(d) d$x[d$y> (.1*max(d$y))]))
   xlims <- xlims +c(-1,1)*sd(xlims)
   ylims=c(0,max(unlist(lapply(denslist,function(li) max(li$y))))*1.1)
 

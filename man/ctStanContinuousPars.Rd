@@ -4,8 +4,13 @@
 \alias{ctStanContinuousPars}
 \title{ctStanContinuousPars}
 \usage{
-ctStanContinuousPars(ctstanfitobj, subjects = "all", iter = "all",
-  calcfunc = quantile, calcfuncargs = list(probs = 0.5))
+ctStanContinuousPars(
+  ctstanfitobj,
+  subjects = "all",
+  iter = "all",
+  calcfunc = quantile,
+  calcfuncargs = list(probs = 0.5)
+)
 }
 \arguments{
 \item{ctstanfitobj}{fit object from \code{\link{ctStanFit}}}
