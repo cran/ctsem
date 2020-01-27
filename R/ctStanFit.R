@@ -356,7 +356,7 @@ verbosify<-function(sf,verbose=2){
 #' plot(m2i)
 #' 
 #' f2i <- ctStanFit(datalong = dat2, ctstanmodel = m2i,intoverpop=TRUE,
-#'   iter=300,chains=2,control=list(max_treedepth=7))
+#'   iter=200,chains=2,control=list(max_treedepth=7))
 #' summary(f2i)
 #' ctStanPlotPost(f2i)
 #' ctKalman(f2i,kalmanvec=c('y','ysmooth'),subjects=2:4,plot=TRUE,errorvec=NA)
@@ -467,35 +467,6 @@ verbosify<-function(sf,verbose=2){
 #' 
 #' 
 #' 
-#' #non-linear dedpendencies - based on m3 model (including intervention)
-#' #specify intervention as dependent on extra parameters in PARS matrix, and latent process 1
-#' 
-#' m3nl <- ctModel( type = 'stanct',
-#'   manifestNames = c('Y1'), latentNames=c('eta1'),
-#'   n.TDpred=1,TDpredNames = 'TD1',
-#'   TDPREDEFFECT=matrix(c('PARS[1,1] + PARS[1,2] * state[1]'),nrow=1,ncol=1),
-#'   PARS=matrix(c('tdpredeffect_int','tdpredeffect_multiply'),1,2),
-#'   DRIFT=matrix('drift11',nrow=1,ncol=1),
-#'   DIFFUSION=matrix('diffusion11',nrow=1,ncol=1),
-#'   CINT=matrix(c('cint1'),ncol=1),
-#'   T0MEANS=matrix(c('t0m1'),ncol=1),
-#'   T0VAR=matrix('t0var11',nrow=1,ncol=1),
-#'   LAMBDA = diag(1),
-#'   MANIFESTMEANS=matrix(0,ncol=1),
-#'   MANIFESTVAR=matrix(c('merror1'),nrow=1,ncol=1))
-#' 
-#' l=ctModelLatex(m3nl)
-#' 
-#' #here fit using optimization instead of sampling -- not appropriate in all cases!
-#' f3nl <- ctStanFit(datalong = dat2, ctstanmodel = m3nl, optimize=TRUE)
-#' 
-#' summary(f3nl)
-#' 
-#' ctKalman(f3nl,subjects=1:4,plot=TRUE,errorvec=NA)
-#' #?plot.ctKalman #for plotting arguments
-#' 
-#' 
-#' 
 #' #dynamic factor model -- fixing CINT to 0 and freeing indicator level intercepts
 #' 
 #' m3df <- ctModel(type = 'stanct',
@@ -538,7 +509,6 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     if(is.null(nlcontrol$ukfspread)) nlcontrol$ukfspread = 1e-1
     if(is.null(nlcontrol$maxtimestep)) nlcontrol$maxtimestep = 999999
     if(is.null(nlcontrol$nldynamics)) nlcontrol$nldynamics = 'auto'
-    if(is.null(nlcontrol$ukffull)) nlcontrol$ukffull = FALSE
     if(is.null(nlcontrol$nlmeasurement)) nlcontrol$nlmeasurement = 'auto'
     if(is.null(nlcontrol$Jstep)) nlcontrol$Jstep = 1e-6
     nldynamics <- nlcontrol$nldynamics
@@ -773,10 +743,13 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     ctm$calcs <- ctsmodelmats$calcs
     
     
-    
     #get extra calculations and adjust model spec as needed
     ctm <- ctStanCalcsList(ctm)
-    if(sum(sapply(ctm$calcs,length)) > 0 || any(matsetup$when %in% c(1,2,3))){
+    
+    if(sum(sapply(ctm$calcs[!names(ctm$calcs) %in% c('jacobian','measurement')],length)) > 0 || 
+        any(matsetup$when %in% c(1,2,3)) ||
+        length(ctm$calcs$jacobian) - sum(grepl('sJy[',unlist(ctm$calcs$jacobian),fixed=TRUE)) > 0 #non measurement jacobians
+        ){
       if(nldynamics == FALSE) warning('Linear model requested but nonlinear model specified! May be a poor approximation') else nldynamics <- TRUE 
     }
     
@@ -788,7 +761,9 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
         length(c(ctm$calcs$driftcint, ctm$calcs$diffusion)) > 0) message('Stationarity assumptions based on initial states when using non-linear dynamics')
     
     nlmeasurement <- nlcontrol$nlmeasurement
+
     if(length(ctm$calcs$measurement) > 0 || 
+        any(matsetup$when %in% c(4)) ||
         (intoverpop && any(ctstanmodelbase$pars$indvarying[ctstanmodelbase$pars$matrix %in% names(mats$measurement)]))) { 
       if(nlmeasurement == FALSE) warning('Linear measurement model requested but nonlinear measurement specified!') else nlmeasurement <- TRUE
       
@@ -962,6 +937,9 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     #   ntdpred=ctm$n.TDpred,when=4,matsetup=matsetup,returnlambdaonly=TRUE),
     #   dim=c(standata$nmanifest,standata$nlatentpop))
     
+    standata$difftype <- 2L;
+    standata$dotipred <- 1L;
+    
     if(!recompile){ #then use finite diffs for some elements
       # standata$sJAxfinite <- array(as.integer(unique(c(which(matrix(ctm$jacobian$JAx %in% #which rows of jacobian are not simply drift / fixed / state refs
       #   jacobianelements(ctm$jacobian$JAx,mats=mx,remove=c('drift','fixed'),
@@ -1019,7 +997,11 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     
     standata$sdscale <- array(as.numeric(sdscale),dim=length(sdscale))
     
+    standata$approxct <- 0L
+    if(!is.null(ctm$approxct)) standata$approxct <- as.integer(ctm$approxct)
     
+    standata$taylorheun <- 0L
+    if(!is.null(ctm$taylorheun)) standata$taylorheun <- as.integer(ctm$taylorheun)
     
     #fixed hyper pars
     if(!is.null(ctm$fixedrawpopchol)) {
@@ -1044,7 +1026,12 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
       
       if(recompile || forcerecompile) {
         message('Compiling model...') 
-        sm <- stan_model(model_name='ctsem', model_code = c(stanmodeltext),auto_write=TRUE)
+        sm <- stan_model(model_name='ctsem', model_code = c(stanmodeltext),auto_write=TRUE
+          # ,allow_undefined = TRUE,verbose=TRUE,
+          # includes = paste0(
+          #   '\n#include "', file.path(getwd(), 'syl2.hpp'),'"',
+          #   '\n')
+          )
       }
       if(!recompile && !forcerecompile) {
         if(!gendata) sm <- stanmodels$ctsm else sm <- stanmodels$ctsmgen

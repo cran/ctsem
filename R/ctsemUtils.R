@@ -1,4 +1,5 @@
 testall<- function(cores=4,folder = '/tests/testthat'){
+  requireNamespace('testthat')
   Sys.setenv(NOT_CRAN='true')
   pdf(NULL)
   tests <- dir(paste0('.',folder))
@@ -24,7 +25,7 @@ testall<- function(cores=4,folder = '/tests/testthat'){
       return(out)
     })
   }
-  out2 <- do.call(what = rbind,lapply(out,as.data.frame))
+  out2 <- do.call(what = rbind,lapply(out,utils::getS3method('as.data.frame','testthat_results')))
   dev.off()
   print(out2[,colnames(out2)!='result'])
   return(invisible(out2))
@@ -308,7 +309,7 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,
   logbwmean = mean(logbw + ifelse(length(logbw) > 1,sd(logbw),0))
 # browser()
   denslist<-lapply(1:length(x),function(xi) {
-    bw=sqrt(exp(mean(logbwmean))) #logbw[xi]+
+    bw=(exp(mean(logbwmean)))^1 #logbw[xi]+
     # print(bw)
     d=stats::density(x[[xi]],bw=bw/2,n=5000,from=xlims[1],to=xlims[2],na.rm=TRUE)
     # d$y=d$y/ sum(d$y)/range(d$x)[2]*length(d$y)

@@ -28,8 +28,10 @@ test_that("anomauth", {
   sm$pars$indvarying<- FALSE
   sf=ctStanFit(ctDeintervalise(ctWideToLong(AnomAuth,Tpoints = AnomAuthmodel$Tpoints,n.manifest = 2)),
     ctstanmodel = sm, optimize=TRUE,verbose=0,savescores = FALSE,cores=2,nopriors=TRUE,
-    optimcontrol=list(finishsamples=100))
+    optimcontrol=list(finishsamples=100),plot=FALSE)
   expect_equal(23415.929,-2*sf$stanfit$optimfit$value,tolerance=.01)
+  anoms=summary(sf)
+  expect_equivalent(.036,anoms$popmeans['manifestmeans_Y1','sd'],tolerance=.004)
  }
 
 })
@@ -83,11 +85,12 @@ oscillatingf <- ctFit(Oscillating, oscillatingm, carefulFit = FALSE,retryattempt
 expect_equal(-3461.936,oscillatingf$mxobj$output$Minus2LogLikelihood,tolerance=.001)
 
 if( .Machine$sizeof.pointer != 4){
-  oscillatingm$DRIFT[2,1]="crosseffect|-log1p(exp(-param))"
+  oscillatingm$DRIFT[2,1]="crosseffect|-log1p(exp(-param))-1e-5"
  sm <- ctStanModel(oscillatingm)
   sm$pars$indvarying<- FALSE
   sf=ctStanFit(ctDeintervalise(ctWideToLong(Oscillating,Tpoints = oscillatingm$Tpoints,n.manifest = 1)),
     cores=2,verbose=0,
+    # optimcontrol=list(carefulfit=T),
     ctstanmodel = sm, optimize=TRUE,savescores = FALSE,nopriors=TRUE)
   expect_equal(-3461.936,-2*sf$stanfit$optimfit$value,tolerance=.01)
   
