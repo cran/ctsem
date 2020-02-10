@@ -1,8 +1,8 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 3.1.0
-Date: 2020-1-10
+Version: 3.1.1
+Date: 2020-2-10
 Authors@R: c(person("Charles", "Driver", role =
     c("aut","cre","cph"),email="driver@mpib-berlin.mpg.de"),
     person("Manuel", "Voelkle", role = c("aut","cph")),
@@ -40,11 +40,11 @@ NeedsCompilation: yes
 Suggests: knitr, testthat, devtools, DEoptim, GGally, shiny, gridExtra
 VignetteBuilder: knitr
 RoxygenNote: 7.0.2
-Packaged: 2020-01-26 22:35:37 UTC; Driver
+Packaged: 2020-02-10 14:00:02 UTC; Driver
 Author: Charles Driver [aut, cre, cph],
   Manuel Voelkle [aut, cph],
   Han Oud [aut, cph],
   Trustees of Columbia University [cph]
 Maintainer: Charles Driver <driver@mpib-berlin.mpg.de>
 Repository: CRAN
-Date/Publication: 2020-01-27 10:10:02 UTC
+Date/Publication: 2020-02-10 22:30:10 UTC
