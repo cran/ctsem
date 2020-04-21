@@ -5,7 +5,8 @@ ctJacobian <- function(m,types=c('J0','JAx','Jtd','Jy') ){
   
   # require(cOde)
   # require(Deriv)
-  mm=ctStanModelMatrices(m) #do here because we change m
+
+  # mm=ctStanModelMatrices(m) #do here because we change m
   
   # get system dimension
   ndim = max(m$pars$row[m$pars$matrix%in% 'T0MEANS'])
@@ -15,42 +16,52 @@ ctJacobian <- function(m,types=c('J0','JAx','Jtd','Jy') ){
   # initialize fn and state
   fn     = c()
   state   = paste0("state__", 1:ndim,'__')
-
+# browser()
   #replace system matrix references
-  matlist <- listOfMatrices(m$pars)
+  for(ri in 1:nrow(m$pars)){
+    if(grepl('[',m$pars$param[ri],fixed=TRUE) && !is.na(m$pars$transform[ri])){
+      # m$pars$param[ri] <- gsub('param',m$pars$param[ri],m$pars$transform[ri])
+    } else if(!grepl('[',m$pars$param[ri],fixed=TRUE) && !is.na(m$pars$param[ri])) m$pars$param[ri] <- paste0(m$pars$matrix[ri],'[',m$pars$row[ri],',',m$pars$col[ri],']')
+  }
+  #replace inverse logit temporarily
+  m$pars$param <- gsub('\\binv_logit\\((.*)\\)','1/\\(1+exp\\(-\\(\\1\\)\\)\\)',m$pars$param)
+  
+  mats <- listOfMatrices(m$pars)
   matnames <- names(ctStanMatricesList(unsafe=TRUE)$base)
   
-  # for(mati in matnames){ 
-  for(ri in 1:nrow(m$pars)){
-    counter <- 0
-    if(grepl('^\\b(state)\\b\\[\\d+\\]$',m$pars$param[ri]) && 
-        !is.na(as.integer(m$pars$transform[ri]))){ #if a simple state reference, and integer transform, include transforms
-      m$pars$param[ri] <- tform(
-        param = m$pars$param[ri],
-        transform = as.integer(m$pars$transform[ri]),
-        multiplier = m$pars$multiplier[ri],
-        meanscale = m$pars$meanscale[ri],
-        offset = m$pars$offset[ri],
-        inneroffset = m$pars$inneroffset[ri],singletext=TRUE)
-      # 
-      # m$pars$param[ri] <- paste0('Jtform___',m$pars$param[ri],' * ',m$pars$param[ri])
-    }
-    while(counter < 10 && grepl(paste0('\\b(',paste0(names(matlist),collapse='|'),')\\b\\['), m$pars$param[ri])){ #if system matrix referenced, unfold
-      counter = counter +1 #prevent infinite loops
-      
-      items = regmatches(m$pars$param[ri], #extract one or more references
-        gregexpr(
-          paste0('\\b(',paste0(names(matlist),collapse='|'),')\\b(?=\\[).*?(?<=\\])'), 
-          m$pars$param[ri], perl=TRUE)
-      )[[1]]
-      
-      for(itemi in 1:length(items)){ #replace one or more references
-        m$pars$param[ri] <- gsub(pattern = items[itemi], replacement = eval(parse(text=paste0('matlist$',items[itemi]))),x = m$pars$param[ri], fixed=TRUE)
-      }
-    }
-  }
+  # for(mati in matnames){
+  # for(ri in 1:nrow(m$pars)){
+  #   counter <- 0
+  #   if(grepl('^\\b(state)\\b\\[\\d+\\]$',m$pars$param[ri]) && 
+  #       !is.na(as.integer(m$pars$transform[ri]))){ #if a simple state reference, and integer transform, include transforms
+  #     m$pars$param[ri] <- tform(
+  #       param = m$pars$param[ri],
+  #       transform = as.integer(m$pars$transform[ri]),
+  #       multiplier = m$pars$multiplier[ri],
+  #       meanscale = m$pars$meanscale[ri],
+  #       offset = m$pars$offset[ri],
+  #       inneroffset = m$pars$inneroffset[ri],singletext=TRUE)
+  #     # 
+  #     # m$pars$param[ri] <- paste0('Jtform___',m$pars$param[ri],' * ',m$pars$param[ri])
+  #   }
+  #   while(counter < 10 && grepl(paste0('\\b(',paste0(names(matlist),collapse='|'),')\\b\\['), m$pars$param[ri])){ #if system matrix referenced, unfold
+  #     counter = counter +1 #prevent infinite loops
+  #     
+  #     items = regmatches(m$pars$param[ri], #extract one or more references
+  #       gregexpr(
+  #         paste0('\\b(',paste0(names(matlist),collapse='|'),')\\b(?=\\[).*?(?<=\\])'), 
+  #         m$pars$param[ri], perl=TRUE)
+  #     )[[1]]
+  #     
+  #     for(itemi in 1:length(items)){ #replace one or more references
+  #       m$pars$param[ri] <- gsub(pattern = items[itemi], replacement = eval(parse(text=paste0('matlist$',items[itemi]))),x = m$pars$param[ri], fixed=TRUE)
+  #     }
+  #   }
+  # }
   # browser()
-  mats<-listOfMatrices(m$pars)
+  # mats<-listOfMatrices(m$pars)
+  
+  
   Jout <- list()
   for(typei in types){
     if(typei=='JAx'){
@@ -93,6 +104,9 @@ ctJacobian <- function(m,types=c('J0','JAx','Jtd','Jy') ){
       fn = paste0(mats$MANIFESTMEANS,' + ',prodSymb(Jybase,cbind(paste0('state[',1:ndim,']'))))
       # fn = sapply(prodSymb(diag(nrow(mats$T0MEANS)), matrix(t0func,ncol=1)),Simplify)
     }
+    
+    # browser()
+    
     fn = gsub(" ", "", fn, fixed = TRUE) #remove spaces
     # replace state[~] by state~ for cOde Jacobian and make fn and state a named list
     names(fn) = paste0("fn", 1:length(fn))
@@ -128,22 +142,54 @@ ctJacobian <- function(m,types=c('J0','JAx','Jtd','Jy') ){
     # mm=ctStanModelMatrices(m)
     Js=J #replace parameter labels with matrix references
     
-    for(x in 1:nrow(mm$matsetup)){
-      Js=gsub(
-        pattern = paste0("\\b",mm$matsetup$parname[x],"\\b"),
-        replacement = paste0(matnames[mm$matsetup$matrix[x]],'[',
-          mm$matsetup$row[x],',',
-          mm$matsetup$col[x],']'),
-        x = Js)
-
-      for(mati in matnames) { #append s to system matrices
-        Js=gsub(pattern = paste0("\\b",mati,"\\b"), replacement = paste0('s',mati),  x = Js)
+    for(x in 1:length(Js)){
+      for(mi in 1:length(mats)){
+        for(ri in 1:nrow(mats[[mi]])){
+          for(ci in 1:ncol(mats[[mi]])){
+            if(suppressWarnings(is.na(as.numeric(Js[x])))){
+          if(Js[x] %in% mats[[mi]][ri,ci]) Js[x] <- paste0('s',names(mats)[mi],'[',ri,',',ci,']')
+            }
+          }
+        }
       }
     }
+
+    Jm <- matrix(Js,Jrows,ndim)
+    
+    if(typei=='JAx') matches <- c('DRIFT','CINT')
+    if(typei=='J0') matches <- c('T0MEANS','T0VAR')
+    if(typei=='Jtd') matches <- c('TDPREDEFFECT')
+    if(typei=='Jy') matches <- c('MANIFESTMEANS','LAMBDA','MANIFESTVAR')
+    for(j in 1:ncol(Jm)){
+      for(i in 1:nrow(Jm)){
+        for(mi in matches){
+          for(jm in 1:ncol(mats[[mi]])){
+            for(im in 1:nrow(mats[[mi]])){
+              if(is.na(suppressWarnings(as.numeric(Jm[i,j]))) && Jm[i,j] %in% mats[[mi]][im,jm]) Jm[i,j] <- paste0('s',mi,'[',im,',',jm,']')
+            }
+          }
+        }
+      }
+    }
+        
+    
+    # for(x in 1:nrow(mm$matsetup)){
+    #   Js=gsub(
+    #     pattern = paste0("\\b",mm$matsetup$parname[x],"\\b"),
+    #     replacement = paste0(matnames[mm$matsetup$matrix[x]],'[',
+    #       mm$matsetup$row[x],',',
+    #       mm$matsetup$col[x],']'),
+    #     x = Js)
+    # 
+    #   for(mati in matnames) { #append s to system matrices
+    #     Js=gsub(pattern = paste0("\\b",mati,"\\b"), replacement = paste0('s',mati),  x = Js)
+    #   }
+    # }
     # browser()
-    Jout[[typei]] <- matrix(Js,Jrows,ndim)
+    Jout[[typei]] <- Jm
   }#end type loop
   # print(Jout)
+   # browser()
   return(Jout)
 }
 

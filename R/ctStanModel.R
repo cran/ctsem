@@ -137,7 +137,7 @@ ctStanModel<-function(ctmodelobj, type='stanct',tipredDefault=TRUE){
   
   for(ri in 1:nrow(ctspec)){ #convert back to text for new approach
     if(!is.na(as.integer(ctspec$transform[ri]))){
-      ctspec$transform[ri] <- Simplify(tform(param = 'param',
+      ctspec$transform[ri] <- Simplify(tform(parin = 'param',
         transform = as.integer(ctspec$transform[ri]),
         multiplier = ctspec$multiplier[ri],
         meanscale = ctspec$meanscale[ri],
@@ -154,18 +154,7 @@ ctStanModel<-function(ctmodelobj, type='stanct',tipredDefault=TRUE){
   
   
   nparams<-sum(freeparams)
-  
-  # indvarying <- 'all'
-  # if(all(indvarying=='all'))  {
-  #   indvarying<-rep(TRUE,nparams)
-  #   # indvarying[ctspec$matrix[is.na(ctspec$value)] %in% 'T0VAR'] <- FALSE
-  # }
-  # 
-  # if(length(indvarying) != nparams) stop('indvarying must be ', nparams,' long!')
-  # nindvarying <- sum(indvarying)
-  # 
-  
-  
+
   ctspec$indvarying<-FALSE
   ctspec$indvarying[!is.na(ctspec$transform) & ctspec$matrix %in% c('T0MEANS','MANIFESTMEANS','CINT')] <- TRUE
   
@@ -203,7 +192,8 @@ ctStanModel<-function(ctmodelobj, type='stanct',tipredDefault=TRUE){
         split <- split[1:4]
       }
       
-      if(grepl('\\W',split[1]) || any(sapply(latentNames,function(x){ #if symbols or latent states
+      if(grepl('\\W',split[1]) || 
+          any(sapply(latentNames,function(x){ #if symbols or latent states
         grepl(paste0('\\b(',x,')\\b'),split[1])
       }))) {
         if(!simpleStateCheck(split[1])) stop(paste0(split[1],' invalid -- Matrix elements involving multiple parameters / latent states cannot have | separators -- transformations should be specified as part of the first element, indvarying and tipredeffects must be specified in the corresponding singular PARS matrix elements.'))
@@ -249,6 +239,7 @@ ctStanModel<-function(ctmodelobj, type='stanct',tipredDefault=TRUE){
     if(grepl('\\W',gsub('.','',ctspec$param[ri],fixed=TRUE)) || ctspec$param[ri] %in% latentNames){
       ctspec$value[ri] <- NA
       if(!simpleStateCheck(ctspec$param[ri])) ctspec$transform[ri] <-NA #allow transforms for simplestates
+      if(simpleStateCheck(ctspec$param[ri])) ctspec$transform[ri] <-'param' #allow transforms for simplestates
     }
   }
   

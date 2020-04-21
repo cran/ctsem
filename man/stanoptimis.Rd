@@ -18,10 +18,12 @@ stanoptimis(
   nopriors = FALSE,
   carefulfit = TRUE,
   subsamplesize = 0.5,
+  finitediff = FALSE,
+  datadrivenpars = c(),
   plot = FALSE,
   is = FALSE,
   isloopsize = 1000,
-  finishsamples = 500,
+  finishsamples = 1000,
   tdf = 10,
   chancethreshold = 100,
   finishmultiply = 5,
@@ -61,13 +63,20 @@ the stan model uses this value.}
 
 \item{subsamplesize}{value between 0 and 1 representing proportion of subjects to include in first pass fit.}
 
+\item{finitediff}{Either 'ask', TRUE, or FALSE. Whether to use the slow finite difference calculations
+for the Hessian (used for confidence intervals) if other approaches do not give a positive definite result.}
+
+\item{datadrivenpars}{vector of integers denoting which parameters should begin fixed
+at zero, and only freed if expected to substantially contribute to model fit.}
+
 \item{plot}{Logical. If TRUE, plot iteration details. Probably slower.}
 
 \item{is}{Logical. Use importance sampling, or just return map estimates?}
 
 \item{isloopsize}{Number of samples of approximating distribution per iteration of importance sampling.}
 
-\item{finishsamples}{Number of samples to draw for final results of importance sampling.}
+\item{finishsamples}{Number of samples to draw (either from hessian
+based covariance or posterior distribution) for final results computation.}
 
 \item{tdf}{degrees of freedom of multivariate t distribution. Higher (more normal) generally gives more efficent
 importance sampling, at risk of truncating tails.}

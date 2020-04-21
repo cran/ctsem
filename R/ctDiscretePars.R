@@ -29,7 +29,8 @@
 #'  DIFFUSION=matrix(c(0, 0, 0, "diffusion"), ncol=2, nrow=2))
 #'
 #' #fit
-#' ssfit <- ctStanFit(datalong, ssmodel, iter=300, chains=2)
+#' ssfit <- ctStanFit(datalong, ssmodel, iter=300, 
+#'   optimize=FALSE, chains=2)
 #' ctStanParnames(ssfit,substrings=c('pop_','popsd'))
 #' }
 #' 
@@ -342,6 +343,12 @@ ctStanDiscreteParsPlot<- function(x,indices='all',add=FALSE,legend=TRUE, polygon
   if(indices[1]=='all') indices <- cbind(
     rep(1:nlatent,nlatent),
     rep(1:nlatent,each=nlatent))
+  
+  if(!'array' %in% class(indices)){#interpret as individual columns
+    indices <- cbind(
+      rep(1:nlatent,length(unique(indices))),
+      rep(unique(indices),each=length(unique(indices))))
+  }
   
   if(ltyvec[1]=='auto') ltyvec=1:nrow(indices)
   if(lwdvec[1]=='auto') lwdvec= rep(3,nrow(indices))

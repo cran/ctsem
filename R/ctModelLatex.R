@@ -1,7 +1,69 @@
+ctModelBuildPopCov <- function(ctm,linearise){ #for latex
+  ctm <- T0VARredundancies(ctm)
+  pars <- unique(ctm$pars$param[ctm$pars$indvarying])
+  d=length(pars)
+  m <- matrix(paste0(ifelse(linearise,'','raw'),'PCov_',rep(1:d,d),'_',rep(1:d,each=d)),d,d,dimnames = list(pars,pars))
+  m[upper.tri(m)]=t(m[lower.tri(m)])
+  return(m)
+}
+
+ctModelBuildTIeffects <- function(ctm){ #for latex
+  ctm$pars <- ctStanModelCleanctspec(ctm$pars)
+  tieffects <- unique(colnames(ctm$pars)[grep('_effect',colnames(ctm$pars),fixed=TRUE)])
+  pars <- unique(ctm$pars$param[apply(ctm$pars[,tieffects,drop=FALSE],1,any)])
+  timat <- matrix(0,length(pars),length(tieffects),dimnames = list(pars,gsub('_effect','',tieffects)))
+  if(length(tieffects)){
+    for(p in 1:length(pars)){
+      timat[p,] <- unlist(ctm$pars[match(x = pars[p],ctm$pars$param),tieffects,drop=FALSE])
+    }
+  }
+  for(i in 1:nrow(timat)){
+    for(j in 1:ncol(timat)){
+      if(timat[i,j] !=0) timat[i,j] = paste0(pars[i],'_',gsub('_effect','',tieffects[j],fixed=TRUE))
+    }}
+  return(timat)
+}
+
+ctMatsetupFreePars <- function(m,intoverpop){
+    m=m[m$when==0 & m$param > 0,,drop=FALSE]
+    m=m[match(unique(m$param),m$param),,drop=FALSE]
+    m = m[order(m$param),,drop=FALSE]
+}
+
+ctMatvalueFreePars <- function(ms,mv){
+  mv=mv[ms$when==0 & ms$param > 0,,drop=FALSE]
+  ms=ms[ms$when==0 & ms$param > 0,,drop=FALSE]
+  mv=mv[match(unique(ms$param),ms$param),,drop=FALSE]
+  mv = mv[order(ms$param),,drop=FALSE]
+}
+
+# ctCovTransform <- function(rawpopcov, rawpopmeans, ms, mv){
+#   mv <- ctMatvalueFreePars(ms,mv)
+#   ms <- ctMatsetupFreePars(ms)
+#   rawpopmeans=rawpopmeans[ms$param[ms$indvarying>0]]
+#   
+#   d=nrow(rawpopcov)
+#   n=10000
+#   mc <- t(chol(rawpopcov))
+#   
+#   x <- matrix(rnorm(n*d),n,d)
+#   x <- t(apply(x,1,function(y)  mc %*% (y) + rawpopmeans ))
+#   tx <- x
+#   for(i in 1:nrow(mc)){
+#       tx[,i] <- ctsem:::tform(x[,i],ms$transform[i],mv$multiplier[i], mv$meanscale[i], mv$offset[i],mv$inneroffset[i])
+#   }
+#   return(cov(tx))
+# }
+
+
+
 #' Generate and optionally compile latex equation of subject level ctsem model.
 #'
 #' @param x ctsem model object or ctStanFit object.
 #' @param matrixnames Logical. If TRUE, includes ctsem matrix names such as DRIFT and DIFFUSION under the matrices.
+#' @param digits Precision of decimals for numeric values.
+#' @param linearise Logical. Show the linearised normal approximation for subject parameters and 
+#' covariate effects, or the raw parameters?
 #' @param textsize Standard latex text sizes -- 
 #' tiny scriptsize footnotesize small normalsize large Large LARGE huge Huge. 
 #' Useful if output overflows page. 
@@ -32,30 +94,115 @@
 #'   
 #' l=ctModelLatex(ctmodel,compile=FALSE, open=FALSE)
 #' cat(l)
-ctModelLatex<- function(x,matrixnames=TRUE,textsize='normalsize',folder=tempdir(),
+ctModelLatex<- function(x,matrixnames=TRUE,digits=3,linearise=class(x) %in% 'ctStanFit',textsize='normalsize',folder=tempdir(),
   filename=paste0('ctsemTex',as.numeric(Sys.time())),tex=TRUE, equationonly=FALSE, compile=TRUE, open=TRUE,
   minimal=FALSE){
   #library(ctsem)
   
-  
+  dopopcov <- FALSE
   
   if('ctStanFit' %in% class(x)){
-    parmats <- summary(x,residualcov=FALSE,priorcheck=FALSE)
-    parmats <- data.frame(parmats$parmatrices,matrix=rownames(parmats$parmatrices))
-    ctmodel <- x$ctstanmodelbase
-    for(i in 1:nrow(ctmodel$pars)){
-      if(is.na(ctmodel$pars$value[i])){
-        ctmodel$pars$value[i] <- parmats[parmats$matrix %in% ctmodel$pars$matrix[i] & 
-            ctmodel$pars$row[i] == parmats$Row & ctmodel$pars$col[i]==parmats$Col,'Mean']
+    ms=ctMatsetupFreePars(x$setup$matsetup)
+    e=ctExtract(x)
+    if(x$standata$ntipred > 0){
+    if(linearise) timat <- round(ctCollapse(e$linearTIPREDEFFECT,1,mean),digits)
+    if(!linearise) timat <- round(ctCollapse(e$TIPREDEFFECT,1,mean),digits)
+    rownames(timat) <- ms$parname
+    colnames(timat) <- x$ctstanmodel$TIpredNames
+    timat <- timat[apply(x$standata$TIPREDEFFECTsetup,1,function(x) any(x!=0)),,drop=FALSE]
+    } else timat <- diag(0,0)
+    
+    if(!is.null(e$rawpopcov)){ 
+      
+      if(!linearise) popcov <- round(ctCollapse(e$rawpopcov,1,mean),digits)
+      if(linearise) {
+        popcov <- stan_constrainsamples(x$stanmodel,x$standata,rbind(x$stanfit$rawest),
+          cores=1,pcovn =1000,dokalman=FALSE,savesubjectmatrices = FALSE)$popcov
+        popcov <- round(ctCollapse(e$popcov,1,mean),digits=digits)
+      if(x$standata$intoverpop==1){
+        t0index <- ms$indvarying[ms$param > 0 & ms$row <= x$standata$nlatent & ms$matrix %in% 1 & ms$indvarying > 0]
+        popcov[t0index,t0index] <- round(ctCollapse(e$pop_T0VAR,1,mean),digits=digits)[
+          t0index,t0index] #is this correct...?
+      }
+        rownames(popcov) <- ms$parname[as.logical(ms$indvarying)]
+        colnames(popcov) <- ms$parname[as.logical(ms$indvarying)]
+      }
+    } else popcov <- diag(0,0)
+
+    if(!linearise) popmeans <- round(ctCollapse(e$rawpopmeans,1,mean),digits)[
+      as.logical(ms$indvarying + ms$tipred),drop=FALSE]
+    if(linearise) {
+      popmeans <- round(ctCollapse(e$popmeans,1,mean),digits)[
+      as.logical(ms$indvarying + ms$tipred),drop=FALSE]
+      if(x$standata$intoverpop==1){
+        popmeans[t0index]<- round(ctCollapse(e$pop_T0MEANS,1,mean),digits=digits)[
+          t0index,1]
       }
     }
     
-    
+    # parmats <- summary(x,residualcov=FALSE,priorcheck=FALSE,digits=digits)
+    # parmats <- data.frame(parmats$parmatrices,matrix=rownames(parmats$parmatrices))
+    ctmodelmats <- listOfMatrices((x$ctstanmodelbase$pars))
+    ctmodel <- x$ctstanmodelbase
+    ####################################################################
+    for(mi in names(ctmodelmats)){
+      mimean <- ctCollapse(e[[paste0('pop_',mi)]],1,mean)
+      for(i in 1:nrow(ctmodelmats[[mi]])){
+        for(j in 1:ncol(ctmodelmats[[mi]])){
+          ctmodelmats[[mi]][i,j] <- round(mimean[i,j],digits)
+      # if(ctmodel$pars$matrix[i] %in% parmats$matrix){
+      #   try(ctmodel$pars$value[i] <- parmats[parmats$matrix %in% ctmodel$pars$matrix[i] & 
+      #       ctmodel$pars$row[i] == parmats$Row & ctmodel$pars$col[i]==parmats$Col,'Mean'],silent=TRUE)
+        }
+      }
+    }
+    ctmodel <- c(ctmodel,ctmodelmats)
+    class(ctmodel) <- 'ctStanModel'
   } else ctmodel <- x
   
   if('ctStanModel' %in% class(ctmodel)) {
+    
+    if(!'ctStanFit' %in% class(x)){ #construct pop effects
+    popcov <- ctModelBuildPopCov(ctmodel,linearise=linearise)
+    if(ctmodel$n.TIpred > 0) timat <- ctModelBuildTIeffects(ctmodel) else timat <- diag(0,0)
+    if(!linearise) timat[,] <- paste0('raw_',timat)
+    popmeans<-paste0(ifelse(linearise,'','raw_'),unique(c(rownames(popcov),rownames(timat))))
+    ctmodel<-T0VARredundancies(ctmodel)
     ctmodel <- c(ctmodel,listOfMatrices(ctmodel$pars)) 
-    continuoustime <- ctmodel$continuoustime
+    }
+    
+    dopopcov <- as.logical(nrow(popcov))
+    doti <- as.logical(nrow(timat))
+    
+    if(doti){
+      # both <- rownames(timat) %in% rownames(popcov)
+      pars <- unique(c(rownames(popcov),rownames(timat)))
+      newpopcov <- matrix(0,length(pars),length(pars),dimnames=list(pars,pars))
+      newtimat <- matrix(0,length(pars),ncol(timat),dimnames=list(pars,colnames(timat)))
+      newtimat[na.omit(match(rownames(timat),rownames(newtimat))),] <- timat
+      newpopcov[na.omit(match(rownames(popcov),rownames(newpopcov))), 
+        na.omit(match(rownames(popcov),rownames(newpopcov)))] <- popcov
+      popcov <- newpopcov
+      timat <- newtimat
+    }
+    
+    dopop <- doti||dopopcov
+
+    if(!'ctStanFit' %in% class(x)){ #if a model
+
+      t0index <- unique(ctmodel$pars$row[ctmodel$pars$matrix %in% 'T0MEANS' & 
+          ctmodel$pars$indvarying & is.na(ctmodel$pars$value)])
+      if(length(t0index)){
+        t0varpopcov <- matrix(
+          paste0('Pcorsqrt_',t0index,'_',rep(t0index,each=length(t0index))),
+          nrow=length(t0index),ncol=length(t0index))
+        t0varpopcov[upper.tri(t0varpopcov)] <- 0
+        # ms$indvarying[ms$param > 0 & ms$row <= x$standata$nlatent & ms$matrix %in% 1 & ms$indvarying > 0]
+      ctmodel$T0VAR[t0index,t0index] <- t0varpopcov
+      }
+    }
+   
+     continuoustime <- ctmodel$continuoustime
   } else {
     if(class(ctmodel) != 'ctsemInit') stop('not a ctsem model!')
     continuoustime <- TRUE
@@ -95,22 +242,24 @@ ctModelLatex<- function(x,matrixnames=TRUE,textsize='normalsize',folder=tempdir(
   }
   
   
-  W <- diag(1,ctmodel$n.latent)
-  if(continuoustime) diag(W) <- 'u-t'
+  W <- diag(1,1)
+  if(continuoustime) diag(W) <- 't-u'
 
 #out = 'Hello' 
 
   
 out <- ifelse(equationonly,"","
-\\documentclass[a4paper,landscape]{report}
-\\usepackage[margin=1cm]{geometry}
-\\usepackage{amsmath} %for multiple line equations
+\\documentclass[a4paper]{article}
+\\usepackage{geometry}
+\\geometry{paperwidth=\\maxdimen,paperheight=\\maxdimen,margin=1cm}
+
+\\usepackage[fleqn]{amsmath} %for multiple line equations
+\\usepackage[active,tightpage,displaymath]{preview}
 \\usepackage{bm}
 \\newcommand{\\vect}[1]{\\boldsymbol{\\mathbf{#1}}}
 
-
 \\begin{document}
-\\thispagestyle{empty}")
+\\pagenumbering{gobble}")
 
 if (minimal){
   dict = list('A' = 'DRIFT','b'='CINT','M'='TDPREDEFFECT','G'='DIFFUSION','tau'='MANIFESTMEANS')
@@ -204,13 +353,36 @@ if (minimal){
   
   out= paste0(out,tablestring,'\n',equationstring)
 } else {
+  showd <- ifelse(continuoustime,"\\mathrm{d}","") #for continuous or discrete system
 out <- paste0(out, "
-\\setcounter{MaxMatrixCols}{200}
  \\begin{",textsize,"}
+ \\setcounter{MaxMatrixCols}{200}
   \\begin{align*}
-  &\\underbrace{",ifelse(continuoustime,"\\mathrm{d}",""),"
+  ",if(dopop) paste0("\\parbox{10em}{\\centering{Subject\\linebreak parameter\\linebreak distribution:}}
+             &\\underbrace{",bmatrix(matrix(paste0('\\text{',
+             gsub('_','\\_',colnames(popcov),fixed=TRUE),'}_i')),nottext=T)," 
+            }_{\\vect{\\phi}(i)} ",ifelse(linearise,"\\approx","\\sim"),
+    ifelse(linearise,"","\\textrm{tform}\\left\\{"),
+    " \\mathrm{N} \\left(
+              ",bmatrix(popmeans),", ", bmatrix(popcov)," \\right) ",
+      if(doti) paste0(" + \\underbrace{",bmatrix(timat),"}_{\\vect{",ifelse(linearise,"\\hat",""),"\\beta}}","
+  \\underbrace{
+    ",bmatrix(matrix(colnames(timat))),"}_{\\vect{z}}"),
+    ifelse(linearise,"","\\right\\}")," \\\\"),
+  "\\parbox{10em}{\\centering{Initial\\linebreak latent\\linebreak state:}}
+  &\\underbrace{",bmatrix(matrix(paste0(ctmodel$latentNames)))," 
+    \\big{(}t_0\\big{)}}_{\\vect{\\eta} (t_0)}	\\sim \\mathrm{N} \\left(
+              \\underbrace{
+        ",bmatrix(ctmodel$T0MEANS),"
+      ",ifelse(!matrixnames,"}_{{", "}_{\\underbrace{"),"\\vect{}}",ifelse(!matrixnames,"}","_\\textrm{T0MEANS}}"),",
+      \\underbrace{",if(!'ctStanFit' %in% class(x)) "covsdcor \\left\\{","
+        ",bmatrix(ctmodel$T0VAR),if(!'ctStanFit' %in% class(x)) "\\right\\}","
+      ",ifelse(!matrixnames,"}_{{", "}_{\\underbrace{"),"\\vect{Q^{*}}_{t0}}",ifelse(!matrixnames,"}","_\\textrm{T0VAR}}"),"
+      \\right) \\\\
+      \\parbox{10em}{\\centering{Deterministic\\linebreak change:}}
+  &\\underbrace{",showd,"
     ",bmatrix(matrix(paste0(ctmodel$latentNames)))," 
-    \\big{(}t\\big{)}}_{",ifelse(continuoustime,"\\mathrm{d}","")," \\vect{\\eta} (t)}	=  \\left(
+    \\big{(}t\\big{)}}_{",showd," \\vect{\\eta} (t)}	=  \\left(
       \\underbrace{
         ",bmatrix(ctmodel$DRIFT),"
       ",ifelse(!matrixnames,"}_{{", "}_{\\underbrace{"),"\\vect{A}}",ifelse(!matrixnames,"}","_\\textrm{DRIFT}}")," \\underbrace{
@@ -226,17 +398,14 @@ out <- paste0(out, "
         ",bmatrix(matrix(paste0('\\chi_{',1:ncol(ctmodel$TDPREDEFFECT),'}')))," 
       }_{\\vect{\\chi} (t)}"),
     "\\right) ",ifelse(continuoustime,"\\mathrm{d}t","")," \\quad + \\nonumber \\\\ \\\\
-    & \\qquad \\qquad \\quad cholsdcor\\bigg(\\underbrace{
-      ",bmatrix(ctmodel$DIFFUSION),"
-    ",ifelse(!matrixnames,"}_{{", "}_{\\underbrace{"),"\\vect{G}}",ifelse(!matrixnames,"}","_\\textrm{DIFFUSION}}\\bigg)"),"
-    \\underbrace{",ifelse(continuoustime,"\\mathrm{d}",""),"
+    \\parbox{10em}{\\centering{Random\\linebreak change:}}
+    & \\qquad \\qquad \\quad \\underbrace{cholsdcor\\left\\{
+      ",bmatrix(ctmodel$DIFFUSION),"\\right\\}
+    ",ifelse(!matrixnames,"}_{{", "}_{\\underbrace{"),"\\vect{G}}",ifelse(!matrixnames,"}","_\\textrm{DIFFUSION}}"),"
+    \\underbrace{",showd,"
       ",bmatrix(matrix(paste0('W_{',1:ctmodel$n.latent,'}')),nottext=TRUE)," 
-      (t)}_{",ifelse(continuoustime,"\\mathrm{d}","")," \\vect{W}(t)} \\\\ \\\\
-          &",if(continuoustime) paste0("\\underbrace{
-            ",bmatrix(matrix(paste0('W_{',1:ctmodel$n.latent,'}')),nottext=TRUE),"  
-            (t+u)}_{\\vect{W}(t+u)} - "),"  \\underbrace{",bmatrix(matrix(paste0('W_{',1:ctmodel$n.latent,'}')),nottext=TRUE),"  
-            (t)}_{\\vect{W}(t)} \\sim  \\mathrm{N} \\left(
-              ",bmatrix(matrix(0,ctmodel$n.latent,1)),", ",bmatrix(W)," \\right) \\\\ \\\\
+      (t)}_{",showd," \\vect{W}(t)} \\\\ \\\\
+              \\textrm{Observations: }
 &\\underbrace{
       ",bmatrix(matrix(ctmodel$manifestNames),nottext=FALSE),"  
       (t)}_{\\vect{Y}(t)} = 
@@ -254,13 +423,16 @@ out <- paste0(out, "
               \\underbrace{
           ",bmatrix(matrix(paste0('\\epsilon_{',1:ctmodel$n.manifest,'}')))," 
           (t)}_{\\vect{\\epsilon}(t)} \\\\ \\\\
-          &\\underbrace{
-            ",bmatrix(matrix(paste0('\\epsilon_{',1:ctmodel$n.manifest,'}')))," 
-            (t)}_{\\vect{\\epsilon}(t)} \\sim  \\mathrm{N} \\left(
-              ",bmatrix(matrix(0,ctmodel$n.manifest,1)),"
-              ,
-                ",bmatrix(diag(1,ctmodel$n.manifest))," \\right) \\\\
-&\\textrm{cholsdcor = Function converting lower tri matrix of std dev and unconstrained correlation to Cholesky factor.} \\\\ \\\\ 
+                \\parbox{10em}{\\centering{Latent noise\\linebreak per time step:}}
+          &",ifelse(continuoustime,'\\Delta ',''),"\\big[W_{j \\in [1,",ctmodel$n.latent,"]}\\big](t",
+          ifelse(continuoustime,'-u',''),")   \\sim  \\mathrm{N}(0,",W,") \\quad
+              \\parbox{10em}{\\centering{Observation\\linebreak noise:}}
+            ",bmatrix(matrix(paste0('\\epsilon_{j \\in [1,',ctmodel$n.latent,']}')))," 
+            (t) \\sim  \\mathrm{N}(0,1) \\\\ \\\\",
+            if(dopop) paste0(if(linearise) "&\\textrm{Linearised approximation of subject parameter distribution shown.}\\\\
+            &\\textrm{Indivividual specific notation (subscript i) only shown for subject parameter distribution -- pop. means shown elsewhere.} \\\\"),"
+&cholsdcor\\textrm{ converts lower tri matrix of std dev and unconstrained correlation to Cholesky factor covariance.} \\\\
+&covsdcor =\\textrm{ transposed cross product of cholsdcor, to give covariance.} \\\\
 &\\textrm{See Driver \\& Voelkle (2018) p11.}
       \\end{align*}
       \\end{",textsize,"}
@@ -276,6 +448,10 @@ out <- paste0(out, "
     on.exit(setwd(oldwd))
     write(x = out,file = paste0(filename,'.tex'))
     if(compile){
+      if(requireNamespace('tinytex',quietly=TRUE)){
+        tinytex::pdflatex(file=paste0(filename,'.tex'), clean=TRUE)
+        
+      } else{
       hastex <- !Sys.which('pdflatex') %in% ''
       a=try(tools::texi2pdf(file=paste0(filename,'.tex'),quiet=FALSE, clean=TRUE))
       if('try-error' %in% class(a) && !hastex) {
@@ -287,6 +463,8 @@ out <- paste0(out, "
         #   if(requireNamespace('tinytex',quietly=TRUE)) tinytex::install_tinytex()
         # }
       }
+      } #end else
+      
       if(interactive() && open) try(openPDF(paste0(filename,'.pdf')))
     }
     

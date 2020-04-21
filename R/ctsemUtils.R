@@ -1,4 +1,4 @@
-testall<- function(cores=4,folder = '/tests/testthat'){
+testall<- function(cores=4,folder = '/tests/testthat',examples=TRUE){
   requireNamespace('testthat')
   Sys.setenv(NOT_CRAN='true')
   pdf(NULL)
@@ -6,6 +6,7 @@ testall<- function(cores=4,folder = '/tests/testthat'){
   tests <- tests[grepl('^test',tests)]
   runex <- grep('runExamples',tests)
   tests <- c(tests[runex],tests[-runex]) #do examples first
+  if(!examples) tests <- tests[-grep('runExamples',tests)]
 
   if(cores > 1){
     cl <- parallel::makeCluster(cores,outfile='')
@@ -116,12 +117,32 @@ gridplot <- function(m, maxdim=c(3,3),...){
   suppressWarnings(do.call(par,oldpar))
 }
 
+perm <- function(v) {
+  n <- length(v)
+  if (n == 1) v
+  else {
+    X <- NULL
+    for (i in 1:n) X <- rbind(X, cbind(v[i], perm(v[-i])))
+    X
+  }
+}
+
 # helper function to generate an index matrix, or return unique elements of a matrix
 indexMatrix<-function(dimension,symmetrical=FALSE,upper=FALSE,lowerTriangular=FALSE, sep=NULL,starttext=NULL,endtext=NULL,
-  unique=FALSE,rowoffset=0,coloffset=0,indices=FALSE,diagonal=TRUE,namesvector=NULL){
+  unique=FALSE,rowoffset=0,coloffset=0,indices=FALSE,diagonal=TRUE,namesvector=NULL,shortdiag=FALSE){
   if(is.null(namesvector)) namesvector=1:9999
-  if(indices==T) sep<-c(",")
-  tempmatrix<-matrix(paste0(starttext,namesvector[1:dimension+rowoffset],sep,rep(namesvector[1:dimension+coloffset],each=dimension),endtext),nrow=dimension,ncol=dimension)
+  if(indices==TRUE) sep<-c(",")
+  tempmatrix<-matrix(paste0(starttext,rep(namesvector[1:dimension+coloffset],dimension)),nrow=dimension,ncol=dimension)
+  for(i in 1:nrow(tempmatrix)){ #append step by step for shortdiag
+    for(j in 1:ncol(tempmatrix)){
+        # tempmatrix[i,j] <- paste0(tempmatrix[i,j],sep,namesvector[1:dimension+rowoffset][i])
+        # print(tempmatrix[i,j])
+        # print(namesvector[1:dimension+rowoffset][i])
+        if(i!=j || !shortdiag) tempmatrix[i,j] <- paste0(tempmatrix[i,j],sep,namesvector[1:dimension+rowoffset][j])
+    }
+  }
+  tempmatrix[,]<-paste0(tempmatrix[,],endtext)
+      
   if(upper==TRUE) tempmatrix<-t(tempmatrix)
   if(symmetrical==TRUE) tempmatrix[col(tempmatrix)>row(tempmatrix)] <-t(tempmatrix)[col(tempmatrix)>row(tempmatrix)]
   if(unique==TRUE && symmetrical==TRUE) tempmatrix<-tempmatrix[lower.tri(tempmatrix,diag=diagonal)]
@@ -280,7 +301,7 @@ ctDensity<-function(x,bw='auto',plot=FALSE,...){
 
 
 
-ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,
+ctDensityList<-function(x,xlimsindex='all',ylimsindex='all',cut=FALSE,plot=FALSE,smoothness=1,
   grouplabels=names(x),
   ylab='Density',
   xlab='Par. Value',probs=c(.05,.95),main='',colvec=NA){
@@ -291,7 +312,7 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,
     newxlims=stats::quantile(x[[i]],probs=probs,na.rm=TRUE)
     if(i==1) {
       xlims=newxlims
-    } 
+    }
     else {
       xlims <- range(c(xlims,newxlims))
     }
@@ -300,25 +321,36 @@ ctDensityList<-function(x,xlimsindex='all',plot=FALSE,smoothness=1,
   xlims[1] = xlims[1] - sd/2
   xlims[2] = xlims[2] + sd/2
 # browser()
-  logbw=log(sapply(x,function(d) {
+  bw=sapply(x,function(d) {
     out<-try(bw.SJ(na.omit(c(d))),silent=TRUE)
     if('try-error' %in% class(out)) out <- bw.nrd0(na.omit(c(d)))
     return(out)
-    }))
+    })
   # browser()
-  logbwmean = mean(logbw + ifelse(length(logbw) > 1,sd(logbw),0))
+  # logbwmean = mean(logbw)# + ifelse(length(logbw) > 1,sd(logbw),0))
 # browser()
   denslist<-lapply(1:length(x),function(xi) {
-    bw=(exp(mean(logbwmean)))^1 #logbw[xi]+
+    bw=exp(log(bw[xi]) + (mean(log(bw))-log(bw[xi]))*.3)
     # print(bw)
-    d=stats::density(x[[xi]],bw=bw/2,n=5000,from=xlims[1],to=xlims[2],na.rm=TRUE)
+    d=stats::density(x[[xi]],bw=bw,n=5000,from=xlims[1],to=xlims[2],na.rm=TRUE)
     # d$y=d$y/ sum(d$y)/range(d$x)[2]*length(d$y)
     return(d)
   })
-
-  xlims=range(sapply(denslist,function(d) d$x[d$y> (.1*max(d$y))]))
+if(xlimsindex[1] %in% 'all') xlimsindex <- 1:length(denslist)
+if(ylimsindex[1] %in% 'all') ylimsindex <- 1:length(denslist)
+  xlims=range(sapply(denslist[xlimsindex],function(d) d$x[d$y> (.1*max(d$y))]))
   xlims <- xlims +c(-1,1)*sd(xlims)
-  ylims=c(0,max(unlist(lapply(denslist,function(li) max(li$y))))*1.1)
+  ylims=c(0,max(unlist(lapply(denslist[ylimsindex],function(li) max(li$y))))*1.1)
+  
+  if(cut){
+    denslist<-lapply(denslist,function(d){
+      d$x[d$x < min(xlims)] <- NA
+      d$x[d$x > max(xlims)] <- NA
+      d$y<-d$y[!is.na(d$x)] 
+      d$x<-d$x[!is.na(d$x)] 
+      return(d)
+    })
+  }
 
   denslist <- lapply(denslist,function(d){
     o<-list()

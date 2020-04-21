@@ -36,8 +36,8 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,prio
   monvars <- c('mean','sd','2.5%','50%','97.5%')
   
   if('stanfit' %in% class(object$stanfit)){ 
-    s<-suppressWarnings(getMethod('summary','stanfit')(object$stanfit))
-    if('98%' %in% colnames(s$summary)) colnames(s$summary)[colnames(s$summary)=='98%'] <- '97.5%'
+    smr<-suppressWarnings(getMethod('summary','stanfit')(object$stanfit))
+    if('98%' %in% colnames(smr$summary)) colnames(smr$summary)[colnames(smr$summary)=='98%'] <- '97.5%'
     e <- ctExtract(object) 
   }
 
@@ -92,33 +92,6 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,prio
         return(out)
       }
       
-      if(1==99 & (is.null(object$data$intoverpop) || object$data$intoverpop==0)){    
-        #transformed subject level params
-        rawpopcorr_transformed= array(sapply(1:iter, function(x) cor(e$indparams[x,,])),dim=c(nindvarying,nindvarying,iter))
-        rawpopcov_transformed= array(sapply(1:iter, function(x) cov(e$indparams[x,,])),dim=c(nindvarying,nindvarying,iter))
-        
-        rawpopcorr_transformedmean=getMean(rawpopcorr_transformed)
-        rawpopcorr_transformedsd=getSd(rawpopcorr_transformed)
-        
-        rawpopcov_transformedmean=getMean(rawpopcov_transformed)
-        rawpopcov_transformedsd=getSd(rawpopcov_transformed)
-        
-        rawpopcovcor_transformedmean=rawpopcov_transformedmean
-        rawpopcovcor_transformedmean[lower.tri(diag(nindvarying))]=rawpopcorr_transformedmean[lower.tri(diag(nindvarying))]
-        
-        rawpopcovcor_transformedsd=rawpopcov_transformedsd
-        rawpopcovcor_transformedsd[lower.tri(diag(nindvarying))]=rawpopcorr_transformedsd[lower.tri(diag(nindvarying))]
-        
-        dimnames(rawpopcovcor_transformedsd)<-list(parnamesiv,parnamesiv)
-        dimnames(rawpopcovcor_transformedmean)<-list(parnamesiv,parnamesiv)
-        
-        out=list(paste0('The following matrix is the posterior mean of the correlation and covariance matrix of subject level parameters,', 
-          ' with correlations on the lower triangle'),
-          popcovcor_mean=round(rawpopcovcor_transformedmean,digits),
-          paste('The following matrix is the posterior std dev. of the correlation and covariance matrix of subject level parameters,', 
-            'with correlations on the lower triangle'),
-          popcovcor_sd=round(rawpopcovcor_transformedsd,digits))
-      }
       #raw pop distribution params
       dimrawpopcorr <- dim(e$rawpopcorr)
       if(!'stanfit' %in% class(object$stanfit)) rawpopcorr= array(e$rawpopcorr,dim=c(dimrawpopcorr[1],1,dimrawpopcorr[2] * dimrawpopcorr[3]))
@@ -203,6 +176,7 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,prio
     object$standata$savescores <- 0L
     object$standata$gendata <- 0L
     object$standata$dokalman <- 0L
+    object$standata$popcovn <- 5L
     sf <- stan_reinitsf(object$stanmodel,data=object$standata)
     parmatlists <- try(apply(ctStanRawSamples(object),
       # sample(x = 1:dim(e$rawpopmeans)[1],
@@ -255,26 +229,28 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,prio
   
   
   if('stanfit' %in% class(object$stanfit)){
-    popsd=s$summary[c(grep('^popsd',rownames(s$summary),fixed=FALSE)),
-      c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE] [ object$data$indvaryingindex,,drop=FALSE]
+    # browser()
+    popsd=smr$summary[c(grep('^popsd',rownames(smr$summary),fixed=FALSE)),
+      c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE] #[ object$data$indvaryingindex,,drop=FALSE]
     rownames(popsd)=parnames[ object$data$indvaryingindex]
-    # popmeans=s$summary[c(grep('hmean_',rownames(s$summary))),
+    # popmeans=smr$summary[c(grep('hmean_',rownames(smr$summary))),
     #   c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE]
-    popmeans=s$summary[c(grep('popmeans[', rownames(s$summary),fixed=TRUE)),
+    popmeans=smr$summary[c(grep('popmeans[', rownames(smr$summary),fixed=TRUE)),
       c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE]
     popmeans=popmeans[(nrow(popmeans)/2+1):nrow(popmeans),,drop=FALSE]
     rownames(popmeans) <- parnames
     
     
     
-    logprob=s$summary[c(grep('lp',rownames(s$summary))),
+    logprob=smr$summary[c(grep('lp',rownames(smr$summary))),
       c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE]
   }
   
   if(!'stanfit' %in% class(object$stanfit)){ #if optimized / importance sampled
     
-    if(!is.null(iter)){ popsd <- suppressWarnings(monitor(array(e$popsd,dim=c(dim(e$popsd)[1],1,dim(e$popsd)[2])),warmup=0,print=FALSE))
-    popsd=popsd[ object$data$indvaryingindex, monvars,drop=FALSE]
+    if(!is.null(iter)){ popsd <- suppressWarnings(monitor(array(
+      e$popsd,dim=c(dim(e$popsd)[1],1,dim(e$popsd)[2])),warmup=0,print=FALSE))
+    popsd=popsd[, monvars,drop=FALSE]
     rownames(popsd)=parnamesiv
     }
     
@@ -291,7 +267,7 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,prio
   
   out$popmeans=round(popmeans,digits=digits)
   
-  out$popNote=paste0('popmeans are reported as specified in ctModel -- covariance related matrices are in sd / matrix square root form.')
+  out$popNote=paste0('popmeans are reported as specified in ctModel -- covariance related matrices are in sd / unconstrained correlation form -- see $parmatrices for simpler interpretations!')
   
   out$logprob=logprob
   
@@ -304,7 +280,7 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=3,parmatrices=TRUE,prio
   
   
   
-  # out$posteriorpredictive=round(s$summary[c(grep('stateppll',rownames(s$summary))),
+  # out$posteriorpredictive=round(smr$summary[c(grep('stateppll',rownames(smr$summary))),
   #     c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE],3)
   # }
   

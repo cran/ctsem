@@ -221,7 +221,7 @@ ctModel<-function(LAMBDA, type='omx',n.manifest = 'auto', n.latent='auto', Tpoin
   
   if(is.null(n.TIpred) || all(n.TIpred %in% 'auto')){
     if(!all(TIpredNames %in% 'auto')){
-      message('n.TIpred inferred  inferred from TDpredNames')
+      message('n.TIpred inferred  inferred from TIpredNames')
       n.TIpred <- length(TIpredNames)
     } else n.TIpred <- 0
   } 
@@ -558,6 +558,10 @@ ctModel<-function(LAMBDA, type='omx',n.manifest = 'auto', n.latent='auto', Tpoin
     warning(paste0(tempmatname,' is not lower triangular! Covariance type matrices should usually be specified in the appropriate lower-triangular form.'))
   }
   
+  # browser()
+  mvaroffdiag=MANIFESTVAR[!diag(1,nrow(MANIFESTVAR))]
+  if(nrow(MANIFESTVAR) > 1 && !all(mvaroffdiag %in% 0)) stop('MANIFESTVAR should be diagonal!')
+  
  
   if(any(dim(LAMBDA)!=c(n.manifest,n.latent))) stop("Incorrect LAMBDA structure specified - check number or rows and columns")
   dimnames(LAMBDA)=list(manifestNames,latentNames)
@@ -565,6 +569,10 @@ ctModel<-function(LAMBDA, type='omx',n.manifest = 'auto', n.latent='auto', Tpoin
   sapply(c(manifestNames,latentNames,TDpredNames,TIpredNames, time,id),function(x){
   if(grepl('\\W',x)) stop(paste0(x,' contains symbols, variable names must be alphanumerics only please!'))
   })
+  
+  for(names in c('manifestNames','TIpredNames','TDpredNames','latentNames')){
+    if(any(duplicated(get(names)))) stop(paste0('Duplicate names in ',names))
+  }
   
   
   
