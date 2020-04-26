@@ -28,7 +28,7 @@ test_that("anomauth", {
   sm$pars$indvarying<- FALSE
   sf=ctStanFit(ctDeintervalise(ctWideToLong(AnomAuth,Tpoints = AnomAuthmodel$Tpoints,n.manifest = 2)),
     ctstanmodel = sm, optimize=TRUE,verbose=0,savescores = FALSE,cores=2,nopriors=TRUE,
-    optimcontrol=list(finishsamples=100,stochastic=T),plot=F)
+    optimcontrol=list(finishsamples=100,stochastic=T),plot=10)
   expect_equal(23415.929,-2*sf$stanfit$optimfit$value,tolerance=.01)
   anoms=summary(sf)
   anoms$popmeans['mm_Y1','sd']
@@ -90,8 +90,8 @@ if( .Machine$sizeof.pointer != 4){
  sm <- ctStanModel(oscillatingm)
   sm$pars$indvarying<- FALSE
   sf=ctStanFit(ctDeintervalise(ctWideToLong(Oscillating,Tpoints = oscillatingm$Tpoints,n.manifest = 1)),
-    cores=2,verbose=0,
-    # optimcontrol=list(carefulfit=T),
+    cores=2,verbose=1,
+    optimcontrol=list(stochastic=T),plot=20,
     ctstanmodel = sm, optimize=TRUE,savescores = FALSE,nopriors=TRUE)
   expect_equal(-3461.936,-2*sf$stanfit$optimfit$value,tolerance=.01)
   

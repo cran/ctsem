@@ -112,10 +112,7 @@ verbosify<-function(sf,verbose=2){
 #'   LAMBDA=diag(2))
 #' 
 #' 
-#' #fit model to data (takes a few minutes - but insufficient 
-#' # iterations and max_treedepth for inference!)
-#' fit<-ctStanFit(ctstantestdat, model, iter=200, chains=2, 
-#' control=list(max_treedepth=6))
+#' fit<-ctStanFit(ctstantestdat, model,nopriors=FALSE)
 #' 
 #' #output functions
 #' summary(fit) 
@@ -123,7 +120,7 @@ verbosify<-function(sf,verbose=2){
 #' plot(fit,wait=FALSE)
 #' 
 #' }
-#' \dontrun{
+#' \donttest{
 #' library(ctsem)
 #' set.seed(3)
 #' 
@@ -412,7 +409,7 @@ verbosify<-function(sf,verbose=2){
 ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intoverstates=TRUE, binomial=FALSE,
   fit=TRUE, intoverpop=TRUE, stationary=FALSE,plot=FALSE,  derrind='all',
   optimize=TRUE,  optimcontrol=list(),
-  nlcontrol = list(), nopriors=FALSE, chains=2,
+  nlcontrol = list(), nopriors=TRUE, chains=2,
   cores=ifelse(optimize,getOption("mc.cores", 2L),'maxneeded'),
   inits=NULL,
   forcerecompile=FALSE,savescores=FALSE,
@@ -567,7 +564,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     if(forcerecompile) recompile <- TRUE
     if(naf(!is.na(ctm$rawpopsdbaselowerbound))) recompile <- TRUE
     if(ctm$rawpopsdbase != 'normal(0,1)') recompile <- TRUE
-    if(ctm$rawpopsdtransform != 'log1p(exp(2*rawpopsdbase-1)) .* sdscale') ctm$recompile <- TRUE
+    if(ctm$rawpopsdtransform != 'log1p_exp(2*rawpopsdbase-1) .* sdscale') ctm$recompile <- TRUE
     if(any(ctm$modelmats$matsetup[,'transform'] < -10)) recompile <- TRUE #if custom transforms needed
 
     ncalcsNoJ<- length(unlist(ctm$modelmats$calcs)[!grepl('JAx[',unlist(ctm$modelmats$calcs),fixed=TRUE)])

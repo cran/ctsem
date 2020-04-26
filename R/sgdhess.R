@@ -1,15 +1,15 @@
 logit = function(x) log(x)-log((1-x))
 
-sgd <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,nsubjects=NA,ndatapoints=NA,plot=FALSE,
-  stepbase=1e-3,gmeminit=ifelse(is.na(startnrows),.8,.8),gmemmax=.96, maxparchange = .50,
+sgdhess <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,nsubjects=NA,ndatapoints=NA,plot=FALSE,
+  stepbase=1e-3,gmeminit=ifelse(is.na(startnrows),.6,.8),gmemmax=.96, maxparchange = .50,
   startnrows=NA,roughnessmemory=.9,groughnesstarget=.4,roughnesschangemulti = 2,
-  lproughnesstarget=ifelse(is.na(whichmcmcpars[1]),.5,.4),
+  lproughnesstarget=ifelse(is.na(whichmcmcpars[1]),.4,.4),
   # gamiter=50000,
   gsmoothroughnesstarget=.05,
-  warmuplength=20,nstore=max(100,length(init)),
+  warmuplength=20,nstore=10,#max(100,length(init)),
   minparchange=1e-800,maxiter=50000,
   nconvergeiter=ifelse(is.na(whichmcmcpars[1]),30,60), 
-  itertol=1e-3, deltatol=1e-5, parsdtol=1e-3){
+  itertol=1e-3, deltatol=1e-5, parsdtol=1e-4){
   
   initfull=init #including ignored params start values
   if(length(whichignore)>0) init=init[-whichignore]
@@ -70,6 +70,7 @@ sgd <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,nsubj
     return(list(lpg=lpg,newmcmcpars=newmcmcpars))
   }
   pars=init
+  ih <- diag(1,length(init))
   mcmcconverged <- TRUE
   if(!is.na(whichmcmcpars[1])){
     artarget=.23
@@ -213,14 +214,14 @@ sgd <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,nsubj
       
       gdelta =  (ghatmix +dghatmix*dghatweight/2) #removed step multiply because divide by zero elsewhere
       if(i > 1){
-        delta =   step  *sign(gdelta)*(abs(gdelta))  #* exp((rnorm(length(g),0,.02)))
+        delta =   .0001  *(ih) %*% g * exp((rnorm(length(g),0,.02))) 
         # if(runif(1) > .95) {
         #   parextra=sample(1:length(pars),floor(.05*length(pars)))
-        #   delta[parextra] <- step*sqrt(abs(gsmooth[parextra]))*10
+        #   delta[parextra] <- delta[parextra]*10
         # }
         delta[abs(delta) > maxparchange] <- maxparchange*sign(delta[abs(delta) > maxparchange])
         newpars = pars + delta
-        newpars = newpars  + delta/2 - deltaold/2 #+ delta - deltaold #
+        newpars = newpars  #+ delta/2 - deltaold/2 #+ delta - deltaold #
       }
       
       # if(i > nstore && (i%%gamiter)==0){
@@ -300,6 +301,7 @@ sgd <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,nsubj
     
     #once accepted 
     lp[i]=lpg[1]
+    oldpars=pars
     pars=newpars
 
     
@@ -308,7 +310,8 @@ sgd <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,nsubj
     deltaold=delta
     oldg=g
     g=attributes(lpg)$gradient
-    g=sign(g)*(abs(g))^(1/2)#sqrt
+    # H=
+    # g=sign(g)*(abs(g))^(1/2)#sqrt
     gmemory2 = gmemory * min(i/warmuplength,1)^(1/8)
     roughnessmemory2 = roughnessmemory * min(i/warmuplength,1)^(1/8)
     
@@ -361,7 +364,22 @@ sgd <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,nsubj
 
       parstore[,1+(i-1) %% nstore] = pars
       gstore[,1+(i-1) %% nstore] = g
-
+      
+      if(i > 1){ 
+      # H=crossprod(diff(t(gstore)),diff(t(parstore)))*1e-3
+      # ih=#ih * gmemory2 + (1-gmemory2)*
+          # -solve(-apply(diff(t(gstore)),2,function(x) coefficients(lm(x~diff(t(parstore))))[-1]))
+      # diag(ih) <- abs(diag(ih))
+        yn=cbind(g-oldg)
+        sn=cbind(pars-oldpars)
+        pn <- c(cbind(1/(t(yn)%*%sn)))
+        ih <- #diag(-1,length(pars)) * .05 + .95*
+         (diag(1,length(pars))-pn*sn%*%t(yn)) %*% ih %*% 
+          (diag(1,length(pars))-pn*yn%*%t(sn))+pn*sn%*%t(sn)
+        print(t(sn)%*%yn)
+      print(diag(ih))
+      # browser()
+}
     
     
     # if(i > (nstore+10) && (i %% gamiter)==10){# == (gamiter-2)) {
@@ -397,7 +415,7 @@ sgd <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,nsubj
     ))
     
     step[gsmoothroughness < gsmoothroughnesstarget] <- step[gsmoothroughness < gsmoothroughnesstarget] * 1.2
-    gsmooth[gsmoothroughness < gsmoothroughnesstarget] <- gsmooth[gsmoothroughness < gsmoothroughnesstarget] * 1.1
+    # gsmooth[gsmoothroughness < gsmoothroughnesstarget] <- gsmooth[gsmoothroughness < gsmoothroughnesstarget] * 1.2
     # step[gsmoothroughness < gsmoothroughnesstarget] * .1*gsmoothroughnessmod[gsmoothroughness < gsmoothroughnesstarget]
     signdif= sign(gmid)!=sign(gdelta)
     if(i > 1 && lp[i] >= max(head(lp,length(lp)-1))) {
@@ -408,8 +426,8 @@ sgd <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,nsubj
         whichmax <- which(pars > maxpars | pars < minpars)
         if(length(whichmax) > 0){
         parscore[whichmax] <- parscore[whichmax]+.1*(as.numeric(pars[whichmax]>maxpars[whichmax])*2-1)
-        # gsmooth[whichmax] <- gsmooth[whichmax]  * 1.2*(1+abs(parscore[whichmax]))#*delta[whichmax] /step[whichmax]
-        # step[whichmax] <- step[whichmax] * 2*(1+abs(parscore[whichmax]))  #+ pars[whichmax]
+        gsmooth[whichmax] <- gsmooth[whichmax]  * 1.2*(1+abs(parscore[whichmax]))#*delta[whichmax] /step[whichmax]
+        step[whichmax] <- step[whichmax] * 2*(1+abs(parscore[whichmax]))  #+ pars[whichmax]
         pars[pars>maxpars] <- pars[pars>maxpars]+10*(1+abs(parscore[pars>maxpars]))*(pars[pars>maxpars]-maxpars[pars>maxpars] )
         pars[pars< minpars] <- pars[pars< minpars]+10*(1+abs(parscore[pars<minpars]))*(pars[pars< minpars]-minpars[pars< minpars] )
 
@@ -486,12 +504,8 @@ sgd <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,nsubj
       plot(log(abs(step*gsmooth)),col=1:length(pars))
       plot(tail(log(-(lp-max(lp)-1)),500),type='l')
       # plot(gamweights,col=1:length(pars))
-      parsd=(apply(parstore,1,sd,na.rm=T))
-      plot(pars,col=1:length(pars))
+      plot((apply(parstore,1,sd,na.rm=T)),col=1:length(pars))
       abline(h=(parsdtol))
-      matplot(t(parstore[
-        which(parsd > sort(parsd,decreasing = TRUE)[min(c(length(pars),5))]),,drop=FALSE]),
-        type='l')
       if(1==2){
         plot(groughness,col='red',ylim=c(0,1))
         abline(h=mean(gsmoothroughness),col='blue',lty=2)
