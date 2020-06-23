@@ -106,12 +106,12 @@ NULL
 #' @name ctstantestdat
 NULL
 
-
 #' ctstantestfit
 #' 
-#' Minimal output from \code{\link{ctStanFit}} from ctsem package.
-#' @format stanfit class.
+#' Dummy fit for testing functions from ctsem package.
+#' @format ctStanFit object
 #' @name ctstantestfit
 NULL
+
 
 

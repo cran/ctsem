@@ -22,7 +22,6 @@ parameter matrices as used in ctsem.
 }
 \examples{
 \donttest{
-if (!exists("ctstantestfit")) example(ctstantestfit)
 pars <- ctStanContinuousPars(ctstantestfit)
 ctDiscretePars(pars,times=c(.5,1))
 }

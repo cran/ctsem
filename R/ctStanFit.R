@@ -1,10 +1,46 @@
+#' Update a ctStanFit object
+#' 
+#' Either to include different data, or because you have upgraded ctsem and the internal data structure has changed.
+#'
+#' @param oldfit fit object to be upgraded
+#' @param data replacement long format data object
+#' @param recompile whether to force a recompile -- safer but slower and usually unnecessary.
+#' @param ... extra arguments to pass to ctStanFit
+#'
+#' @return updated ctStanFit object.
+#' @export
+#'
+#' @examples
+#' if(w32chk()){
+#' newfit <- ctStanFitUpdate(ctstantestfit)
+#' }
+#' 
+ctStanFitUpdate <- function(oldfit, data=NA, recompile=FALSE,...){
+  
+  dots <- list(...)
+  args <- as.list(oldfit$args)
+  for(n in names(dots)){
+    args[[n]] <- dots[[n]]
+  }
+  args$fit <- FALSE
+  args$ctstanmodel <- oldfit$ctstanmodelbase
+  if(length(data==1)) args$datalong <- standatatolong(oldfit$standata,origstructure = TRUE,ctm=oldfit$ctstanmodelbase)
+  if(length(data) > 1) args$datalong <- data
+  newfit <- do.call(ctStanFit,args)
+  oldfit$standata <- newfit$standata
+  if(oldfit$ctstanmodel$recompile || recompile) oldfit$stanmodel <- rstan::stan_model(model_code = newfit$stanmodeltext) else
+    oldfit$stanmodel <- stanmodels$ctsm
+  return(oldfit)
+}
+
+
 T0VARredundancies <- function(ctm) {
   whichT0VAR_T0MEANSindvarying <- ctm$pars$matrix %in% 'T0VAR'  &  
     is.na(ctm$pars$value) &
     (ctm$pars$row %in% ctm$pars$row[ctm$pars$matrix %in% 'T0MEANS' & ctm$pars$indvarying] |
         ctm$pars$col %in% ctm$pars$row[ctm$pars$matrix %in% 'T0MEANS' & ctm$pars$indvarying])
   if(any(whichT0VAR_T0MEANSindvarying)){
-    message('Free T0VAR parameters as well as indvarying T0MEANS -- fixing T0VAR pars to diag matrix 1e-3')
+    message('Free T0VAR parameters as well as indvarying T0MEANS -- fixing T0VAR pars to diag matrix of 1e-3')
     ctm$pars$value[whichT0VAR_T0MEANSindvarying & ctm$pars$col == ctm$pars$row ] <- 1e-3
     ctm$pars$value[whichT0VAR_T0MEANSindvarying & ctm$pars$col != ctm$pars$row ] <- 0
     ctm$pars$param[whichT0VAR_T0MEANSindvarying] <- NA
@@ -27,8 +63,7 @@ verbosify<-function(sf,verbose=2){
 
 #' ctStanFit
 #'
-#' Fits a ctsem model specified via \code{\link{ctModel}} with type either 'stanct' or 'standt', using Bayseian inference software
-#' Stan. 
+#' Fits a ctsem model specified via \code{\link{ctModel}} with type either 'stanct' or 'standt'.
 #' 
 #' @param datalong long format data containing columns for subject id (numeric values, 1 to max subjects), manifest variables, 
 #' any time dependent (i.e. varying within subject) predictors, 
@@ -42,7 +77,8 @@ verbosify<-function(sf,verbose=2){
 #' @param binomial Deprecated. Logical indicating the use of binary rather than Gaussian data, as with IRT analyses.
 #' This now sets \code{intoverstates = FALSE} and the \code{manifesttype} of every indicator to 1, for binary.
 #' @param fit If TRUE, fit specified model using Stan, if FALSE, return stan model object without fitting.
-#' @param intoverpop if TRUE, integrates over population distribution of parameters rather than full sampling.
+#' @param intoverpop if 'auto', set to TRUE if optimizing and FALSE if using hmc. 
+#' if TRUE, integrates over population distribution of parameters rather than full sampling.
 #' Allows for optimization of non-linearities and random effects.
 #' @param plot if TRUE, for sampling, a Shiny program is launched upon fitting to interactively plot samples. 
 #' May struggle with many (e.g., > 5000) parameters. For optimizing, various optimization details are plotted -- in development.
@@ -69,9 +105,6 @@ verbosify<-function(sf,verbose=2){
 #' \code{nldynamics} defaults to "auto", but may also be a logical. Set to FALSE to use estimator that assumes linear dynamics, 
 #' TRUE to use non-linear estimator. "auto" selects linear when the model is obviously linear, 
 #' otherwise nonlinear -- nonlinear is slower.
-#' \code{nlmeasurement} defaults to "auto", but may also be a logical. Set to TRUE to use non linear measurement model estimator, 
-#' FALSE to use linear model. "auto" selects linear if appropriate, otherwise nonlinear. Non-linear methods are slower but applicable to both linear
-#' and non linear cases.
 #' \code{maxtimestep} must be a positive numeric,  specifying the largest time
 #' span covered by the numerical integration. The large default ensures that for each observation time interval, 
 #' only a single step of exponential integration is used. When \code{maxtimestep} is smaller than the observation time interval, 
@@ -95,32 +128,27 @@ verbosify<-function(sf,verbose=2){
 #' For datasets with many manifest variables or time points, file size may be large.
 #' To generate data based on the posterior of a fitted model, see \code{\link{ctStanGenerateFromFit}}.
 #' @param ... additional arguments to pass to \code{\link[rstan]{stan}} function.
-#' @importFrom Rcpp evalCpp
 #' @export
 #' @examples
 #' \donttest{
-#' #test data with 2 manifest indicators measuring 1 latent process each, 
-#' # 1 time dependent predictor, 3 time independent predictors
-#' head(ctstantestdat) 
 #' 
-#' #generate a ctStanModel relying on defaults
+#' #generate a ctStanModel relying heavily on defaults
 #' model<-ctModel(type='stanct',
 #'   latentNames=c('eta1','eta2'),
 #'   manifestNames=c('Y1','Y2'),
+#'   MANIFESTVAR=diag(.1,2),
 #'   TDpredNames='TD1', 
 #'   TIpredNames=c('TI1','TI2','TI3'),
-#'   LAMBDA=diag(2))
-#' 
+#'   LAMBDA=diag(2)) 
 #' 
 #' fit<-ctStanFit(ctstantestdat, model,nopriors=FALSE)
 #' 
-#' #output functions
 #' summary(fit) 
 #' 
 #' plot(fit,wait=FALSE)
 #' 
-#' }
-#' \donttest{
+#' #### extended examples
+#' 
 #' library(ctsem)
 #' set.seed(3)
 #' 
@@ -142,8 +170,8 @@ verbosify<-function(sf,verbose=2){
 #'   gm<-ctModel(Tpoints=Tpoints,n.manifest = nmanifest,n.latent = nlatent,n.TDpred = 1,
 #'     LAMBDA = matrix(c(1,0,0,0, 0,1,.8,1.3),nrow=nmanifest,ncol=nlatent),
 #'     DRIFT=matrix(c(-.3, .2, 0, -.5),nlatent,nlatent),
-#'     TDPREDEFFECT=matrix(c(tdpredeffect[i],0),nrow=nlatent),
 #'     TDPREDMEANS=matrix(c(rep(0,Tpoints-10),1,rep(0,9)),ncol=1),
+#'     TDPREDEFFECT=matrix(c(tdpredeffect[i],0),nrow=nlatent),
 #'     DIFFUSION = matrix(c(1, 0, 0, .5),2,2),
 #'     CINT = matrix(c(cint1[i],cint2[i]),ncol=1),
 #'     T0VAR=diag(2,nlatent,nlatent),
@@ -151,8 +179,7 @@ verbosify<-function(sf,verbose=2){
 #' 
 #'   #generate data
 #'   newdat <- ctGenerate(ctmodelobj = gm,n.subjects = 1,burnin = 2,
-#'     dtmat<-rbind(c(rep(.5,8),3,rep(.5,Tpoints-9))),
-#'     wide = FALSE)
+#'     dtmat<-rbind(c(rep(.5,8),3,rep(.5,Tpoints-9))))
 #'   newdat[,'id'] <- i #set id for each subject
 #'   newdat <- cbind(newdat,age[i]) #include time independent predictor
 #'   if(i ==1) {
@@ -222,7 +249,7 @@ verbosify<-function(sf,verbose=2){
 #' cf<-ctCheckFit(f1) #compare mean and covariance of randomly generated data to observed cov
 #' plot(cf,wait=FALSE)
 #' 
-#' 
+#'  ### Further example models
 #' 
 #' #Include intervention
 #' m2 <- ctModel(type = 'stanct',
@@ -237,15 +264,6 @@ verbosify<-function(sf,verbose=2){
 #'   LAMBDA = diag(1),
 #'   MANIFESTMEANS=matrix(0,ncol=1),
 #'   MANIFESTVAR=matrix(c('merror'),nrow=1,ncol=1))
-#' 
-#' f2 <- ctStanFit(datalong = dat2, ctstanmodel = m2, optimize=TRUE)
-#' 
-#' summary(f2)
-#' 
-#' ctKalman(f2,plot=TRUE,subjects=1,kalmanvec=c('y','ysmooth'))
-#' ctKalman(f2,plot=TRUE,subjects=1:3,kalmanvec=c('y','ysmooth'),errorvec=NA,legend=FALSE)
-#' 
-#' ctStanPostPredict(f2, datarows=1:100, wait=FALSE)
 #' 
 #' 
 #' 
@@ -264,15 +282,7 @@ verbosify<-function(sf,verbose=2){
 #'   MANIFESTMEANS=matrix(0,ncol=1),
 #'   MANIFESTVAR=matrix(c('merror'),nrow=1,ncol=1))
 #'   
-#' plot(m2i)
-#' 
-#' f2i <- ctStanFit(datalong = dat2, ctstanmodel = m2i,intoverpop=TRUE,
-#'   iter=200,chains=2,control=list(max_treedepth=7))
-#' summary(f2i)
-#' ctStanPlotPost(f2i)
-#' ctKalman(f2i,kalmanvec=c('y','ysmooth'),subjects=2:4,plot=TRUE,errorvec=NA)
-#' 
-#' 
+#'   
 #' #Including covariate effects
 #' m2ic <- ctModel(type = 'stanct',
 #'   manifestNames = c('Y1'), latentNames=c('eta1'),
@@ -290,13 +300,6 @@ verbosify<-function(sf,verbose=2){
 #' 
 #' m2ic$pars$indvarying[m2ic$pars$matrix %in% 'TDPREDEFFECT'] <- TRUE
 #' 
-#' plot(m2ic)
-#' 
-#' f2ic <- ctStanFit(datalong = dat2, ctstanmodel = m2ic,optimize=TRUE)
-#' summary(f2ic)
-#' 
-#' ctStanTIpredeffects(fit = f2ic,includeMeanUncertainty = TRUE,whichpars = 'TDPREDEFFECT',
-#'   plot=TRUE,probs = c(.025,.5,.975))
 #' 
 #' #Include deterministic dynamics
 #' m3 <- ctModel(type = 'stanct',
@@ -311,15 +314,6 @@ verbosify<-function(sf,verbose=2){
 #'   LAMBDA = diag(1),
 #'   MANIFESTMEANS=matrix(0,ncol=1),
 #'   MANIFESTVAR=matrix(c('merror1'),nrow=1,ncol=1))
-#' 
-#' ctModelLatex(m3)
-#' 
-#' f3 <- ctStanFit(datalong = dat2, ctstanmodel = m3, optimize=TRUE)
-#' 
-#' summary(f3)
-#' 
-#' ctKalman(f3,plot=TRUE,subjects=1,kalmanvec=c('y','ysmooth'))
-#' ctKalman(f3,plot=TRUE,subjects=1:3,kalmanvec=c('y','ysmooth'),errorvec=NA)
 #' 
 #' 
 #' 
@@ -339,17 +333,6 @@ verbosify<-function(sf,verbose=2){
 #'   MANIFESTMEANS=matrix(0,ncol=1),
 #'   MANIFESTVAR=matrix(c(0),nrow=1,ncol=1))
 #' 
-#' ctModelLatex(m3n)
-#' 
-#' f3n <- ctStanFit(datalong = dat2, ctstanmodel = m3n, optimize=TRUE)
-#' 
-#' summary(f3n)
-#' 
-#' k=ctKalman(f3n,plot=T,subjects=1,kalmanvec=c('y','etasmooth'),timestep=.01)
-#' ctKalman(f3n,plot=TRUE,subjects=1:3,kalmanvec=c('y','etasmooth'),errorvec=NA)
-#' 
-#' 
-#' 
 #' 
 #' 
 #' #include 2nd latent process
@@ -367,17 +350,6 @@ verbosify<-function(sf,verbose=2){
 #'   MANIFESTMEANS=matrix(c(0,0),nrow=2,ncol=1),
 #'   MANIFESTVAR=matrix(c('merror1',0,0,'merror2'),nrow=2,ncol=2))
 #' 
-#' f4 <- ctStanFit(datalong = dat2, ctstanmodel = m4,optimize=TRUE)
-#' 
-#' summary(f4)
-#' 
-#' ctStanDiscretePars(f4,plot=TRUE) #auto and cross regressive plots over time
-#' 
-#' ctKalman(f4,plot=TRUE,subjects=1,kalmanvec=c('y','ysmooth'))
-#' ctKalman(f4,plot=TRUE,subjects=1:2,kalmanvec=c('y','ysmooth'),errorvec=NA)
-#' 
-#' 
-#' 
 #' #dynamic factor model -- fixing CINT to 0 and freeing indicator level intercepts
 #' 
 #' m3df <- ctModel(type = 'stanct',
@@ -393,21 +365,10 @@ verbosify<-function(sf,verbose=2){
 #'   MANIFESTMEANS=matrix(c('Y2_int','Y3_int'),nrow=2,ncol=1),
 #'   MANIFESTVAR=matrix(c('Y2residual',0,0,'Y3residual'),nrow=2,ncol=2))
 #' 
-#' ctModelLatex(m3df)
-#' 
-#' f3df <- ctStanFit(datalong = dat2, ctstanmodel = m3df, optimize=TRUE)
-#' 
-#' summary(f3df)
-#' 
-#' ctKalman(f3df,plot=TRUE,subjects=1,kalmanvec=c('y','ysmooth'),errorvec=NA)
-#' ctKalman(f3df,plot=TRUE,subjects=1:3,kalmanvec=c('y','ysmooth'),errorvec=NA)
-#' 
-#' 
-#' 
 #' }
 
 ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intoverstates=TRUE, binomial=FALSE,
-  fit=TRUE, intoverpop=TRUE, stationary=FALSE,plot=FALSE,  derrind='all',
+  fit=TRUE, intoverpop='auto', stationary=FALSE,plot=FALSE,  derrind='all',
   optimize=TRUE,  optimcontrol=list(),
   nlcontrol = list(), nopriors=TRUE, chains=2,
   cores=ifelse(optimize,getOption("mc.cores", 2L),'maxneeded'),
@@ -425,15 +386,27 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     #set nlcontrol defaults
     if(is.null(nlcontrol$maxtimestep)) nlcontrol$maxtimestep = 999999
     if(is.null(nlcontrol$nldynamics)) nlcontrol$nldynamics = 'auto'
-    if(is.null(nlcontrol$nlmeasurement)) nlcontrol$nlmeasurement = 'auto'
+    # if(is.null(nlcontrol$nlmeasurement)) nlcontrol$nlmeasurement = 'auto'
     if(is.null(nlcontrol$Jstep)) nlcontrol$Jstep = 1e-6
     
-    args=match.call()
+    args=as.list(match.call(expand.dots=FALSE,))
+    args[[1]] <- NULL
+    args$datalong <- NULL
     
     ctm <- ctstanmodel
-
     ctm <- ctModel0DRIFT(ctm, ctm$continuoustime) #offset 0 drift
     ctm <- ctModelStatesAndPARS(ctm) #replace state and par refs with square bracket refs
+    
+    if(!is.null(ctm$TIpredAuto) && ctm$TIpredAuto %in% c(1L,TRUE)){ #if auto tipred, set all effects to true
+      for(tip in ctm$TIpredNames){
+        ctm$pars[[paste0(tip,'_effect')]] <- TRUE
+      }
+    }
+
+    if(optimize && nopriors) message("Maximum likelihood estimation requested")
+    if(optimize && !nopriors && (is.null(optimcontrol$is)  || optimcontrol$is %in% FALSE)) message("Maximum a posteriori estimation requested")
+    if(optimize && !nopriors && (!is.null(optimcontrol$is)  && optimcontrol$is %in% TRUE)) message("Bayesian estimation via optimization and importance sampling requested")
+    if(!optimize && !nopriors) message("Bayesian estimation via Stan's NUTS sampler requested")
 
     
     ###stationarity
@@ -470,7 +443,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
           ctm$pars$value[ri] <- ifelse(ctm$pars$row[ri] == ctm$pars$col[ri], 1, 0)
         }
       }
-      message('Free T0VAR parameters fixed to diagonal matrix of 1\'s as only 1 subject - consider appropriateness!')
+      message('Free T0VAR parameters fixed to diagonal matrix of 1 as only 1 subject - consider appropriateness!')
     }
     
     if(binomial){
@@ -484,7 +457,9 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
       message('HMC sampling requested, priors required so disabling nopriors argument')
       nopriors <- FALSE
     }
-    if(optimize && !intoverstates) stop('intoverstates=TRUE required for optimization!')
+    if(optimize && !intoverstates) warning('intoverstates=TRUE required for sensible optimization! Proceed onwards to weird output at own risk!')
+    
+    if(intoverpop == 'auto')  intoverpop <- ifelse(optimize,TRUE,FALSE)
     
     # if(optimize && !intoverpop && any(ctm$pars$indvarying[is.na(ctm$pars$value)]) && 
     #     is.null(ctm$fixedrawpopchol) && is.null(ctm$fixedsubpars)){
@@ -493,11 +468,12 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     # }
 
     if(intoverpop==TRUE && !any(ctm$pars$indvarying[is.na(ctm$pars$value)])) {
-      message('No individual variation -- disabling intoverpop switch'); intoverpop <- FALSE
-    } 
+    # message('No individual variation -- disabling intoverpop switch'); 
+      intoverpop <- FALSE
+    }
 
     if(intoverpop)   ctm <- ctStanModelIntOverPop(ctm)
-    # browser()
+    # 
     
     #jacobian addition
     ctm$jacobian <- ctJacobian(ctm)
@@ -528,7 +504,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     #fix binary manifestvariance
     
     if(any(ctm$manifesttype > 0)){ #if any non continuous variables, (with free parameters)...
-      nlcontrol$nlmeasurement <- TRUE
+      # nlcontrol$nlmeasurement <- TRUE
       errfix <- which(ctm$pars$matrix %in% 'MANIFESTVAR' & 
             (ctm$pars$row %in% which(ctm$manifesttype==1) | 
                 ctm$pars$col %in% which(ctm$manifesttype==1)) &
@@ -549,7 +525,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     }
     ctm$modelmats <- ctStanModelMatrices(ctm)
     ctm <- ctStanCalcsList(ctm) #get extra calculations and adjust model spec as needed???
-    
+
     #store values in ctm
     ctm$intoverpop <- as.integer(intoverpop)
     ctm$nlatentpop <- as.integer(ifelse(ctm$intoverpop ==1, max(ctm$pars$row[ctm$pars$matrix %in% 'T0MEANS']),  ctm$n.latent))
@@ -614,9 +590,10 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     if(cores=='maxneeded') cores=max(1,min(c(chains,parallel::detectCores()-1))) else cores <-max(1, min(cores,parallel::detectCores()-1))
 
     
-    if(ctm$recompile && is.na(stanmodeltext)) {
+    if(is.logical(stanmodeltext)) {
       stanmodeltext<- ctStanModelWriter(ctm, gendata, ctm$modelmats$extratforms,ctm$modelmats$matsetup)
     }
+    
     
     
     
@@ -638,6 +615,8 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
       }
       if(!recompile && !forcerecompile) {
         if(!gendata) sm <- stanmodels$ctsm else sm <- stanmodels$ctsmgen
+        # 
+        # a=attributes(sm)
       }
       # if(!is.null(inits) & any(inits!=0)){
       #   sf <- stan_reinitsf(sm,standata)
@@ -700,7 +679,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
         
         
         message('Sampling...')
-        # browser()
+        # 
         stanargs <- list(object = sm, 
           # enable_random_init=TRUE,
           init_r=.3,
@@ -717,9 +696,14 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
         optimcontrol$cores <- cores
         optimcontrol$verbose <- verbose
         optimcontrol$nopriors <- as.logical(nopriors)
-        opcall <- paste0('stanoptimis(standata = standata,sm = sm,init = inits,plot=plot,',
-          paste0(gsub('list(','',paste0(deparse(optimcontrol),collapse=''),fixed=TRUE)))
-        stanfit <- eval(parse(text=opcall))
+        optimcontrol$standata=standata
+        optimcontrol$sm=sm
+        optimcontrol$init=inits
+        optimcontrol$plot=plot
+        # browser()
+        # opcall <- paste0('stanoptimis(standata = standata,sm = sm,init = inits,plot=plot,',
+        #   paste0(gsub('list(','',paste0(deparse(optimcontrol),collapse=''),fixed=TRUE)))
+        stanfit <- do.call(stanoptimis,optimcontrol) #eval(parse(text=opcall))
         #update data that may have changed during optimization
         for(ni in names(stanfit$standata)){
           standata[[ni]] <- stanfit$standata[[ni]]
@@ -741,9 +725,10 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
       # if(is.na(STAN_NUM_THREADS)) Sys.unsetenv('STAN_NUM_THREADS') else Sys.setenv(STAN_NUM_THREADS = STAN_NUM_THREADS) #reset sys env
     } # end if fit==TRUE
     #convert missings back to NA's for data output
-    standataout<-unlist(standata)
-    standataout[standataout==99999] <- NA
-    standataout <- utils::relist(standataout,skeleton=standata)
+    standataout<-standata
+    standataout$Y[standataout$Y==99999] <- NA
+    standataout$tipreds[standataout$tipreds==99999] <- NA
+    # standataout <- utils::relist((standataout),skeleton=standata)
     
     setup=list(recompile=recompile,idmap=standata$idmap,matsetup=ctm$modelmats$matsetup,matvalues=ctm$modelmats$matvalues,
       popsetup=ctm$modelmats$matsetup[ctm$modelmats$matsetup$when==0 & ctm$modelmats$matsetup$param > 0,],
@@ -752,15 +737,19 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     if(fit) {
       out <- list(args=args,
         setup=setup, 
-        stanmodeltext=stanmodeltext, data=standataout, ctdatastruct=datalong[c(1,nrow(datalong)),],standata=standata, ctstanmodelbase=ctstanmodel, ctstanmodel=ctm,stanmodel=sm, stanfit=stanfit)
+        stanmodeltext=stanmodeltext, data=standataout, ctdatastruct=datalong[c(1,nrow(datalong)),],standata=standata, 
+        ctstanmodelbase=ctstanmodel, ctstanmodel=ctm,stanmodel=sm, stanfit=stanfit)
       class(out) <- 'ctStanFit'
+      out$kalman <- ctStanKalman(out,collapsefunc = mean,cores=1)
     }
     
     if(!fit) out=list(args=args,setup=setup,
-      stanmodeltext=stanmodeltext,data=standataout,  ctdatastruct=datalong[c(1,nrow(datalong)),],standata=standata, ctstanmodelbase=ctstanmodel,  ctstanmodel=ctm)
+      stanmodeltext=stanmodeltext,data=standataout,  ctdatastruct=datalong[c(1,nrow(datalong)),],standata=standata, 
+      ctstanmodelbase=ctstanmodel,  ctstanmodel=ctm)
+    
     
     return(out)
   }
 }
 
-
+#'@export

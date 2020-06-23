@@ -18,8 +18,8 @@
 #' @return if plot=TRUE, nothing is returned and plots are created. Otherwise, a list containing ggplot objects is returned 
 #' and may be customized as desired.
 #' @examples
-#' \donttest{
-#' if (!exists("ctstantestfit")) example(ctstantestfit)
+#' if(w32chk()){
+#'
 #' ctStanPostPredict(ctstantestfit,wait=FALSE, diffsize=2,resolution=100)
 #' }
 ctStanPostPredict <- function(fit,diffsize=1,jitter=.02, wait=TRUE,probs=c(.025,.5,.975),

@@ -22,7 +22,7 @@ ctIntervalise(
 }
 \arguments{
 \item{datawide}{Wide format data, containing absolute time measurements, 
-to convert to interval time scale. Otherwise as used in \code{\link{ctFit}}.  
+to convert to interval time scale.  
 See \code{\link{ctLongToWide}} to easily convert long format data.}
 
 \item{Tpoints}{Maximum number of discrete time points (waves of data, or measurement occasions) 
@@ -72,18 +72,14 @@ Converts absolute times to intervals for wide format ctsem panel data
 Time column must be numeric!
 }
 \examples{
-#First load the long format data with absolute times
-data('longexample')
-
-#Then convert to wide format
-wideexample <- ctLongToWide(datalong = longexample, id = "id", 
-time = "time", manifestNames = c("Y1", "Y2", "Y3"), 
-TDpredNames = "TD1", TIpredNames = c("TI1", "TI2"))
+wideexample <- ctLongToWide(datalong = ctstantestdat, id = "id", 
+time = "time", manifestNames = c("Y1", "Y2"), 
+TDpredNames = "TD1", TIpredNames = c("TI1", "TI2","TI3"))
 
 #Then convert the absolute times to intervals, using the Tpoints reported from the prior step.
-wide <- ctIntervalise(datawide = wideexample, Tpoints = 4, n.manifest = 3, 
-n.TDpred = 1, n.TIpred = 2, manifestNames = c("Y1", "Y2", "Y3"), 
-TDpredNames = "TD1", TIpredNames = c("TI1", "TI2") )
+wide <- ctIntervalise(datawide = wideexample, Tpoints = 10, n.manifest = 2, 
+n.TDpred = 1, n.TIpred = 3, manifestNames = c("Y1", "Y2"), 
+TDpredNames = "TD1", TIpredNames = c("TI1", "TI2","TI3") )
  
 print(wide)
 }

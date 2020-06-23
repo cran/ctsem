@@ -12,7 +12,7 @@ ctStanFit(
   intoverstates = TRUE,
   binomial = FALSE,
   fit = TRUE,
-  intoverpop = TRUE,
+  intoverpop = "auto",
   stationary = FALSE,
   plot = FALSE,
   derrind = "all",
@@ -54,7 +54,8 @@ This now sets \code{intoverstates = FALSE} and the \code{manifesttype} of every 
 
 \item{fit}{If TRUE, fit specified model using Stan, if FALSE, return stan model object without fitting.}
 
-\item{intoverpop}{if TRUE, integrates over population distribution of parameters rather than full sampling.
+\item{intoverpop}{if 'auto', set to TRUE if optimizing and FALSE if using hmc. 
+if TRUE, integrates over population distribution of parameters rather than full sampling.
 Allows for optimization of non-linearities and random effects.}
 
 \item{stationary}{Logical. If TRUE, T0VAR and T0MEANS input matrices are ignored, 
@@ -79,9 +80,6 @@ otherwise use the HMC sampler from Stan, which is (much) slower, but generally m
 \code{nldynamics} defaults to "auto", but may also be a logical. Set to FALSE to use estimator that assumes linear dynamics, 
 TRUE to use non-linear estimator. "auto" selects linear when the model is obviously linear, 
 otherwise nonlinear -- nonlinear is slower.
-\code{nlmeasurement} defaults to "auto", but may also be a logical. Set to TRUE to use non linear measurement model estimator, 
-FALSE to use linear model. "auto" selects linear if appropriate, otherwise nonlinear. Non-linear methods are slower but applicable to both linear
-and non linear cases.
 \code{maxtimestep} must be a positive numeric,  specifying the largest time
 span covered by the numerical integration. The large default ensures that for each observation time interval, 
 only a single step of exponential integration is used. When \code{maxtimestep} is smaller than the observation time interval, 
@@ -124,33 +122,28 @@ list(adapt_delta = .8, adapt_window=2, max_treedepth=10, adapt_init_buffer=2, st
 \item{...}{additional arguments to pass to \code{\link[rstan]{stan}} function.}
 }
 \description{
-Fits a ctsem model specified via \code{\link{ctModel}} with type either 'stanct' or 'standt', using Bayseian inference software
-Stan.
+Fits a ctsem model specified via \code{\link{ctModel}} with type either 'stanct' or 'standt'.
 }
 \examples{
 \donttest{
-#test data with 2 manifest indicators measuring 1 latent process each, 
-# 1 time dependent predictor, 3 time independent predictors
-head(ctstantestdat) 
 
-#generate a ctStanModel relying on defaults
+#generate a ctStanModel relying heavily on defaults
 model<-ctModel(type='stanct',
   latentNames=c('eta1','eta2'),
   manifestNames=c('Y1','Y2'),
+  MANIFESTVAR=diag(.1,2),
   TDpredNames='TD1', 
   TIpredNames=c('TI1','TI2','TI3'),
-  LAMBDA=diag(2))
-
+  LAMBDA=diag(2)) 
 
 fit<-ctStanFit(ctstantestdat, model,nopriors=FALSE)
 
-#output functions
 summary(fit) 
 
 plot(fit,wait=FALSE)
 
-}
-\donttest{
+#### extended examples
+
 library(ctsem)
 set.seed(3)
 
@@ -172,8 +165,8 @@ for(i in 1:nsubjects){
   gm<-ctModel(Tpoints=Tpoints,n.manifest = nmanifest,n.latent = nlatent,n.TDpred = 1,
     LAMBDA = matrix(c(1,0,0,0, 0,1,.8,1.3),nrow=nmanifest,ncol=nlatent),
     DRIFT=matrix(c(-.3, .2, 0, -.5),nlatent,nlatent),
-    TDPREDEFFECT=matrix(c(tdpredeffect[i],0),nrow=nlatent),
     TDPREDMEANS=matrix(c(rep(0,Tpoints-10),1,rep(0,9)),ncol=1),
+    TDPREDEFFECT=matrix(c(tdpredeffect[i],0),nrow=nlatent),
     DIFFUSION = matrix(c(1, 0, 0, .5),2,2),
     CINT = matrix(c(cint1[i],cint2[i]),ncol=1),
     T0VAR=diag(2,nlatent,nlatent),
@@ -181,8 +174,7 @@ for(i in 1:nsubjects){
 
   #generate data
   newdat <- ctGenerate(ctmodelobj = gm,n.subjects = 1,burnin = 2,
-    dtmat<-rbind(c(rep(.5,8),3,rep(.5,Tpoints-9))),
-    wide = FALSE)
+    dtmat<-rbind(c(rep(.5,8),3,rep(.5,Tpoints-9))))
   newdat[,'id'] <- i #set id for each subject
   newdat <- cbind(newdat,age[i]) #include time independent predictor
   if(i ==1) {
@@ -252,7 +244,7 @@ ctStanPostPredict(f1, wait=FALSE) #compare randomly generated data from posterio
 cf<-ctCheckFit(f1) #compare mean and covariance of randomly generated data to observed cov
 plot(cf,wait=FALSE)
 
-
+ ### Further example models
 
 #Include intervention
 m2 <- ctModel(type = 'stanct',
@@ -267,15 +259,6 @@ m2 <- ctModel(type = 'stanct',
   LAMBDA = diag(1),
   MANIFESTMEANS=matrix(0,ncol=1),
   MANIFESTVAR=matrix(c('merror'),nrow=1,ncol=1))
-
-f2 <- ctStanFit(datalong = dat2, ctstanmodel = m2, optimize=TRUE)
-
-summary(f2)
-
-ctKalman(f2,plot=TRUE,subjects=1,kalmanvec=c('y','ysmooth'))
-ctKalman(f2,plot=TRUE,subjects=1:3,kalmanvec=c('y','ysmooth'),errorvec=NA,legend=FALSE)
-
-ctStanPostPredict(f2, datarows=1:100, wait=FALSE)
 
 
 
@@ -294,15 +277,7 @@ m2i <- ctModel(type = 'stanct',
   MANIFESTMEANS=matrix(0,ncol=1),
   MANIFESTVAR=matrix(c('merror'),nrow=1,ncol=1))
   
-plot(m2i)
-
-f2i <- ctStanFit(datalong = dat2, ctstanmodel = m2i,intoverpop=TRUE,
-  iter=200,chains=2,control=list(max_treedepth=7))
-summary(f2i)
-ctStanPlotPost(f2i)
-ctKalman(f2i,kalmanvec=c('y','ysmooth'),subjects=2:4,plot=TRUE,errorvec=NA)
-
-
+  
 #Including covariate effects
 m2ic <- ctModel(type = 'stanct',
   manifestNames = c('Y1'), latentNames=c('eta1'),
@@ -320,13 +295,6 @@ m2ic <- ctModel(type = 'stanct',
 
 m2ic$pars$indvarying[m2ic$pars$matrix \%in\% 'TDPREDEFFECT'] <- TRUE
 
-plot(m2ic)
-
-f2ic <- ctStanFit(datalong = dat2, ctstanmodel = m2ic,optimize=TRUE)
-summary(f2ic)
-
-ctStanTIpredeffects(fit = f2ic,includeMeanUncertainty = TRUE,whichpars = 'TDPREDEFFECT',
-  plot=TRUE,probs = c(.025,.5,.975))
 
 #Include deterministic dynamics
 m3 <- ctModel(type = 'stanct',
@@ -341,15 +309,6 @@ m3 <- ctModel(type = 'stanct',
   LAMBDA = diag(1),
   MANIFESTMEANS=matrix(0,ncol=1),
   MANIFESTVAR=matrix(c('merror1'),nrow=1,ncol=1))
-
-ctModelLatex(m3)
-
-f3 <- ctStanFit(datalong = dat2, ctstanmodel = m3, optimize=TRUE)
-
-summary(f3)
-
-ctKalman(f3,plot=TRUE,subjects=1,kalmanvec=c('y','ysmooth'))
-ctKalman(f3,plot=TRUE,subjects=1:3,kalmanvec=c('y','ysmooth'),errorvec=NA)
 
 
 
@@ -369,17 +328,6 @@ m3n <- ctModel(type = 'stanct',
   MANIFESTMEANS=matrix(0,ncol=1),
   MANIFESTVAR=matrix(c(0),nrow=1,ncol=1))
 
-ctModelLatex(m3n)
-
-f3n <- ctStanFit(datalong = dat2, ctstanmodel = m3n, optimize=TRUE)
-
-summary(f3n)
-
-k=ctKalman(f3n,plot=T,subjects=1,kalmanvec=c('y','etasmooth'),timestep=.01)
-ctKalman(f3n,plot=TRUE,subjects=1:3,kalmanvec=c('y','etasmooth'),errorvec=NA)
-
-
-
 
 
 #include 2nd latent process
@@ -397,17 +345,6 @@ m4 <- ctModel(n.manifest = 2,n.latent = 2, type = 'stanct',
   MANIFESTMEANS=matrix(c(0,0),nrow=2,ncol=1),
   MANIFESTVAR=matrix(c('merror1',0,0,'merror2'),nrow=2,ncol=2))
 
-f4 <- ctStanFit(datalong = dat2, ctstanmodel = m4,optimize=TRUE)
-
-summary(f4)
-
-ctStanDiscretePars(f4,plot=TRUE) #auto and cross regressive plots over time
-
-ctKalman(f4,plot=TRUE,subjects=1,kalmanvec=c('y','ysmooth'))
-ctKalman(f4,plot=TRUE,subjects=1:2,kalmanvec=c('y','ysmooth'),errorvec=NA)
-
-
-
 #dynamic factor model -- fixing CINT to 0 and freeing indicator level intercepts
 
 m3df <- ctModel(type = 'stanct',
@@ -422,17 +359,6 @@ m3df <- ctModel(type = 'stanct',
   LAMBDA = matrix(c(1,'Y3loading'),nrow=2,ncol=1),
   MANIFESTMEANS=matrix(c('Y2_int','Y3_int'),nrow=2,ncol=1),
   MANIFESTVAR=matrix(c('Y2residual',0,0,'Y3residual'),nrow=2,ncol=2))
-
-ctModelLatex(m3df)
-
-f3df <- ctStanFit(datalong = dat2, ctstanmodel = m3df, optimize=TRUE)
-
-summary(f3df)
-
-ctKalman(f3df,plot=TRUE,subjects=1,kalmanvec=c('y','ysmooth'),errorvec=NA)
-ctKalman(f3df,plot=TRUE,subjects=1:3,kalmanvec=c('y','ysmooth'),errorvec=NA)
-
-
 
 }
 }

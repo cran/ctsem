@@ -7,7 +7,7 @@
 \method{summary}{ctStanFit}(
   object,
   timeinterval = 1,
-  digits = 3,
+  digits = 4,
   parmatrices = TRUE,
   priorcheck = TRUE,
   residualcov = TRUE,
@@ -38,8 +38,8 @@ List containing summary items.
 Summarise a ctStanFit object that was fit using \code{\link{ctStanFit}}.
 }
 \examples{
-\donttest{
-if (!exists("ctstantestfit")) example(ctstantestfit)
+if(w32chk()){
+
 summary(ctstantestfit)
 }
 }

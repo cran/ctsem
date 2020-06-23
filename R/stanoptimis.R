@@ -1,74 +1,13 @@
-log1p_exp <- function(x) log1p(exp(x))
 
-jac<-function(pars,fgfunc,step=rep(1e-6,length(pars)),whichpars='all',
-  lpdifmin=1e-5,lpdifmax=1, cl=NA,verbose=1){
-  if('all' %in% whichpars) whichpars <- 1:length(pars)
-  base <- fgfunc(pars)
-  hessout <- flexsapply(cl = cl, cores = 1, whichpars, function(i) {
-    if(verbose) message('### Par ',i,'###')
-    stepsize = step[i]
-    uppars<-rep(0,length(pars))
-    uppars[i]<-1
-    accepted <- FALSE
-    count <- 0
-    lp <- list()
-    steplist <- list()
-    for(di in 1:2){
-      count <- 0
-      accepted <- FALSE
-      stepchange = 0
-      stepchangemultiplier = 1
-      while(!accepted && count < 15){
-        stepchangemultiplier <- max(stepchangemultiplier,.11)
-        count <- count + 1
-        lp[[di]] <- fgfunc(pars+uppars*stepsize*ifelse(di==2,-1,1))
-        accepted <- !'try-error' %in% class(lp[[di]])
-        if(accepted){
-          lpdiff <- base[1] - lp[[di]][1]
-          # if(lpdiff > 1e100) browser()
-          if(lpdiff < lpdifmin) {
-            if(verbose) message('Increasing step')
-            if(stepchange == -1) stepchangemultiplier = stepchangemultiplier*.5
-            stepchange <- 1
-            stepsize <- stepsize*(1-stepchangemultiplier)+ (stepsize*10)*stepchangemultiplier
-          }
-          if(lpdiff > lpdifmax){
-            if(verbose) message('Decreasing step')
-            if(stepchange == 1) stepchangemultiplier = stepchangemultiplier * .5
-            stepchange <- -1
-            stepsize <- stepsize*(1-stepchangemultiplier)+ (stepsize*.1)*stepchangemultiplier
-          }
-          if(lpdiff > lpdifmin && lpdiff < lpdifmax && lpdiff > 0) accepted <- TRUE else accepted <- FALSE
-          if(lpdiff < 0){
-            base <- lp[[di]]
-            if(verbose) message('Better log probability found during Hessian estimation...')
-            accepted <- FALSE
-            stepchangemultiplier <- 1
-            stepchange=0
-            count <- 0
-            di <- 1
-          }
-        } else stepsize <- stepsize * 1e-3
-        # if(count > 1) print(paste0(count,'___',stepsize,'___',lpdiff))
-      }
-      steplist[[di]] <- stepsize
-    }
-    # browser()
-    grad<- suppressMessages(suppressWarnings(try({
-      (attributes(lp[[1]])$gradient / steplist[[di]] + attributes(lp[[2]])$gradient / (steplist[[di]]*-1))/2
-    },silent=TRUE)))
-    rbind(grad)
-  })
-  return((hessout+t(hessout))/2)
-}
 
-hesscalc <- function(sf,step){ #input stanfit, get hessian
-  smf <- stan_reinitsf(sf$stanmodel,sf$standata)
-  fgfunc <- function(x) rstan::log_prob(smf,x,gradient=TRUE)
-  # step=findstepsize(est = sf$stanfit$rawest,func = fgfunc,eps = 1e-2,
-  #   maxlpd = 2*length(sf$stanfit$rawest),minlpd=.1*length(sf$stanfit$rawest))
-  H=jac(pars = sf$stanfit$rawest,fgfunc = fgfunc,step = rep(step,length(sf$stanfit$rawest)))
-}
+
+# hesscalc <- function(sf,step){ #input stanfit, get hessian
+#   smf <- stan_reinitsf(sf$stanmodel,sf$standata)
+#   fgfunc <- function(x) rstan::log_prob(smf,x,gradient=TRUE)
+#   # step=findstepsize(est = sf$stanfit$rawest,func = fgfunc,eps = 1e-2,
+#   #   maxlpd = 2*length(sf$stanfit$rawest),minlpd=.1*length(sf$stanfit$rawest))
+#   H=jac(pars = sf$stanfit$rawest,fgfunc = fgfunc,step = rep(step,length(sf$stanfit$rawest)))
+# }
 
 findstepsize <- function(est,func,eps=1e-3,maxlpd=3,minlpd=1e-3){
   
@@ -188,7 +127,7 @@ jacrandom <- function(grfunc, est, eps=1e-4,
       grm <- devs
     }
     i=i+1
-    # browser()
+    # 
     accepted <- FALSE
     trycount <-0
     while(!accepted){
@@ -277,17 +216,17 @@ parallelStanSetup <- function(cl, standata,split=TRUE){
   }
   
   parallel::clusterExport(cl,c('standata'),envir = environment())
+  
   parallel::clusterApply(cl,stansubjectindices,function(subindices) {
-    # require(Rcpp)
     library(ctsem)
     if(length(subindices) < length(unique(standata$subject))) standata <- standatact_specificsubjects(standata,subindices)
     if(!1 %in% subindices) standata$nopriors <- 1L
-    # future(globals = c('sm','standata'),
-    #   packages=c('ctsem','rstan'),
     if(1==99) sm=1
     g = eval(parse(text=paste0('gl','obalenv()'))) #avoid spurious cran check -- assigning to global environment only on created parallel workers.
     assign('smf',stan_reinitsf(sm,standata),pos = g)
     
+    rm(standata,env=g)
+    rm(sm,env=g)
     # env <- new.env(parent=globalenv())
     # environment(parlp) <- env
     # assign('parlp',parlp,pos = g)
@@ -318,14 +257,14 @@ getcxxfun <- function(object) {
 #' @export
 #'
 #' @examples
-#' \donttest{
-#' if (!exists("ctstantestfit")) example(ctstantestfit)
+#' if(w32chk()){
+#'
 #' sf <- stan_reinitsf(ctstantestfit$stanmodel,ctstantestfit$standata)
 #' }
 stan_reinitsf <- function(model, data,fast=FALSE){
   if(fast) sf <- new(model@mk_cppmodule(model),data,0L,getcxxfun(model@dso))
   
-  if(!fast) suppressMessages(suppressWarnings(suppressOutput(sf<-sampling(model,iter=0,chains=0,init=0,data=data,check_data=FALSE,
+  if(!fast) suppressMessages(suppressWarnings(suppressOutput(sf<-rstan::sampling(model,iter=0,chains=0,init=0,data=data,check_data=FALSE,
     control=list(max_treedepth=0),save_warmup=FALSE,test_grad=FALSE))))
   
   return(sf)
@@ -350,8 +289,8 @@ flexlapply <- function(cl, X, fn,cores=1,...){
 #' @export
 #'
 #' @examples
-#' \donttest{
-#' if (!exists("ctstantestfit")) example(ctstantestfit)
+#' if(w32chk()){
+#'
 #' d <- standatact_specificsubjects(ctstantestfit$standata, 1:2)
 #' }
 standatact_specificsubjects <- function(standata, subjects,timestep=NA){
@@ -371,13 +310,35 @@ standatalongobjects <- function() {
   return(longobjects)
 }
 
-standatatolong <- function(standata){
-  long <- lapply(standatalongobjects(),function(x) standata[[x]])
+standatatolong <- function(standata, origstructure=FALSE,ctm=NA){
+  long <- lapply(standatalongobjects(),function(x) as.matrix(standata[[x]]))
   names(long) <- standatalongobjects()
-  long <- data.frame(long) #,simplify=data.frame(subject=standata$subject, time=standata$time
+  
+  if(origstructure){
+    colnames(long[['Y']]) <- colnames(standata$Y)
+    long[['Y']][long[['Y']] %in% 99999] <- NA
+    if(!is.na(ctm[1])){
+      colnames(long[['subject']]) <- ctm$subjectIDname
+      colnames(long[['time']]) <- ctm$timeName
+    }
+    longout <- data.frame(long[['subject']],long[['time']],long[['Y']])
+    if(standata$ntdpred > 0){
+      colnames(long[['tdpreds']]) <- colnames(standata$tdpreds)
+      if(!is.na(ctm[1])) colnames(long[['tdpreds']]) <- ctm$TDpredNames
+      longout <- cbind(longout,long[['tdpreds']])
+    }
+    if(standata$ntipred > 0){
+      tipreds <- standata$tipredsdata[longout$id,,drop=FALSE]
+      tipreds[tipreds %in% 99999] <- NA
+      if(!is.na(ctm[1])) colnames(tipreds) <- ctm$TIpredNames
+      longout <- cbind(longout,tipreds)
+    }
+  } else longout <- data.frame(long) 
+  
+  #,simplify=data.frame(subject=standata$subject, time=standata$time
   # colnames(long)[colnames(long) %in% 'Y'] <- paste0('Y.1'
   # colnames(long)[colnames(long) %in% 'tdpreds'] <- 'tdpreds.1'
-  return(long)
+  return(longout)
 }
 
 # stanlongtostandatasml <- function(long){
@@ -437,7 +398,6 @@ standataFillTime <- function(standata, times){
 stan_constrainsamples<-function(sm,standata, samples,cores=2, cl=NA,savescores=FALSE,
   savesubjectmatrices=TRUE,
   dokalman=TRUE,onlyfirstrow=ifelse(savescores,FALSE,TRUE),pcovn=500,quiet=FALSE){
-  
   if(savesubjectmatrices && !dokalman){
     dokalman <- TRUE
     warning('savesubjectmatrices = TRUE requires dokalman=TRUE also!')
@@ -479,12 +439,15 @@ stan_constrainsamples<-function(sm,standata, samples,cores=2, cl=NA,savescores=F
   env$samples <- samples
   if(cores > 1 && all(is.na(cl))){
     cl <- parallel::makeCluster(cores, type = "PSOCK",useXDR=TRUE)
-    on.exit(parallel::stopCluster(cl),add = TRUE)
+    on.exit(try(parallel::stopCluster(cl),silent=TRUE),add = TRUE)
     # parallel::clusterExport(cl2, c('sm','standata','samples'),environment())
     # parallel::clusterApply(cl2,1:cores, function(x) library(ctsem))
   }
+  if(cores > 1) parallel::clusterExport(cl, 'standata',environment())
   transformedpars <- try(flexlapply(cl, 
-    split(1:nrow(samples), sort((1:nrow(samples))%%cores)),tparfunc,cores=cores,parallel=cores > 1))
+    split(1:nrow(samples), sort((1:nrow(samples))%%cores)),
+    tparfunc,cores=cores,parallel=cores > 1))
+  
   
   #fix this hack
   # 
@@ -495,7 +458,6 @@ stan_constrainsamples<-function(sm,standata, samples,cores=2, cl=NA,savescores=F
   
   
   if(nasampscount > 0) {
-    # 
     # a=lapply(transformedpars[[1]],function(x) any(is.na(x)));a[unlist(a)]
     message(paste0(nasampscount,' NAs generated during final sampling of ', nrow(samples), '. Biased estimates may result -- consider importance sampling, respecification, or full HMC sampling'))
   }
@@ -570,60 +532,25 @@ tostanarray <- function(flesh, skeleton){
 #' without replacement from this set.
 #' @param tdf degrees of freedom of multivariate t distribution. Higher (more normal) generally gives more efficent
 #' importance sampling, at risk of truncating tails.
-#' @param datadrivenpars vector of integers denoting which parameters should begin fixed
-#' at zero, and only freed if expected to substantially contribute to model fit.
+#' @param parsteps ordered list of vectors of integers denoting which parameters should begin fixed
+#' at zero, and freed sequentially (by list order). Useful for complex models, e.g. keep all cross couplings fixed to zero 
+#' as a first step, free them in second step. 
 #' @param finitediff Either 'ask', TRUE, or FALSE. Whether to use the slow finite difference calculations
 #' for the Hessian (used for confidence intervals) if other approaches do not give a positive definite result. 
 #' @param chancethreshold drop iterations of importance sampling where any samples are chancethreshold times more likely to be drawn than expected.
 #'
-#' @return list containing fit elements
+#' @return list containing fit elementsF
 #' @importFrom mize mize
 #' @importFrom utils head tail
 #' @importFrom Rcpp evalCpp
-#' @import rstan
-#' @export
-#' @examples
-#' \donttest{
-#'
-#' library(rstan)
-#' scode <- "
-#' parameters {
-#'   real y[2];
-#' }
-#' model {
-#'   y[1] ~ normal(0, 1);
-#'   y[2] ~ double_exponential(0, 2);
-#' }
-#' "
-#'
-#' sm <- stan_model(model_code=scode)
-#' fit <- sampling(sm, iter = 10000)
-#' summary(fit)$summary
-#'
-#' ## extract samples as a list of arrays
-#' e <- ctExtract(fit, permuted = TRUE)
-#'
-#' #for ml or map estimates
-#' optimis <- stanoptimis(standata = list(),sm = sm,finishsamples = 3000,cores=2)
-#' optimis$optimfit
-#'
-#' #for posterior distributions
-#' optimis <- stanoptimis(standata = list(),sm = sm,finishsamples = 3000,cores=2,tdf=5)
-#'
-#' apply(optimis$rawposterior,2,mean)
-#' apply(optimis$rawposterior,2,sd)
-#' isdiag(optimis)
-#'
-#' plot(density(optimis$rawposterior[,2],bw=.05))
-#' points(density(e$y[,2],bw=.05),type='l',col=2)
-#' }
+
 stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
   deoptim=FALSE, estonly=FALSE,tol=1e-12,
   decontrol=list(),
-  stochastic = "auto",
+  stochastic = TRUE,
   nopriors=FALSE,carefulfit=TRUE,
   subsamplesize=.5,finitediff=FALSE,
-  datadrivenpars=c(),
+  parsteps=c(),
   plot=FALSE,
   is=FALSE, isloopsize=1000, finishsamples=1000, tdf=10,chancethreshold=100,finishmultiply=5,
   verbose=0,cores=2){
@@ -643,14 +570,6 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
   
   clctsem <- NA #placeholder for flexsapply usage
   
-  if(length(unique(standata$subject)) < cores) optimcores <- length(unique(standata$subject))  else optimcores <- cores
-  
-  betterfit<-TRUE
-  bestfit <- -9999999999
-  try2 <- FALSE
-  
-  message('Using ',cores,'/', parallel::detectCores(),' available CPU cores')
-  
   notipredsfirstpass <- FALSE
   if(init[1] =='random'){# #remove tipreds for first pass
     notipredsfirstpass <- TRUE
@@ -668,17 +587,42 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
     whichmcmcpars <- (a1+1):(a1+standata$nindvarying) #*standata$nsubjects)
   } else whichmcmcpars <- NA
   
+  smf <- stan_reinitsf(sm,standata)
+  npars=rstan::get_num_upars(smf)
+  if(cores > 1 & !deoptim) rm(smf)
+  
+  if(stochastic=='auto' && npars > 50){
+    message('> 50 parameters and stochastic="auto" so stochastic gradient descent used -- try disabling if slow!')
+    stochastic <- TRUE
+  } else if(stochastic=='auto') stochastic <- FALSE
+  if(length(parsteps)>0 && !stochastic){
+    stochastic=TRUE
+    message('Stochastic optimizer used for data driven parameter inclusion') 
+  }
+  
+  parsets <- 1
+  if(length(unique(standata$subject)) < cores){
+    if(length(unique(standata$subject))==1){
+      optimcores <- cores
+      parsets <- cores
+      if(cores >1) stochastic=TRUE
+    } else  optimcores <- length(unique(standata$subject))
+  } else optimcores <- cores
+  
+  betterfit<-TRUE
+  bestfit <- -9999999999
+  try2 <- FALSE
+  
+  message('Using ',cores,'/', parallel::detectCores(),' logical CPU cores')
   
   while(betterfit){ #repeat loop if importance sampling improves on optimized max
     betterfit <- FALSE
-    smf <- stan_reinitsf(sm,standata)
-    npars=rstan::get_num_upars(smf)
     
-    # if(standata$TIpredAuto >0) datadrivenpars <- c(datadrivenpars,(npars:(npars-max(standata$TIPREDEFFECTsetup)+1)))
+    # if(standata$TIpredAuto >0) parsteps <- c(parsteps,(npars:(npars-max(standata$TIPREDEFFECTsetup)+1)))
     
     if(all(init %in% 'random')){
       init <- rnorm(npars, 0, initsd)
-      if(length(datadrivenpars)>0) init[datadrivenpars] <- 0 
+      if(length(parsteps)>0) init[unlist(parsteps)] <- 0 
     }
     if(all(init == 0)) init <- rep(0,npars)
     if(length(init) != npars) init=init[1:npars]
@@ -741,8 +685,8 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       
       if(optimcores==1) target = singletarget #we use this for importance sampling
       if(cores > 1){ #for parallelised computation after fitting, if only single subject
-        clctsem=parallel::makeCluster(cores,useXDR=TRUE)
-        on.exit({parallel::stopCluster(clctsem)},add=TRUE)
+        clctsem=parallel::makeCluster(cores,useXDR=TRUE,type='PSOCK')
+        on.exit(try({parallel::stopCluster(clctsem)},silent=TRUE),add=TRUE)
         parallel::clusterExport(clctsem,varlist = 'sm',envir = environment())
       }
       if(optimcores > 1) {
@@ -752,14 +696,23 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         environment(parlp) <- env
         
         target<-function(parm,gradnoise=TRUE) {
-          whichframe <- which(sapply(lapply(sys.frames(),ls),function(x){ 'clctsem' %in% x}))
+          # whichframe <- which(sapply(lapply(sys.frames(),ls),function(x){ 'clctsem' %in% x}))
           a=Sys.time()
-          out2<- parallel::clusterCall(clctsem,parlp,parm)
+          if('list' %in% class(parm)){
+            out2 <- parallel::parLapply(cl = clctsem,X = parm,parlp)
+            bestset <- which(unlist(out2)==max(unlist(out2)))#sapply(out,max))
+            # print(bestset)
+            bestset <- bestset[1]
+            parm <- parm[[bestset]]
+            out <- out2[[bestset]]
+            attributes(out)$bestset <- bestset
+          } else {
+            out2<- parallel::clusterCall(clctsem,parlp,parm)
+            out <- try(sum(unlist(out2)),silent=TRUE)
+            attributes(out)$gradient <- try(apply(sapply(out2,function(x) attributes(x)$gradient,simplify='matrix'),1,sum))
+          }
           b=Sys.time()
           b-a
-          
-          out <- try(sum(unlist(out2)),silent=TRUE)
-          attributes(out)$gradient <- try(apply(sapply(out2,function(x) attributes(x)$gradient,simplify='matrix'),1,sum))
           
           if('try-error' %in% class(out) || is.nan(out)) {
             out=-1e100
@@ -811,7 +764,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
           decontrollist$initialpop=deinit
           decontrollist$NP = NP
           
-          if(optimcores > 1) parallelStanSetup(cl = clctsem,standata = standata)
+          if(optimcores > 1) parallelStanSetup(cl = clctsem,standata = standata,split=parsets<2)
           if(optimcores==1) smf<-stan_reinitsf(sm,standata)
           
           optimfitde <- suppressWarnings(DEoptim::DEoptim(fn = lp2,lower = rep(-1e10, npars), upper=rep(1e10, npars),
@@ -835,15 +788,6 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         gr=function(pars) -attributes(target(pars))$gradient
       )
       
-      if(stochastic=='auto' && npars > 50){
-        message('> 50 parameters and stochastic="auto" so stochastic gradient descent used -- try disabling if slow!')
-        stochastic <- TRUE
-      } else if(stochastic=='auto') stochastic <- FALSE
-      if(length(datadrivenpars)>0 && !stochastic){
-        stochastic=TRUE
-        message('Stochastic optimizer used for data driven parameter inclusion') 
-      }
-      
       nopriorsbak <- standata$nopriors
       taylorheun <- standata$taylorheun
       finished <- FALSE
@@ -860,10 +804,11 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         smlnsub <- min(standata$nsubjects,max(min(30,cores*2),ceiling(standata$nsubjects * subsamplesize)))
         standatasml <- standatact_specificsubjects(standata,
           sample(unique(standata$subject),smlnsub))
+        
         # smlndat <- min(standatasml$ndatapoints,ceiling(max(standatasml$nsubjects * 10, standatasml$ndatapoints*.5)))
         # standatasml$dokalmanrows[sample(1:standatasml$ndatapoints,smlndat)] <- 0L
         # standatasml$dokalmanrows[match(unique(standatasml$subject),standatasml$subject)] <- 1L #ensure first obs is included for t0var consistency
-        if(optimcores > 1) parallelStanSetup(cl = clctsem,standata = standatasml)
+        if(optimcores > 1) parallelStanSetup(cl = clctsem,standata = standatasml,split=parsets<2)
         if(optimcores==1) smf<-stan_reinitsf(sm,standatasml)
         
         if(!stochastic) {
@@ -876,7 +821,8 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         
         if(stochastic) {
           optimfit <- sgd(init, fitfunc = function(x) target(x),
-            whichignore = datadrivenpars,whichmcmcpars=whichmcmcpars,nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
+            parsets=parsets,
+            whichignore = unlist(parsteps),whichmcmcpars=whichmcmcpars,nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
             plot=plot,itertol=1e-1,deltatol=1e-2,maxiter=500)
         }
         
@@ -885,13 +831,13 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         standata$taylorheun <- as.integer(taylorheun)
         standata$sdscale <- sdscale
         
-        if(length(datadrivenpars)>0) init[-datadrivenpars] = optimfit$par else init=optimfit$par
+        if(length(parsteps)>0) init[-unlist(parsteps)] = optimfit$par else init=optimfit$par
       } #end carefulfit init
       
       
       message('Optimizing...')
-      if(length(datadrivenpars) <1 && (standata$ntipred ==0 || notipredsfirstpass ==FALSE)) finished <- TRUE
-      if(optimcores > 1) parallelStanSetup(cl = clctsem,standata = standata)
+      if(length(parsteps) <1 && (standata$ntipred ==0 || notipredsfirstpass ==FALSE)) finished <- TRUE
+      if(optimcores > 1) parallelStanSetup(cl = clctsem,standata = standata,split=parsets<2)
       if(optimcores==1) smf<-stan_reinitsf(sm,standata)
       
       if(!stochastic){
@@ -912,70 +858,36 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         if(is.infinite(bestfit)) message('Switching to stochastic optimizer -- failed initialisation with bfgs')
         if(!stochastic && carefulfit) message('carefulfit = TRUE , so checking for improvements with stochastic optimizer')
         optimfit <- sgd(init, fitfunc = target,
+          parsets=parsets,
           itertol = ifelse(!finished,1e-1,1e-3),
           deltatol=ifelse(!finished,1e-2,1e-5),
           # itertol = ifelse(standata$ntipred >0,1e-1,1e-3),
           # deltatol=ifelse(standata$ntipred >0,1e-2,1e-5),
-          whichignore = datadrivenpars,whichmcmcpars=whichmcmcpars,
+          whichignore = unlist(parsteps),whichmcmcpars=whichmcmcpars,
           nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
           ndatapoints=standata$ndatapoints,plot=plot)
-        if(length(datadrivenpars)>0) init[-datadrivenpars] = optimfit$par else init=optimfit$par
+        if(length(parsteps)>0) init[-unlist(parsteps)] = optimfit$par else init=optimfit$par
       }
       
       
-      if(length(datadrivenpars) > 0){
-        message('Checking for parameters to free...')
+      if(length(parsteps) > 0){
+        message('Freeing parameters...')
         finished <- FALSE
-        while(!finished && length(datadrivenpars)>0){
-          oldlp <- optimfit$value
-          score = scorecalc(standata = standata,
-            est = init,stanmodel = sm,
-            subjectsonly = FALSE, #standata$nsubjects > 30,
-            returnsubjectlist = FALSE)
-          # apply(score,2,mean)
-          # plot(apply(score,2,function(x) sum(x)/sd(x)))
-          # for(i in 1:ncol(score)){
-          #   plot(scale(score[,i],center = FALSE),type='l',main=i)
-          #   abline(h=0)
-          #   abline(h=mean(scale(score[,i],center = FALSE)),col='red')
-          # }
-          # browser()
-          pstat=apply(score,2,function(x) wilcox.test(x)$p.value)[datadrivenpars]
-          plot(pstat)
-          # plot((apply(score,2,sum)/apply(score,2,sd))[datadrivenpars],pstat[datadrivenpars])
-          # # plot(apply(score,2,mean))
-          # # plot(apply(score,2,sd))
-          zstat=abs(apply(score,2,sum)/apply(score,2,sd))[datadrivenpars]
-          # apply(score,2,function(x) plot(density(x)))
-          # 
+        while(!finished && length(parsteps)>0){
+          if(length(parsteps)>1) parsteps <- parsteps[-1] else parsteps <- c()#parsteps[pstat> pcheck]
           
-          pcheck <- 2.95
-          if(any(pstat< pcheck)){
-            message(paste0('Freed ',sum(pstat< pcheck),' new parameters, ', sum(pstat>= pcheck),' still captive...'))
-            # message(paste0('Freed a parameter, ', length(datadrivenpars)-1,' still captive...'))
-            # datadrivenpars <- datadrivenpars[-which(pstat==min(pstat))]
-            datadrivenpars <- datadrivenpars[pstat> pcheck]
-            
-            optimfit <- sgd(init, fitfunc = target,
-              itertol = 1e-2, deltatol= 1e-2,
-              whichignore = datadrivenpars,whichmcmcpars=whichmcmcpars,
-              nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
-              ndatapoints=standata$ndatapoints,plot=plot)
-            if(length(datadrivenpars)>0) init[-datadrivenpars] = optimfit$par else{
-              finished <- TRUE
-              init = optimfit$par
-            }
-            # if((optimfit$value-oldlp) < 3.92) finished <- TRUE
-            # print(optimfit$value-oldlp)
-            
-          } else finished <- TRUE
-        } #finish datadrivenpar loop
-        standata$taylorheun <- as.integer(taylorheun)
-        if(standata$ntipred ==0 || !notipredsfirstpass ) optimfit <- sgd(init, fitfunc = target,
-          itertol = 1e-3, deltatol= 1e-3,
-          whichignore = datadrivenpars,whichmcmcpars=whichmcmcpars,
-          nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
-          ndatapoints=standata$ndatapoints,plot=plot)
+          optimfit <- sgd(init, fitfunc = target,
+            parsets=parsets,
+            itertol = 1e-2, deltatol= 1e-2,
+            whichignore = unlist(parsteps),whichmcmcpars=whichmcmcpars,
+            nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
+            ndatapoints=standata$ndatapoints,plot=plot)
+          
+          if(length(parsteps)>0) init[-unlist(parsteps)] = optimfit$par else{
+            finished <- TRUE
+            init = optimfit$par
+          }
+        }
       }
       
       
@@ -1032,7 +944,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
             standata$ntipredeffects <- as.integer(max(TIPREDEFFECTsetup))
           }
           
-          if(optimcores > 1) parallelStanSetup(cl = clctsem,standata = standata)
+          if(optimcores > 1) parallelStanSetup(cl = clctsem,standata = standata,split=parsets<2)
           if(optimcores==1) smf<-stan_reinitsf(sm,standata)
           if(!stochastic) {
             optimfit <- mize(init, fg=mizelpg, max_iter=99999,
@@ -1042,21 +954,23 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
             optimfit$value = -optimfit$f
           }
           if(stochastic && finished) optimfit <- sgd(init, fitfunc = target,
-            whichignore = datadrivenpars,whichmcmcpars=whichmcmcpars,
+            parsets=parsets,
+            whichignore = parsteps,whichmcmcpars=whichmcmcpars,
             nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
             plot=plot)
           if(stochastic && !finished) optimfit <- sgd(init, fitfunc = target,
-            whichignore = datadrivenpars,whichmcmcpars=whichmcmcpars,
+            parsets=parsets,
+            whichignore = parsteps,whichmcmcpars=whichmcmcpars,
             nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
             plot=plot,itertol=1e-1,deltatol=1e-2)
-          if(length(datadrivenpars)>0) init[-datadrivenpars] = optimfit$par else init=optimfit$par
+          if(length(parsteps)>0) init[-parsteps] = optimfit$par else init=optimfit$par
           # }
         }
         # smf <- stan_reinitsf(sm,standata)
         # 
         #   optimfit <- sgd(init, fitfunc = target,
         #     itertol = 1e-3, deltatol= 1e-3,
-        #     whichignore = datadrivenpars,whichmcmcpars=whichmcmcpars,
+        #     whichignore = parsteps,whichmcmcpars=whichmcmcpars,
         #     nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
         #     ndatapoints=standata$ndatapoints,plot=plot)
       } #end ti pred auto total loop
@@ -1065,7 +979,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       
       bestfit <-optimfit$value
       est2=init #because init contains the fixed values #unconstrain_pars(smf, est1)
-      if(length(datadrivenpars)>0) est2[-datadrivenpars] = optimfit$par else est2=optimfit$par
+      if(length(parsteps)>0) est2[-parsteps] = optimfit$par else est2=optimfit$par
       
       if(standata$nindvarying > 0 && standata$intoverpop==0){ #recompose into single model
         standata$doonesubject <- 0L
@@ -1081,86 +995,92 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
     }
     
     if(!estonly){
-      if(optimcores > 1) parallelStanSetup(cl = clctsem,standata = standata)
-      if(optimcores==1) smf<-stan_reinitsf(sm,standata)
       
-      base <- lapply(1:10,function(x) target(est2 + rnorm(length(est2),0,1e-12),
-        gradnoise = FALSE))
-      basegrad <- mean(unlist(lapply(base,function(x) attributes(x)$gradient)))
-      base <- mean(unlist(base))
-      
-      grmat<-function(pars,step=1e-1,lpdifmin=1e-1, 
-        lpdifmax=3, direction=1,whichpars='all',gradmod=FALSE,parmod=TRUE){
-        if('all' %in% whichpars) whichpars <- 1:length(pars)
-        hessout <- flexsapply(cl = clctsem, cores = 1, whichpars, function(i) {
-          stepsize <- step * direction
-          if(parmod) stepsize <- min(step, abs(pars[i]*1e-4)) * direction
-          colout <- NA
-          dolpchecks <- TRUE #set to true to try the log prob checks again..
-          # 
-          while(any(is.na(colout)) && abs(stepsize) > 1e-20){
-            stepsize <- stepsize * .1
-            lpdifok<-FALSE
-            lpdifcount <- 0
-            lpdifdirection <- 0
-            lpdifmultiplier <- 1
-            # message('par',i)
-            while(!lpdifok & lpdifcount < 15){
-              # message(paste(i,'  col=',colout,'  lpdifmultiplier=',lpdifmultiplier, '  stepsize=',stepsize))
-              lpdifok <- TRUE
-              lpdifcount <- lpdifcount + 1
-              uppars<-pars
-              uppars[i]<-pars[i]+stepsize / ifelse(gradmod,(abs(basegrad[i])),1)
-              
-              suppressMessages(suppressWarnings(try({uplp<- target(uppars,gradnoise=FALSE)},silent=TRUE))) #try(smf$log_prob(upars=uppars,adjust_transform=TRUE,gradient=TRUE)) #lpg(uppars)
-              # storedPars <<- cbind(storedPars,matrix(uppars))
-              # storedLp <<- c(storedLp,uplp[1])
-              
-              if('try-error' %in% class(uplp)){
-                lpdifok <- TRUE
-                upgrad <- rep(NA,length(pars))
-                dolpchecks <- FALSE
-              } else{
-                upgradnew= ((attributes(uplp)$gradient -basegrad) / stepsize)
-                upgrad = upgradnew * ifelse(abs(base-uplp) < 2,.5,0) + 
-                  upgradnew*ifelse(lpdifcount==1 ||abs(base-uplp) < 2,.5,0)
-                
-                
-                # print((  (upgrad[i] * (-abs(uppars[i]-pars[i]))) / (uplp[1]-bestfit[1]) ))
-                # upgrad = upgrad / (  (upgrad[i] * (-abs(uppars[i]-pars[i]))) / (uplp[1]-bestfit[1]) ) #linearised upgrad
-                
-                if(dolpchecks){
-                  if(abs(base-uplp) > lpdifmax) {
-                    # print(abs(base-uplp))
-                    message(paste0('decreasing step for ', i))
-                    lpdifok <- FALSE
-                    if(lpdifdirection== 1) {
-                      lpdifmultiplier = lpdifmultiplier * .5
-                    }
-                    stepsize = stepsize * (1e-2 * lpdifmultiplier)
-                    lpdifdirection <- -1
-                  }
-                  if(abs(base-uplp) < lpdifmin ) { #include sufficient gradient[i] checks #|| upgrad[i] < 1e-2
-                    # print(abs(base-uplp))
-                    message(paste0('increasing step for ', i))
-                    lpdifok <- FALSE
-                    if(lpdifdirection== -1) {
-                      lpdifmultiplier = lpdifmultiplier * .5
-                    }
-                    stepsize = stepsize * (100 * lpdifmultiplier)
-                    lpdifdirection <- 1
-                  }
-                  if(any(is.na(c(uplp)))) stepsize = stepsize * .1
-                }
-              }
-            }
-            # print(abs(base-uplp))
-            colout<- (upgrad)  * ifelse(gradmod,(abs(basegrad[i])),1)
-          }
-          rbind(colout)
-        })
-        return((hessout))# + t(hessout))/2)
+      if(standata$nsubjects > cores){
+      hesscl <- NA
+      } else {
+        hesscl <- clctsem
+        if(cores > 1) parallelStanSetup(cl = clctsem,standata = standata,split=FALSE)#,split=parsets<2)
+        if(cores==1) smf<-stan_reinitsf(sm,standata)
       }
+      
+      # base <- lapply(1:10,function(x) target(est2 + rnorm(length(est2),0,1e-12),
+      #   gradnoise = FALSE))
+      # basegrad <- mean(unlist(lapply(base,function(x) attributes(x)$gradient)))
+      # base <- mean(unlist(base))
+      
+      # grmat<-function(pars,step=1e-1,lpdifmin=1e-1, 
+      #   lpdifmax=3, direction=1,whichpars='all',gradmod=FALSE,parmod=TRUE){
+      #   if('all' %in% whichpars) whichpars <- 1:length(pars)
+      #   hessout <- flexsapply(cl = clctsem, cores = 1, whichpars, function(i) {
+      #     stepsize <- step * direction
+      #     if(parmod) stepsize <- min(step, abs(pars[i]*1e-4)) * direction
+      #     colout <- NA
+      #     dolpchecks <- TRUE #set to true to try the log prob checks again..
+      #     # 
+      #     while(any(is.na(colout)) && abs(stepsize) > 1e-20){
+      #       stepsize <- stepsize * .1
+      #       lpdifok<-FALSE
+      #       lpdifcount <- 0
+      #       lpdifdirection <- 0
+      #       lpdifmultiplier <- 1
+      #       # message('par',i)
+      #       while(!lpdifok & lpdifcount < 15){
+      #         # message(paste(i,'  col=',colout,'  lpdifmultiplier=',lpdifmultiplier, '  stepsize=',stepsize))
+      #         lpdifok <- TRUE
+      #         lpdifcount <- lpdifcount + 1
+      #         uppars<-pars
+      #         uppars[i]<-pars[i]+stepsize / ifelse(gradmod,(abs(basegrad[i])),1)
+      #         
+      #         suppressMessages(suppressWarnings(try({uplp<- target(uppars,gradnoise=FALSE)},silent=TRUE))) #try(smf$log_prob(upars=uppars,adjust_transform=TRUE,gradient=TRUE)) #lpg(uppars)
+      #         # storedPars <<- cbind(storedPars,matrix(uppars))
+      #         # storedLp <<- c(storedLp,uplp[1])
+      #         
+      #         if('try-error' %in% class(uplp)){
+      #           lpdifok <- TRUE
+      #           upgrad <- rep(NA,length(pars))
+      #           dolpchecks <- FALSE
+      #         } else{
+      #           upgradnew= ((attributes(uplp)$gradient -basegrad) / stepsize)
+      #           upgrad = upgradnew * ifelse(abs(base-uplp) < 2,.5,0) + 
+      #             upgradnew*ifelse(lpdifcount==1 ||abs(base-uplp) < 2,.5,0)
+      #           
+      #           
+      #           # print((  (upgrad[i] * (-abs(uppars[i]-pars[i]))) / (uplp[1]-bestfit[1]) ))
+      #           # upgrad = upgrad / (  (upgrad[i] * (-abs(uppars[i]-pars[i]))) / (uplp[1]-bestfit[1]) ) #linearised upgrad
+      #           
+      #           if(dolpchecks){
+      #             if(abs(base-uplp) > lpdifmax) {
+      #               # print(abs(base-uplp))
+      #               message(paste0('decreasing step for ', i))
+      #               lpdifok <- FALSE
+      #               if(lpdifdirection== 1) {
+      #                 lpdifmultiplier = lpdifmultiplier * .5
+      #               }
+      #               stepsize = stepsize * (1e-2 * lpdifmultiplier)
+      #               lpdifdirection <- -1
+      #             }
+      #             if(abs(base-uplp) < lpdifmin ) { #include sufficient gradient[i] checks #|| upgrad[i] < 1e-2
+      #               # print(abs(base-uplp))
+      #               message(paste0('increasing step for ', i))
+      #               lpdifok <- FALSE
+      #               if(lpdifdirection== -1) {
+      #                 lpdifmultiplier = lpdifmultiplier * .5
+      #               }
+      #               stepsize = stepsize * (100 * lpdifmultiplier)
+      #               lpdifdirection <- 1
+      #             }
+      #             if(any(is.na(c(uplp)))) stepsize = stepsize * .1
+      #           }
+      #         }
+      #       }
+      #       # print(abs(base-uplp))
+      #       colout<- (upgrad)  * ifelse(gradmod,(abs(basegrad[i])),1)
+      #     }
+      #     rbind(colout)
+      #   })
+      #   return((hessout))# + t(hessout))/2)
+      # }
       
       # A more numerically stable way of calculating log( sum( exp( x ))) Source:
       # http://r.789695.n4.nabble.com/logsumexp-function-in-R-td3310119.html
@@ -1175,7 +1095,6 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       if(is.na(sampleinit[1])){
         
         message('Estimating Hessian')
-        time1 <- Sys.time()
         
         # hesslist <- list()
         # remainingpars <- c()
@@ -1258,36 +1177,36 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         
         
         # grfunc <- function(x){
-        #   if(length(datadrivenpars)>0){
+        #   if(length(parsteps)>0){
         #     pars <- est2
-        #     pars[-datadrivenpars] <- x
+        #     pars[-parsteps] <- x
         #   } else pars <- x
         #   fg=target(pars)
-        #   if(length(datadrivenpars)>0){ 
-        #     attributes(fg)$gradient <- attributes(fg)$gradient[-datadrivenpars]
+        #   if(length(parsteps)>0){ 
+        #     attributes(fg)$gradient <- attributes(fg)$gradient[-parsteps]
         #   }
         #   return(attributes(fg)$gradient)
         # }
         
-        fgfunc <- function(x){
-          if(length(datadrivenpars)>0){
-            pars <- est2
-            pars[-datadrivenpars] <- x
-          } else pars <- x
-          fg=target(pars)
-          if(length(datadrivenpars)>0){ 
-            attributes(fg)$gradient <- attributes(fg)$gradient[-datadrivenpars]
-          }
-          # print(fg[1])
-          if(fg[1] < -1e99) class(fg) <- c('try-error',class(fg))
-          return(fg)
-        }
+        # fgfunc <- function(x){
+        #   if(length(parsteps)>0){
+        #     pars <- est2
+        #     pars[-parsteps] <- x
+        #   } else pars <- x
+        #   fg=target(pars)
+        #   if(length(parsteps)>0){ 
+        #     attributes(fg)$gradient <- attributes(fg)$gradient[-parsteps]
+        #   }
+        #   # print(fg[1])
+        #   if(fg[1] < -1e99) class(fg) <- c('try-error',class(fg))
+        #   return(fg)
+        # }
         
-        gfunc <- function(x) attributes(fgfunc(x))$gradient
+        # gfunc <- function(x) attributes(fgfunc(x))$gradient
         
-        if(length(datadrivenpars)>0) grinit= est2[-datadrivenpars] else grinit = est2
+        if(length(parsteps)>0) grinit= est2[-parsteps] else grinit = est2
         # hess <- numDeriv::jacobian(grfunc, grinit,method.args=list(eps=1e-3,r=3,v=10))
-        # browser()
+        # 
         # 
         # lpstore <- optimfit$lpstore
         # gstore <- t(optimfit$gstore[,(bestfit-lpstore) < .5])
@@ -1296,10 +1215,120 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         # lmf <- apply(gstore,2,function(y) coefficients(lm(y ~ parstore-1)))
         
         # hess <- jacrandom(fgfunc, grinit)
-        # browser()
+        # 
         # eps <- findstepsize(grinit,fgfunc)
-        hess <- jac(pars = grinit,fgfunc = fgfunc,
-          step = rep(1e-3,length(grinit)),cl=clctsem,verbose=verbose)
+        
+        jac<-function(pars,step=rep(1e-2,length(pars)),whichpars='all',
+          lpdifmin=1e-2,lpdifmax=3, cl=NA,verbose=1,directions=c(-1,1),parsteps=c()){
+          if('all' %in% whichpars) whichpars <- 1:length(pars)
+          base <- optimfit$value
+          
+          if(!is.na(hesscl[1]))  target <- function(x){ #if cluster is passed, create target function, otherwise use old target
+            if(length(parsteps)>0){
+              pars <- est2
+              pars[-parsteps] <- x
+            } else pars <- x
+            fg=parlp(pars)
+            if(length(parsteps)>0){ 
+              attributes(fg)$gradient <- attributes(fg)$gradient[-parsteps]
+            }
+            # print(fg[1])
+            if(fg[1] < -1e99) class(fg) <- c('try-error',class(fg))
+            return(fg)
+          }
+          
+          hessout <- flexsapply(cl = cl, cores = length(cl), whichpars, function(i){
+          
+          # if(is.na(cl[1])) fgfunc <- target
+            
+            # for(i in whichpars){
+            if(verbose) message('### Par ',i,'###')
+            stepsize = step[i]
+            uppars<-rep(0,length(pars))
+            uppars[i]<-1
+            accepted <- FALSE
+            count <- 0
+            lp <- list()
+            steplist <- list()
+            for(di in 1:length(directions)){
+              count <- 0
+              accepted <- FALSE
+              stepchange = 0
+              stepchangemultiplier = 1
+              while(!accepted && count < 15){
+                stepchangemultiplier <- max(stepchangemultiplier,.11)
+                count <- count + 1
+                lp[[di]] <- target(pars+uppars*stepsize*directions[di])
+                accepted <- !'try-error' %in% class(lp[[di]])
+                if(accepted){
+                  lpdiff <- base[1] - lp[[di]][1]
+                  # if(lpdiff > 1e100) 
+                  if(lpdiff < lpdifmin) {
+                    if(verbose) message('Increasing step')
+                    if(stepchange == -1) stepchangemultiplier = stepchangemultiplier*.5
+                    stepchange <- 1
+                    stepsize <- stepsize*(1-stepchangemultiplier)+ (stepsize*10)*stepchangemultiplier
+                  }
+                  if(lpdiff > lpdifmax){
+                    if(verbose) message('Decreasing step')
+                    if(stepchange == 1) stepchangemultiplier = stepchangemultiplier * .5
+                    stepchange <- -1
+                    stepsize <- stepsize*(1-stepchangemultiplier)+ (stepsize*.1)*stepchangemultiplier
+                  }
+                  if(lpdiff > lpdifmin && lpdiff < lpdifmax && lpdiff > 0) accepted <- TRUE else accepted <- FALSE
+                  if(lpdiff < 0){
+                    base <- lp[[di]]
+                    if(verbose) message('Better log probability found during Hessian estimation...')
+                    accepted <- FALSE
+                    stepchangemultiplier <- 1
+                    stepchange=0
+                    count <- 0
+                    di <- 1
+                  }
+                } else stepsize <- stepsize * 1e-3
+                # if(count > 1) print(paste0(count,'___',stepsize,'___',lpdiff))
+              }
+              steplist[[di]] <- stepsize
+            }
+            # 
+            grad<- attributes(lp[[1]])$gradient / steplist[[di]] * directions[di]
+            if(length(directions) > 1) grad <- (grad + attributes(lp[[2]])$gradient / (steplist[[di]]*-1))/2
+            
+            # hessout[,i] <-rbind(grad)
+            return(grad)
+          }
+          ) #end flexapply
+          # 
+          out=(hessout+t(hessout))/2
+          # attributes(out)$steplist=steplist
+          # })
+          return(out)
+        }
+
+        hess1 <- jac(pars = grinit,parsteps=parsteps,
+          step = rep(1e-3,length(grinit)),cl=hesscl,verbose=verbose,directions=1)
+        hess2 <- jac(pars = grinit,parsteps=parsteps,#fgfunc = fgfunc,
+          step = rep(1e-3,length(grinit)),cl=hesscl,verbose=verbose,directions=-1)
+        # 
+        
+        hess1good <- diag(hess1) < -1e-8
+        hess2good <- diag(hess2) < -1e-8
+        
+        hess <- hess1 
+        hess[,!hess1good & !hess2good] <- (hess1[,!hess2good & !hess1good] + 
+            hess2[,!hess2good & !hess1good]) /2
+        hess[,hess2good & hess1good] <- (hess1[,hess2good & hess1good] + 
+            hess2[,hess2good & hess1good]) /2
+        hess[,hess1good & !hess2good] <- hess1[,hess1good & !hess2good]
+        hess[,hess2good & !hess1good] <- hess2[,hess2good & !hess1good]
+        
+        if(sum(hess1good)+sum(hess2good) < nrow(hess)*2){
+          if(any(is.na(hess))) message ('Problems computing Hessian...')
+          onesided <- c(which(!hess1good[hess2good]), which(!hess2good[hess1good]))
+          if(length(onesided))  message ('One sided Hessian used for pars: ', onesided)
+        }
+        
+        hess <- (t(hess)+hess)/2
         cholcov = try(suppressWarnings(t(chol(solve(-hess)))),silent = TRUE)
         # 
         # if('try-error' %in% class(cholcov)){
@@ -1319,7 +1348,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         # time2 <- Sys.time()-time1
         # esttime <- round(time2*npars/60,0)
         # continue <- ifelse(finitediff %in% FALSE,'N','Y')
-        # if(time2 * npars > 5*60 && interactive() && finitediff=='ask' && length(datadrivenpars)==0) continue <- readline(
+        # if(time2 * npars > 5*60 && interactive() && finitediff=='ask' && length(parsteps)==0) continue <- readline(
         #   paste0('Hessian not positive definite, std errors may be invalid, try slower approach? Est ',esttime,' mins.  Y/N?'))
         # # if(!continue %in% c('n','N','no','No') || finitediff==TRUE){
         #   message('Trying finite differences Richardson Hessian')
@@ -1345,10 +1374,10 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         #   score=as.matrix(ctsem:::scorecalc(fit,subjectsonly = F,returnsubjectlist = F,cores=cores))
         #   mcov=tcrossprod(mcov,MASS::ginv(crossprod(score)))
         # }
-        # browser()
+        # 
         mcovtmp=as.matrix(Matrix::nearPD(mcov,conv.norm.type = 'F')$mat)
         mcov <- diag(1e-10,npars)
-        if(length(datadrivenpars)>0) mcov[-datadrivenpars,-datadrivenpars] <- mcovtmp else mcov <- mcovtmp
+        if(length(parsteps)>0) mcov[-parsteps,-parsteps] <- mcovtmp else mcov <- mcovtmp
         mchol = t(chol(mcov))
         
         
@@ -1372,7 +1401,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         mcov = cov(sampleinit)*1.5+diag(1e-6,ncol(sampleinit))
         est2 = apply(sampleinit,2,mean)
         bestfit = 9e100
-        optimfit <- suppressWarnings(list(par=sampling(sm,standata,iter=2,control=list(max_treedepth=1),chains=1,show_messages = FALSE,refresh=0)@inits[[1]]))
+        optimfit <- suppressWarnings(list(par=rstan::sampling(sm,standata,iter=2,control=list(max_treedepth=1),chains=1,show_messages = FALSE,refresh=0)@inits[[1]]))
       }
       mcovl<-list()
       mcovl[[1]]=mcov
@@ -1427,14 +1456,14 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
           #   return(out)
           # }
           
-          # browser()
+          # 
           target_dens[[j]] <- unlist(flexlapply(cl = clctsem, 
             split(1:isloopsize, sort((1:isloopsize)%%cores)), 
             function(x){
               # future(globals=c('x','samples','isloopsize'),expr={
               eval(parse(text='apply(tail(samples,isloopsize)[x,],1,parlp)'))
             },cores=cores))
-          # browser()
+          # 
           
           
           
@@ -1545,9 +1574,16 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       savesubjectmatrices = FALSE, dokalman=FALSE,
       samples=resamples,cores=cores, cl=clctsem)
     
+    if(cores > 1) {
+      parallel::stopCluster(clctsem)
+      smf <- stan_reinitsf(sm,standata)
+    }
     
-    # quantile(sapply(transformedpars, function(x) x$rawpopcorr[3,2]),probs=c(.025,.5,.975))
-    # quantile(sapply(transformedpars, function(x) x$DRIFT[1,2,2]),probs=c(.025,.5,.975))
+    transformedparsfull=stan_constrainsamples(sm = sm,standata = standata,
+      savesubjectmatrices = TRUE, dokalman=TRUE,savescores = TRUE,
+      samples=matrix(est2,nrow=1),cores=1, quiet = TRUE)
+    
+    
     
     sds=try(suppressWarnings(sqrt(diag(mcov))))  #try(sqrt(diag(solve(optimfit$hessian))))
     if('try-error' %in% class(sds)[1]) sds <- rep(NA,length(est2))
@@ -1559,8 +1595,9 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       unlist(constrain_pars(smf, upars= est2)),
       unlist(constrain_pars(smf, upars= uest))),silent=TRUE)
     try(colnames(transformedpars_old)<-c('2.5%','mean','97.5%'),silent=TRUE)
-    stanfit=list(optimfit=optimfit,stanfit=smf, rawest=est2, rawposterior = resamples, cov=mcov,
+    stanfit=list(optimfit=optimfit,stanfit=stan_reinitsf(sm,standata), rawest=est2, rawposterior = resamples, cov=mcov,
       transformedpars=transformedpars,transformedpars_old=transformedpars_old,
+      transformedparsfull=transformedparsfull,
       standata=list(TIPREDEFFECTsetup=standata$TIPREDEFFECTsetup,ntipredeffects = standata$ntipredeffects),
       isdiags=list(cov=mcovl,means=delta,ess=ess,qdiag=qdiag,lpsamples=lpsamples ))
   }

@@ -16,11 +16,9 @@
 #'
 #' @examples
 #' \donttest{
-#' if (!exists("ctstantestfit")) example(ctstantestfit)
-#' 
 #' #generate and plot samples from prior predictive
 #' priorpred <- ctStanGenerate(ctm = ctstantestfit$ctstanmodelbase,
-#'   datastruct = ctstantestdat,cores=6,nsamples = 50)
+#'   datastruct = ctstantestdat,cores=2,nsamples = 50)
 #'}
 ctStanGenerate <- function(ctm,datastruct, optimize=TRUE, is=FALSE, 
   fullposterior=TRUE, nsamples=200, parsonly=FALSE,includePreds = FALSE,...){
@@ -29,6 +27,7 @@ ctStanGenerate <- function(ctm,datastruct, optimize=TRUE, is=FALSE,
   dots$carefulfit=FALSE
   dots$is <- is
   dots$tol=1e-18
+  dots$stochastic=FALSE
   if(is.null(dots$finishsamples) && parsonly) dots$finishsamples=nsamples
   if(!includePreds){
     ctm$n.TDpred <- 0

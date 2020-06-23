@@ -33,11 +33,8 @@
 #' are returned in a row * column * time array. 
 #' @examples
 #' \donttest{
-#' ### ctstantestfit is a dummy ctStanFit object with 2 manifest indicators,
-#' ###  4 latents, and 1 time dependent predictor.
-#' 
 #' ### get parameter matrices
-#' if (!exists("ctstantestfit")) example(ctstantestfit)
+#'
 #' kpars <- ctStanContinuousPars(ctstantestfit)
 #' 
 #' #construct dummy data
@@ -114,7 +111,7 @@ Kalman<-function(kpars,datalong,
     for(rowi in 1:(nrow(datalong))){
       
       if(continuoustime){
-        discreteDRIFT[[rowi]] <- expm(kpars$DRIFT * dt[rowi])
+        discreteDRIFT[[rowi]] <- as.matrix(Matrix::expm(kpars$DRIFT * dt[rowi]))
         discreteCINT[[rowi]] <- solve(kpars$DRIFT, (discreteDRIFT[[rowi]] - diag(nlatent))) %*% kpars$CINT
         discreteDIFFUSION[,,rowi] <- asymDIFFUSION - (discreteDRIFT[[rowi]][derrind,derrind,drop=FALSE] %*% 
             asymDIFFUSION %*% t(discreteDRIFT[[rowi]][derrind,derrind,drop=FALSE]))

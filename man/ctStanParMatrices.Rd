@@ -24,8 +24,9 @@ and "cor" refers to correlations.
 Returns population system matrices from a ctStanFit object, and vector of values for free parameters.
 }
 \examples{
-\donttest{
-if (!exists("ctstantestfit")) example(ctstantestfit)
-ctStanParMatrices(ctstantestfit,rnorm(17,0,.1))
+if(w32chk()){
+
+ctStanParMatrices(ctstantestfit,
+  rnorm(length(ctstantestfit$stanfit$rawest),0,.1))
 }
 }

@@ -1,3 +1,67 @@
+vgrep <- function(patterns,x){
+  unique(unlist(sapply(patterns,function(pattern) grep(pattern,x))))
+}
+
+findmatrixslots <- function(pars,l){
+  p<-list()
+  for(pi in pars){
+    for(mi in 1:length(l)){
+      if(any(l[[mi]] %in% pi)){
+        arrind <- arrayInd(which(l[[mi]] %in% pi),dim(l[[mi]]))
+        p[[pi]] <- paste0(names(l)[mi],'[',arrind[1,1],',',arrind[1,2],']')
+        next
+      }
+    }
+  }
+  return(p)
+}
+
+
+
+ctstantestfitfunc<-function(){
+  checkm<-ctModel(
+    type='stanct',
+    n.latent=2,n.TDpred=1,n.TIpred=1,n.manifest=2,
+    MANIFESTVAR=matrix(c('merror',0,0,'merror'),2,2),
+    MANIFESTMEANS=0,
+    DIFFUSION=c('diff11',0,'diff21','diff22||||TI1'),
+    CINT=matrix(c('cint1||||TI1','cint2||||TI1'),ncol=1),
+    LAMBDA=diag(2),tipredDefault=FALSE)  
+  
+  ctstantestfit<-ctStanFit(ctsem::ctstantestdat,checkm,cores=1,
+    inits = c(0.748310681869536,0.945659953796114,0.0964592332562144,
+      0.029153487981562,0.651471066485501,0.0314778013950629,
+      0.217818608752396,1.10441297459423,-0.801320300354595,
+      0.647010811111734,-0.7344068376597,-1.04150782976995,
+      0.0558819480347101,-0.108435212373754,-0.225029736388403,
+      -0.203457959897841,-0.736264486213394,-0.687369939087293,
+      0.576641002392084,0.248625561427667,-0.0683189297539777,
+      -0.230342395895042,0.205299380670756,-0.34522281922735,
+      0.0829819407118698,0.0137367678089216,-0.0611697475527028),
+    optimize = TRUE,optimcontrol=list(finishsamples=20),nopriors=FALSE)
+  
+  ctstantestfit <- ctStanGenerateFromFit(ctstantestfit,nsamples = 20,fullposterior = TRUE)
+  
+  return(ctstantestfit)
+}
+
+
+
+#' Check for non win32
+#' 
+#' If win32, returns FALSE, else TRUE
+#'
+#' @return Logical
+#' @export
+#'
+#' @examples
+#' w32chk()
+w32chk <- function(){
+  notw32 <- !(.Platform$OS.type=="windows" && .Platform$r_arch=="i386")
+  return(notw32)
+}
+
+
 testall<- function(cores=4,folder = '/tests/testthat',examples=TRUE){
   requireNamespace('testthat')
   Sys.setenv(NOT_CRAN='true')
@@ -10,8 +74,9 @@ testall<- function(cores=4,folder = '/tests/testthat',examples=TRUE){
 
   if(cores > 1){
     cl <- parallel::makeCluster(cores,outfile='')
-    on.exit(parallel::stopCluster(cl))
+    on.exit(try(parallel::stopCluster(cl),silent=TRUE),add=TRUE)
     out <- parallel::parLapplyLB(cl,paste0(getwd(),folder,'/',tests),function(x){
+      Sys.setenv(NOT_CRAN='true')
       pdf(NULL)
     out<-testthat::test_file(x, reporter = "minimal")
     dev.off()
@@ -29,6 +94,7 @@ testall<- function(cores=4,folder = '/tests/testthat',examples=TRUE){
   out2 <- do.call(what = rbind,lapply(out,utils::getS3method('as.data.frame','testthat_results')))
   dev.off()
   print(out2[,colnames(out2)!='result'])
+  if(cores > 1) parallel::stopCluster(cl)
   return(invisible(out2))
 }
   
@@ -184,19 +250,6 @@ makeNumericIDs <- function(datalong,idName='id',timeName='time'){
   return(datalong)
 }
 
-#' Right multiply a matrix by its transpose.
-#'
-#' @param x matrix.
-#'
-#' @return matrix.
-#' @export
-#'
-#' @examples
-#' msquare(t(chol(diag(3,4)+1)))
-msquare <- function(x) {
-  x %*% t(x)
-}
-
 
 crosscov <- function(a,b){
   da <- a-matrix(colMeans(a),nrow=nrow(a),ncol=ncol(a),byrow=TRUE)
@@ -253,7 +306,16 @@ inv_logit<-function(x) {
   exp(x)/(1+exp(x))
 }
 
-
+#' log1p_exp
+#' 
+#' Maps the stan function so the same code works in R.
+#'
+#' @param x value to use. 
+#'
+#' @examples
+#' log1p_exp(-3)
+#' @export
+log1p_exp <- function(x) log1p(exp(x))
 
 #' ctDensity
 #'

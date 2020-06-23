@@ -22,7 +22,8 @@ Runs stan, and plots sampling information while sampling.
 On windows, requires Rtools installed and able to be found by pkgbuild::rtools_path()
 }
 \examples{
-\donttest{
+if(w32chk()){
+library(rstan)
 #### example 1 
 scode <- "
 parameters {
@@ -33,7 +34,8 @@ model {
   y[2] ~ double_exponential(0, 2);
 } 
 "
-sm <- stan_model(model_code = scode)
-fit1 <- stanWplot(object = sm,iter = 100000,chains=2,cores=1)
+#Uncomment the following lines -- launches rscript not compatible with cran check.
+#sm <- stan_model(model_code = scode)
+#fit1 <- stanWplot(object = sm,iter = 100000,chains=2,cores=1)
 }
 }

@@ -21,8 +21,7 @@
 #' @method plot ctStanModel
 #' @export
 #' @examples
-#' model <- ctModel(type='omx', Tpoints=50,
-#' n.latent=2, n.manifest=1, 
+#' model <- ctModel(type='stanct',
 #' manifestNames='sunspots', 
 #' latentNames=c('ss_level', 'ss_velocity'),
 #' LAMBDA=matrix(c( 1, 'ma1' ), nrow=1, ncol=2),
@@ -33,9 +32,8 @@
 #' DIFFUSION=matrix(c(
 #'   0, 0,
 #'   0, "diffusion"), ncol=2, nrow=2, byrow=TRUE))
-#' 
-#' stanmodel=ctStanModel(model)
-#' plot(stanmodel,rows=8)
+#'   
+#' plot(model,rows=8)
 
 plot.ctStanModel<-function(x,rows='all',wait=FALSE,nsamples=1e6, rawpopsd='marginalise',inddifdevs=c(-1,1),plot=TRUE,...){
   if(!'ctStanModel' %in% class(x)) stop('not a ctStanModel object!')
@@ -94,6 +92,7 @@ plot.ctStanModel<-function(x,rows='all',wait=FALSE,nsamples=1e6, rawpopsd='margi
             colvec <- c(1,2,4)
           }
         }
+        
         dens <- ctDensityList(denslist,probs=c(.01,.99),plot=FALSE)
         for(i in 1:length(leg)){
           dat <- rbind(dat,data.table(Par.Value=dens$density[[i]]$x,

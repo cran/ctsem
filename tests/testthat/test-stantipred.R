@@ -24,7 +24,7 @@ n.TDpred=n.TDpred,n.manifest=n.manifest,
 
 for(i in 1:n.subjects){
   gm$CINT[1,1] <- TI1[i]*5+rnorm(1,0,.6)
-ndat<-ctGenerate(gm,n.subjects=1,burnin=30,wide=FALSE,logdtsd=.4)
+ndat<-ctGenerate(gm,n.subjects=1,burnin=30,logdtsd=.4)
 ndat <- cbind(ndat,TI1[i])
 ndat[,1] <- i
 if(i>1) tdat <- rbind(tdat,ndat) else tdat <- ndat
@@ -58,7 +58,7 @@ expect_equivalent(s1$popsd[2,'mean'],.6,tolerance=.2)
 
 tfit2<-ctStanFit(tdat,checkm,chains=1,optimize=TRUE,cores=1,verbose=0,
   optimcontrol=list(is=FALSE),nopriors=FALSE,
-  nlcontrol=list(nldynamics=TRUE,nlmeasurement=TRUE))
+  nlcontrol=list(nldynamics=TRUE))
 s2=summary(tfit2)
 
 expect_equivalent(s2$tipreds[2,'mean'],5,tolerance=.1)

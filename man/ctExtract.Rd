@@ -5,12 +5,14 @@
 \alias{extract}
 \title{Extract samples from a ctStanFit object}
 \usage{
-ctExtract(object, ...)
+ctExtract(object, subjectMatrices = FALSE, cores = 2)
 }
 \arguments{
 \item{object}{ctStanFit object, samples may be from Stan's HMC, or the importance sampling approach of ctsem.}
 
-\item{...}{additional arguments to pass to \code{rstan::extract}.}
+\item{subjectMatrices}{Calculate subject specific system matrices?}
+
+\item{cores}{Only used if subjectMatrices = TRUE . For faster computation use more cores.}
 }
 \value{
 Array of posterior samples.
@@ -20,7 +22,6 @@ Extract samples from a ctStanFit object
 }
 \examples{
 \donttest{
-if (!exists("ctstantestfit")) example(ctstantestfit)
 e = ctExtract(ctstantestfit)
 }
 }

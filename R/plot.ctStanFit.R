@@ -25,7 +25,6 @@
 #' @method plot ctStanFit
 #' @examples
 #' \donttest{
-#' if (!exists("ctstantestfit")) example(ctstantestfit)
 #' plot(ctstantestfit,types=c('regression','kalman','priorcheck'), wait=FALSE)
 #' }
 #' @export
@@ -43,7 +42,7 @@ plot.ctStanFit <- function(x, types='all',wait=TRUE,...){
   }
 
   if(types[1]=='all') {
-    if( (x$standata$nldynamics + x$standata$nlmeasurement) ==0 & x$standata$continuoustime == 1) types <- c('regression', 'kalman')
+    if( (x$standata$nldynamics) ==0 & x$standata$continuoustime == 1) types <- c('regression', 'kalman')
     types=c(types, 'priorcheck')
     if('stanfit' %in% class(x$stanfit)) types <- c('trace','regression','density','intervals')
   }

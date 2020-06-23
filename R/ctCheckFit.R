@@ -1,6 +1,6 @@
 #' Check absolute fit of ctFit or ctStanFit object.
 #'
-#' @param fit ctFit or ctStanFit object.
+#' @param fit ctsem fit object.
 #' @param niter number of data generation iterations to use to calculate quantiles.
 #' @param probs 3 digit vector of quantiles to return and to test significance.
 #'
@@ -16,17 +16,10 @@
 #'
 #' @examples
 #' \donttest{
-#' data(ctExample1)
-#' traitmodel <- ctModel(n.manifest=2, n.latent=2, Tpoints=6, LAMBDA=diag(2), 
-#'   manifestNames=c('LeisureTime', 'Happiness'), 
-#'   latentNames=c('LeisureTime', 'Happiness'), TRAITVAR="auto")
-#' traitfit <- ctFit(dat=ctExample1, ctmodelobj=traitmodel)
-#' 
-#' check <- ctCheckFit(traitfit,niter=5)
-#' plot(check)
+#' scheck <- ctCheckFit(ctstantestfit,niter=50)
 #' }
 ctCheckFit <- function(fit, niter=500,probs=c(.025,.5,.975)){
-  
+  id=NULL #global warnings
   if(!class(fit) %in% c('ctStanFit','ctsemFit')) stop('not a ctsemFit or ctStanFit object!')
   
   
@@ -86,14 +79,7 @@ ctCheckFit <- function(fit, niter=500,probs=c(.025,.5,.975)){
   }
   
   if(class(fit)=='ctsemFit'){
-    for(i in 1:niter){
-      ndat <- ctGenerateFromFit(fit = fit,n.subjects = nrow(wdat))
-      ndat[is.na(wdat)] <- NA #match missingness
-      covarray[,,i] <- cov(ndat[,paste0(rep(manifestNames,each=fit$ctmodelobj$Tpoints),'_T',
-        0:(fit$ctmodelobj$Tpoints-1)),drop=FALSE], use='pairwise.complete.obs')
-      means[,,i] <- t(matrix(apply(ndat[,paste0(rep(manifestNames,each=fit$ctmodelobj$Tpoints),'_T',
-        0:(fit$ctmodelobj$Tpoints-1)),drop=FALSE],2,mean,na.rm=TRUE),byrow=TRUE,ncol=nmanifest))
-    }
+    stop('OpenMx based fit objects not supported -- try ctModel types standt or stanct!')
   }
   # browser()
   covql <- ctCollapse(covarray,collapsemargin = 3,quantile,probs=probs[1],na.rm=TRUE)
@@ -145,18 +131,10 @@ ctCheckFit <- function(fit, niter=500,probs=c(.025,.5,.975)){
 #' @method plot ctsemFitMeasure
 #'
 #' @examples
-#' \donttest{
-#' data(ctExample1)
-#' traitmodel <- ctModel(n.manifest=2, n.latent=2, Tpoints=6, LAMBDA=diag(2), 
-#'   manifestNames=c('LeisureTime', 'Happiness'), 
-#'   latentNames=c('LeisureTime', 'Happiness'), TRAITVAR="auto")
-#' traitfit <- ctFit(dat=ctExample1, ctmodelobj=traitmodel)
+#' if(w32chk()){
 #' 
-#' check <- ctCheckFit(traitfit,niter=50)
-#' plot(check)
-#' 
-#' if (!exists("ctstantestfit")) example(ctstantestfit)
-#' scheck <- ctCheckFit(ctstantestfit,niter=500)
+#'
+#' scheck <- ctCheckFit(ctstantestfit,niter=50)
 #' plot(scheck,wait=FALSE)
 #' 
 #' }

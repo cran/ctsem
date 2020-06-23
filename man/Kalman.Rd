@@ -70,11 +70,8 @@ predicted and updated latent states, likelihoods, and predicted observations usi
 }
 \examples{
 \donttest{
-### ctstantestfit is a dummy ctStanFit object with 2 manifest indicators,
-###  4 latents, and 1 time dependent predictor.
-
 ### get parameter matrices
-if (!exists("ctstantestfit")) example(ctstantestfit)
+
 kpars <- ctStanContinuousPars(ctstantestfit)
 
 #construct dummy data

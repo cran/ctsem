@@ -14,12 +14,12 @@ stanoptimis(
   estonly = FALSE,
   tol = 1e-12,
   decontrol = list(),
-  stochastic = "auto",
+  stochastic = TRUE,
   nopriors = FALSE,
   carefulfit = TRUE,
   subsamplesize = 0.5,
   finitediff = FALSE,
-  datadrivenpars = c(),
+  parsteps = c(),
   plot = FALSE,
   is = FALSE,
   isloopsize = 1000,
@@ -66,8 +66,9 @@ the stan model uses this value.}
 \item{finitediff}{Either 'ask', TRUE, or FALSE. Whether to use the slow finite difference calculations
 for the Hessian (used for confidence intervals) if other approaches do not give a positive definite result.}
 
-\item{datadrivenpars}{vector of integers denoting which parameters should begin fixed
-at zero, and only freed if expected to substantially contribute to model fit.}
+\item{parsteps}{ordered list of vectors of integers denoting which parameters should begin fixed
+at zero, and freed sequentially (by list order). Useful for complex models, e.g. keep all cross couplings fixed to zero 
+as a first step, free them in second step.}
 
 \item{plot}{Logical. If TRUE, plot iteration details. Probably slower.}
 
@@ -91,44 +92,8 @@ without replacement from this set.}
 \item{cores}{Number of cpu cores to use, should be at least 2.}
 }
 \value{
-list containing fit elements
+list containing fit elementsF
 }
 \description{
 Optimize / importance sample a stan or ctStan model.
-}
-\examples{
-\donttest{
-
-library(rstan)
-scode <- "
-parameters {
-  real y[2];
-}
-model {
-  y[1] ~ normal(0, 1);
-  y[2] ~ double_exponential(0, 2);
-}
-"
-
-sm <- stan_model(model_code=scode)
-fit <- sampling(sm, iter = 10000)
-summary(fit)$summary
-
-## extract samples as a list of arrays
-e <- ctExtract(fit, permuted = TRUE)
-
-#for ml or map estimates
-optimis <- stanoptimis(standata = list(),sm = sm,finishsamples = 3000,cores=2)
-optimis$optimfit
-
-#for posterior distributions
-optimis <- stanoptimis(standata = list(),sm = sm,finishsamples = 3000,cores=2,tdf=5)
-
-apply(optimis$rawposterior,2,mean)
-apply(optimis$rawposterior,2,sd)
-isdiag(optimis)
-
-plot(density(optimis$rawposterior[,2],bw=.05))
-points(density(e$y[,2],bw=.05),type='l',col=2)
-}
 }

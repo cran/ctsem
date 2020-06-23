@@ -48,8 +48,8 @@ Calculate model implied regressions for a sequence of time intervals based on a 
 from ctStanFit, for specified subjects.
 }
 \examples{
-\donttest{
-if (!exists("ctstantestfit")) example(ctstantestfit)
+if(w32chk()){
+
 ctStanDiscretePars(ctstantestfit,times=seq(.5,4,.1), 
  plot=TRUE,indices='all')
  
