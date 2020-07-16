@@ -1,8 +1,8 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 3.3.6
-Date: 2020-6-24
+Version: 3.3.8
+Date: 2020-7-10
 Authors@R: c(person("Charles", "Driver", role =
     c("aut","cre","cph"),email="driver@mpib-berlin.mpg.de"),
     person("Manuel", "Voelkle", role = c("aut","cph")),
@@ -14,7 +14,8 @@ Description: Hierarchical continuous time state space modelling, for linear
     differential equation (SDE), measurement models are typically multivariate normal factor models. 
     Linear mixed effects SDE's estimated via maximum likelihood and optimization are the default.
     Nonlinearities,  (state dependent parameters) and random effects on all parameters
-    are possible, using either optimization (with optional importance sampling) or
+    are possible, using either max likelihood / max a posteriori optimization 
+    (with optional importance sampling) or
     Stan's Hamiltonian Monte Carlo sampling. See  <https://github.com/cdriveraus/ctsem/raw/master/vignettes/hierarchicalmanual.pdf>
     for details. Priors may be used. For the conceptual
     overview of the hierarchical Bayesian linear SDE approach, see <https://www.researchgate.net/publication/324093594_Hierarchical_Bayesian_Continuous_Time_Dynamic_Modeling>.
@@ -27,7 +28,7 @@ URL: https://github.com/cdriveraus/ctsem
 Imports: cOde, expm, data.table (>= 1.12.8), datasets, Deriv, ggplot2,
         graphics, grDevices, MASS, Matrix, methods, mize, mvtnorm,
         parallel, pkgbuild, plyr, rstan (>= 2.19.0), stats, tools,
-        utils, RcppParallel
+        utils, RcppParallel, tibble
 Encoding: UTF-8
 LazyData: true
 ByteCompile: true
@@ -39,13 +40,13 @@ NeedsCompilation: yes
 Suggests: knitr, testthat, devtools, DEoptim, tinytex, lme4, GGally,
         shiny, gridExtra, quantreg
 VignetteBuilder: knitr
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1
 Biarch: true
-Packaged: 2020-06-22 22:52:12 UTC; Driver
+Packaged: 2020-07-11 20:19:17 UTC; Driver
 Author: Charles Driver [aut, cre, cph],
   Manuel Voelkle [aut, cph],
   Han Oud [aut, cph],
   Trustees of Columbia University [cph]
 Maintainer: Charles Driver <driver@mpib-berlin.mpg.de>
 Repository: CRAN
-Date/Publication: 2020-06-23 14:30:02 UTC
+Date/Publication: 2020-07-16 15:20:02 UTC

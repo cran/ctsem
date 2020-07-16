@@ -1218,8 +1218,8 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         # 
         # eps <- findstepsize(grinit,fgfunc)
         
-        jac<-function(pars,step=rep(1e-2,length(pars)),whichpars='all',
-          lpdifmin=1e-2,lpdifmax=3, cl=NA,verbose=1,directions=c(-1,1),parsteps=c()){
+        jac<-function(pars,step=1e-3,whichpars='all',
+          lpdifmin=1e-2,lpdifmax=5, cl=NA,verbose=1,directions=c(-1,1),parsteps=c()){
           if('all' %in% whichpars) whichpars <- 1:length(pars)
           base <- optimfit$value
           
@@ -1243,7 +1243,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
             
             # for(i in whichpars){
             if(verbose) message('### Par ',i,'###')
-            stepsize = step[i]
+            stepsize = step
             uppars<-rep(0,length(pars))
             uppars[i]<-1
             accepted <- FALSE
@@ -1256,6 +1256,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
               stepchange = 0
               stepchangemultiplier = 1
               while(!accepted && count < 15){
+                if(count>8) stepsize=stepsize*-1 #is this good?
                 stepchangemultiplier <- max(stepchangemultiplier,.11)
                 count <- count + 1
                 lp[[di]] <- target(pars+uppars*stepsize*directions[di])
@@ -1288,6 +1289,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
                 } else stepsize <- stepsize * 1e-3
                 # if(count > 1) print(paste0(count,'___',stepsize,'___',lpdiff))
               }
+              step <<- stepsize
               steplist[[di]] <- stepsize
             }
             # 
