@@ -1,11 +1,11 @@
-675dd219ffac72cac2c054cd3010eb33 *DESCRIPTION
+7a9e82eea30aa4a33be5180e688e1de3 *DESCRIPTION
 a891a89862e579822ffb36ee2e297582 *NAMESPACE
 0534f3b611c53154b0906f3aa5e96d2d *NEWS
 ffda8f27d7c237f55a23581e0e10c715 *R/Kalman.R
 e260d4565d28daf80e7ef1e1d4b0d7e3 *R/ctCheckFit.R
-bce92e462756af5d8d15f4bc3c492bb8 *R/ctDataHelp.R
+ca15f48381a9d451378f06842f7e7861 *R/ctDataHelp.R
 c8730672f1f1d368e9a91830d3085a47 *R/ctDeintervalise.R
-208f9cc324dfd01f8279cc0fb9f8979c *R/ctDiscretePars.R
+4b5f61e5e7ff05cde5c672c889db4561 *R/ctDiscretePars.R
 e8503a18d2883b6fe242d03227b2b4a1 *R/ctDiscretiseData.R
 fb8d2846410007808c6ba5390eaffd73 *R/ctGenerate.R
 4484a4e02803c8f65a787311bed030e1 *R/ctGuessPriors.R
@@ -18,7 +18,7 @@ e5c09afde13c2bf4ce546f3b642a1039 *R/ctLabel.R
 18ae795b91c170d15554192540e6bfe3 *R/ctLongtowide.r
 48c8c6522b7bb2019324e4727e712d2e *R/ctModel.R
 8e7f27bf2778bf3f93c0cda0f2fed5c2 *R/ctModelHigherOrder.R
-767939d8acb27b418b3f107388c5f904 *R/ctModelLatex.R
+b53852adb0ab4b1175af14f45c89d7f1 *R/ctModelLatex.R
 9904f82c8023d14166f582fa2752092e *R/ctPlotArray.R
 9c2fe387aa2cdeac186deac7f212f6d6 *R/ctStanContinuousPars.R
 88507985399dc68735447a18e27c2c81 *R/ctStanData.R
@@ -27,7 +27,7 @@ e3789d74e37463ab1d4777891d01af6d *R/ctStanFit.R
 9f8a2425e89a5686cacdc2083c7095aa *R/ctStanGenerateFromFit.R
 ca7273342c705053ad7f5990a89e7478 *R/ctStanKalman.R
 bfc0ae19d6e4a9acfbc3b0b46b1685d4 *R/ctStanModel.R
-a43606b8a5bf1fce6ba3f49d24437a5e *R/ctStanModelWriter.R
+1e4c56581b3a0a53bcf88ee02fd601e1 *R/ctStanModelWriter.R
 a1e259e155537a0e466af1256c812193 *R/ctStanParMatrices.R
 ef69517e2fe44d6e274a735650407f30 *R/ctStanPlotPost.R
 862006e20d7f6ff0b8b71fc19046b474 *R/ctStanPostPredict.R
@@ -79,11 +79,11 @@ fa0c3e77a75242b33409e49b153434f9 *data/datastructure.rda
 69bf503e1c8a947c9a358186759c2fe5 *data/longexample.rda
 efff50095c89aaaca5e85e36b39ba822 *inst/CITATION
 0491ff8f0a6b90a2498cad4f1e39c33d *inst/doc/hierarchicalmanual.R
-71f8e5558cd2b63a65f4bed373162be1 *inst/doc/hierarchicalmanual.pdf
+38a17fe7384ab391769f9f9a2dd26415 *inst/doc/hierarchicalmanual.pdf
 80417b479a44b27fe205edc8abad3732 *inst/doc/hierarchicalmanual.rnw
 c7764e6494f5cfa3c0f329f926143223 *man/AnomAuth.Rd
 b6451e7eff0ca5aac18664aee849bf96 *man/Kalman.Rd
-55a6a43d58384dd6ada304d98e0aa575 *man/Oscillating.Rd
+073dce4c9ff3b7046735d97d6638a798 *man/Oscillating.Rd
 30b13e8fe9beb837fcefa72f1aad904c *man/ctCheckFit.Rd
 a5f03024db3923cdfd063fe2e4d724d6 *man/ctCollapse.Rd
 6d9eecffc8fdfc63c82e9355ac50ccb9 *man/ctDeintervalise.Rd
@@ -111,7 +111,7 @@ febcb05955c60436b97e2c256d337e2d *man/ctModelLatex.Rd
 1bb64f821b92d06da1862780e6085bcb *man/ctPlotArray.Rd
 ac8774765fdf39592a3c0b5f6027c64d *man/ctPoly.Rd
 0e87f601e554a15f65b72c704bcf3367 *man/ctStanContinuousPars.Rd
-369cb031af5ea293b04d60cb6efa578d *man/ctStanDiscretePars.Rd
+e85c9b13481d4a837a867153fdf3699c *man/ctStanDiscretePars.Rd
 a5f60648a939bf1d19f6e7bd1496bf62 *man/ctStanDiscreteParsPlot.Rd
 c5a776a70acc5e04f87c23cc9c85f3f4 *man/ctStanFit.Rd
 ba07559ec9c1b84dc28c13bab3327dca *man/ctStanFitUpdate.Rd
@@ -154,8 +154,8 @@ e39dcbc80d722ac76e7dbb490965f2f7 *man/summary.ctStanFit.Rd
 ff614d38c4786d782dba8710434ddaff *src/Makevars.win
 ad47f88f0dfcf6c425d409408194a6b3 *src/init.cpp
 4a937e0ef2274ad1cc7580c43345c8ca *src/stan_files/chunks/license.stan
-b1d7d6247cb0e489bbdf8dc167cb3796 *src/stan_files/ctsm.stan
-74a26dfd0c41b097fc1dfed12c0b6da1 *src/stan_files/ctsmgen.stan
+67ea319c49bfec78dde7cd85b46d7d92 *src/stan_files/ctsm.stan
+360becab37e386e858f1a0fd9beb4028 *src/stan_files/ctsmgen.stan
 76ca350c5cce00f4bb99cf4538fd7de8 *tests/testthat.R
 c6c9799172b2240e5a2233a5e99353aa *tests/testthat/test-ctRaschExampleTest.R
 c080e54b49c8676549e7e6e3ca69f8ad *tests/testthat/test-dtVct.R

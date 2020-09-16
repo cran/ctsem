@@ -1,8 +1,8 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 3.3.8
-Date: 2020-7-10
+Version: 3.3.11
+Date: 2020-09-16
 Authors@R: c(person("Charles", "Driver", role =
     c("aut","cre","cph"),email="driver@mpib-berlin.mpg.de"),
     person("Manuel", "Voelkle", role = c("aut","cph")),
@@ -21,7 +21,7 @@ Description: Hierarchical continuous time state space modelling, for linear
     overview of the hierarchical Bayesian linear SDE approach, see <https://www.researchgate.net/publication/324093594_Hierarchical_Bayesian_Continuous_Time_Dynamic_Modeling>.
     Exogenous inputs may also be included, for an overview of such possibilities see <https://www.researchgate.net/publication/328221807_Understanding_the_Time_Course_of_Interventions_with_Continuous_Time_Dynamic_Models> .
     Stan based functions are not available on 32 bit Windows systems at present. 
-    <https://cdriver.netlify.com> contains some tutorial blog posts.
+    <https://cdriver.netlify.app/> contains some tutorial blog posts.
 License: GPL-3
 Depends: R (>= 3.5.0), Rcpp (>= 0.12.16)
 URL: https://github.com/cdriveraus/ctsem
@@ -33,20 +33,20 @@ Encoding: UTF-8
 LazyData: true
 ByteCompile: true
 LinkingTo: BH (>= 1.66.0-1), Rcpp (>= 0.12.16), RcppEigen (>=
-        0.3.3.4.0), RcppParallel (>= 5.0.1), rstan (>= 2.19),
-        StanHeaders (>= 2.19.0), RcppParallel (>= 5.0.1)
+        0.3.3.4.0), RcppParallel (>= 5.0.1), rstan (>= 2.21),
+        StanHeaders (>= 2.21.0), RcppParallel (>= 5.0.1)
 SystemRequirements: GNU make
 NeedsCompilation: yes
 Suggests: knitr, testthat, devtools, DEoptim, tinytex, lme4, GGally,
-        shiny, gridExtra, quantreg
+        shiny, gridExtra
 VignetteBuilder: knitr
 RoxygenNote: 7.1.1
 Biarch: true
-Packaged: 2020-07-11 20:19:17 UTC; Driver
+Packaged: 2020-09-16 09:54:52 UTC; Driver
 Author: Charles Driver [aut, cre, cph],
   Manuel Voelkle [aut, cph],
   Han Oud [aut, cph],
   Trustees of Columbia University [cph]
 Maintainer: Charles Driver <driver@mpib-berlin.mpg.de>
 Repository: CRAN
-Date/Publication: 2020-07-16 15:20:02 UTC
+Date/Publication: 2020-09-16 11:10:04 UTC
