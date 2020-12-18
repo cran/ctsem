@@ -7,24 +7,24 @@ set.seed(1)
 context("tipredcheck")
 
 test_that("simpleTIpredcheck", {
-Tpoints=20
+Tpoints=10
 n.manifest=1
 n.TDpred=0
 n.TIpred=1
 n.latent=1
-n.subjects=80
+n.subjects=50
 TI1 <- rnorm(n.subjects)
 gm<-ctModel(type='omx', Tpoints=Tpoints,n.latent=n.latent,
 n.TDpred=n.TDpred,n.manifest=n.manifest,
   MANIFESTVAR=diag(0.5,1),
-  LAMBDA=diag(1,1),
+  LAMBDA=diag(1,1),T0MEANS=100,
   DRIFT=matrix(c(-.3),nrow=1),
   DIFFUSION=matrix(c(2),1),
   T0VAR=diag(10,1))
 
 for(i in 1:n.subjects){
   gm$CINT[1,1] <- TI1[i]*5+rnorm(1,0,.6)
-ndat<-ctGenerate(gm,n.subjects=1,burnin=30,logdtsd=.4)
+ndat<-ctGenerate(gm,n.subjects=1,burnin=10,logdtsd=.4)
 ndat <- cbind(ndat,TI1[i])
 ndat[,1] <- i
 if(i>1) tdat <- rbind(tdat,ndat) else tdat <- ndat
@@ -56,15 +56,14 @@ s1=summary(tfit1)
 expect_equivalent(s1$tipreds[2,'mean'],5,tolerance=.1)
 expect_equivalent(s1$popsd[2,'mean'],.6,tolerance=.2)
 
-tfit2<-ctStanFit(tdat,checkm,chains=1,optimize=TRUE,cores=1,verbose=0,
-  optimcontrol=list(is=FALSE),nopriors=FALSE,
-  nlcontrol=list(nldynamics=TRUE))
+tfit2<-ctStanFit(tdat,checkm,chains=1,optimize=TRUE,cores=2,verbose=0,
+  optimcontrol=list(is=FALSE),nopriors=FALSE)
 s2=summary(tfit2)
 
 expect_equivalent(s2$tipreds[2,'mean'],5,tolerance=.1)
 expect_equivalent(s2$popsd[2,'mean'],.6,tolerance=.2)
 
-tfit3<-suppressWarnings(ctStanFit(tdat,checkm,iter=400,chains=2,optimize=FALSE,
+tfit3<-suppressWarnings(ctStanFit(tdat,checkm,iter=300,chains=2,optimize=FALSE,
   control=list(adapt_delta=.8,max_treedepth=6),plot=FALSE))
 s3=summary(tfit3)
 

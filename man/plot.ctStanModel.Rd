@@ -11,6 +11,7 @@
   nsamples = 1e+06,
   rawpopsd = "marginalise",
   inddifdevs = c(-1, 1),
+  inddifsd = 0.1,
   plot = TRUE,
   ...
 )
@@ -30,6 +31,9 @@ prior distribution for the raw population standard deviation, or a numeric value
 for all subject level prior plots - the plots in dotted blue or red.}
 
 \item{inddifdevs}{numeric vector of length 2, setting the means for the individual differences distributions.}
+
+\item{inddifsd}{numeric, setting the standard deviation of the population means used to generate individual
+difference distributions.}
 
 \item{plot}{If FALSE, ouputs list of GGplot objects that can be further modified.}
 

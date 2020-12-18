@@ -1,5 +1,5 @@
 ctStanParnamesRaw <- function(fit){
-  if(!class(fit) %in% 'ctStanFit' && !class(fit$stanfit) %in% 'list') stop('Not an optimized ctStanFit model!')
+  if(!class(fit) %in% 'ctStanFit' || !length(fit$stanfit$stanfit@sim)==0) stop('Not an optimized ctStanFit model!')
   ms <- fit$setup$matsetup
   ms <- ms[ms$param > 0 & ms$when %in% 0 & ms$copyrow < 1,]
   ms <- ms[order(ms$param),]
@@ -78,6 +78,8 @@ checkTIauto <- function(){
     if(i>1) tdat <- rbind(tdat,ndat) else tdat <- ndat
   }
   colnames(tdat)[4] <- 'TI1'
+  tdat$TI2 <- rnorm(nrow(tdat))
+  # colnames(tdat)[5] <- 'TI2'
   
   tdat[2,'Y1'] <- NA
   tdat[tdat[,'id']==2,'TI1'] <- NA
@@ -87,21 +89,24 @@ checkTIauto <- function(){
     # DRIFT=matrix(c(-.3),nrow=1),
     # DIFFUSION=matrix(c(2),1),
     n.latent=n.latent,n.TDpred=n.TDpred,
-    n.TIpred=n.TIpred,
+    n.TIpred=2,
     MANIFESTMEANS=matrix(0,nrow=n.manifest),
     CINT=matrix(c('cint1'),ncol=1),
     n.manifest=n.manifest,LAMBDA=diag(1))
   
-  checkm$pars$indvarying[!checkm$pars$matrix %in% 'T0MEANS'] <- FALSE
+  # checkm$pars$indvarying[!checkm$pars$matrix %in% 'T0MEANS'] <- FALSE
   
   checkm$TIpredAuto <- 1L
   
-  fit1<-ctStanFit(tdat,checkm,chains=1,optimize=TRUE,cores=2,verbose=1,
-    # intoverpop=F,plot=T,
+  fit1<-ctStanFit(tdat,checkm,chains=1,optimize=TRUE,cores=1,verbose=0,
+    # intoverpop=F,
+    plot=10,
     # savesubjectmatrices = F,plot=F,
     # init=init,
+    # fit=F,
     optimcontrol=list(is=FALSE,stochastic=T,subsamplesize=1,carefulfit=F),
-    nopriors=TRUE)
+    nopriors=F)
+  summary(fit1)
 }
 
 whichsubjectpars <- function(standata,subjects=NA){
@@ -116,8 +121,10 @@ whichsubjectpars <- function(standata,subjects=NA){
   if(standata$ntipredeffects > 0) {
     tipredstart <- (a1+
         ifelse(standata$intoverpop,0,standata$nindvarying*standata$nsubjects)+1)
-    whichbase <- c(whichbase,tipredstart:(tipredstart+standata$ntipredeffects+
-        ifelse(standata$doonesubject >0,0,-1)))
+    whichbase <- c(whichbase,tipredstart:(tipredstart+standata$ntipredeffects -1
+        # ifelse(standata$doonesubject >0,0,-1)
+        #disabled the doonesubject thing
+      ))
   }
   return(whichbase)
 }
@@ -128,14 +135,20 @@ scorecalc <- function(standata,est,stanmodel,subjectsonly=TRUE,
   standata$dokalmanpriormodifier <- ifelse(subjectsonly, 1/standata$nsubjects,1/standata$ndatapoints)
   
   scores <- list()
+  # browser()
+  sf <- suppressMessages(try(stan_reinitsf(stanmodel,standata,fast = TRUE)))
+  if('try-error' %in% class(sf)) fast=FALSE else fast=TRUE
   for(i in 1:standata$nsubjects){
     whichpars = whichsubjectpars(standata,i)
     scores[[i]]<-matrix(NA,length(whichpars),ifelse(subjectsonly,1,sum(standata$subject==i)))
     standata1 <- standatact_specificsubjects(standata,i)
     for(j in 1:ncol(scores[[i]])){
       standata1$llsinglerow=as.integer(ifelse(subjectsonly,0,j))
-      sf <- stan_reinitsf(stanmodel,standata1,fast = TRUE)
-      scores[[i]][,j] <- sf$grad_log_prob(
+      sf <- stan_reinitsf(stanmodel,standata1,fast = fast)
+      if(fast) scores[[i]][,j] <- sf$grad_log_prob(
+        upars=est[whichpars],
+        adjust_transform = TRUE)
+      if(!fast) scores[[i]][,j] <- rstan::grad_log_prob(sf,
         upars=est[whichpars],
         adjust_transform = TRUE)
     }
@@ -191,6 +204,7 @@ ctTIauto <- function(fit,tipreds=NA){
     for(i in 2:fit$standata$ndatapoints){
       if(fit$standata$subject[i] == fit$standata$subject[i-1]) firstsub[i] <- FALSE
     }
+    e$etasmooth <-  array(e$etaa[,3,,,drop=FALSE],dim=dim(e$etaa)[-2])
     states <- ctCollapse(e$etasmooth[,firstsub,p,drop=FALSE],1,mean)
     sc=list()
     for(i in 1:ncol(states)){

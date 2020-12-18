@@ -1,10 +1,71 @@
 ctStanRawSamples<-function(fit){
-  if(!class(fit$stanfit) %in% 'stanfit') {
+  if(length(fit$stanfit$stanfit@sim)==0) {
     samples = fit$stanfit$rawposterior
   } else {
-    samples = t(stan_unconstrainsamples(fit$stanfit,fit$standata))
+    samples = t(stan_unconstrainsamples(fit$stanfit$stanfit,fit$standata))
   }
   return(samples)
+}
+
+
+#' Extract an array of subject specific parameters from a ctStanFit object.
+#'
+#' @param fit fit object
+#' @param pointest if TRUE, returns only the set of individual difference parameters
+#' based on the max a posteriori estimate (or the median if sampling approaches were used).
+#' @param cores Number of cores to use.
+#' @param nsamples Number of samples to calculate parameters for. Not used if pointest=TRUE.
+#' 
+#' @details This function returns the estimates of individual parameters, taking into account any
+#' covariates and random effects. 
+#'
+#' @return an nsamples by nsubjects by nparams array.
+#' @export
+#'
+#' @examples
+#' indpars <- ctStanSubjectPars(ctstantestfit)
+#' dimnames(indpars)
+#' plot(indpars[1,,'cint1'],indpars[1,,'cint2'])
+ctStanSubjectPars <- function(fit,pointest=TRUE,cores=2,nsamples='all'){
+  if(!nsamples[1] %in% 'all') fit$stanfit$rawposterior <- 
+      fit$stanfit$rawposterior[sample(1:nrow(fit$stanfit$rawposterior),nsamples),,drop=FALSE]
+  pnames <- getparnames(fit,subjvariationonly = TRUE)
+  m <- fit$ctstanmodelbase$pars
+  if(pointest) tfp <- fit$stanfit$transformedparsfull else {
+    tfp <- ctExtract(fit,subjectMatrices = TRUE,cores=cores)
+  }
+  p <- array(NA, dim=c(dim(tfp$pop_DRIFT)[1],fit$standata$nsubjects,length(pnames)))
+  dimnames(p) <- list(iter=1:dim(p)[1],subject=1:dim(p)[2],param=1:dim(p)[3])
+  co<-0
+  for(i in 1:nrow(m)){
+    if(!is.na(m$param[i]) & is.na(m$value[i]) & #if a free param, not complex and not already collected...
+        !grepl('[',m$param[i],fixed=TRUE) & !m$param[i] %in% dimnames(p)[[3]]){
+      if(m$param[i] %in% pnames){ #if ind differences
+        co = co+1
+        p[,,co] <- tfp[[paste0('subj_',m$matrix[i])]] [
+          , ,m$row[i],m$col[i]]
+        dimnames(p)[[3]][co] <- m$param[i]
+      }
+    }
+  }
+  p=p[,,order(dimnames(p)[[3]]),drop=FALSE]
+  return(p)
+}
+
+getparnames <- function(fit,reonly=FALSE, subjvariationonly=FALSE, popstatesonly=FALSE){
+  ms <- fit$setup$matsetup
+  
+  if(popstatesonly)  indices=ms$param > 0 & ms$copyrow <1 & ms$matrix==1 & ms$indvarying > 0 & ms$row > fit$standata$nlatent
+  if(!popstatesonly)  indices=ms$when %in% c(0,-1) & ms$param > 0 & ms$copyrow < 1
+  if(subjvariationonly) indices = ms$when %in% c(0,-1) & ms$param > 0 & ms$copyrow < 1 & (ms$tipred >0 | ms$indvarying > 0)
+  pars <- data.frame(parnames = ms$parname[indices],  parindices = ms$param[indices])
+  
+  pars<-pars[!duplicated(pars$parnames),]
+  pars<-pars[order(pars$parindices),]
+  parnames <- pars[pars$parindices >0, 1]
+  if(reonly)  parnames <- parnames[fit$standata$indvaryingindex]
+  
+  return(parnames)
 }
 
 #' summary.ctStanFit
@@ -33,36 +94,43 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=4,parmatrices=TRUE,prio
   
   if(!'ctStanFit' %in% class(object)) stop('Not a ctStanFit object!')
   
+  monitor <- function(dat,...){
+    out <- rstan::monitor(dat,...)
+    class(out) <- 'data.frame'
+    return(out)
+  }
+  
+  
   out=list()
   monvars <- c('mean','sd','2.5%','50%','97.5%')
   
-  if('stanfit' %in% class(object$stanfit)){ 
-    smr<-suppressWarnings(getMethod('summary','stanfit')(object$stanfit))
+  optimize=length(object$stanfit$stanfit@sim)==0
+  
+  if(!optimize){ 
+    smr<-suppressWarnings(getMethod('summary','stanfit')(object$stanfit$stanfit))
     if('98%' %in% colnames(smr$summary)) colnames(smr$summary)[colnames(smr$summary)=='98%'] <- '97.5%'
   }
-
-  e <- ctExtract(object) 
- 
-  if(residualcov){ #cov of residuals
-  obscov <- cov(object$data$Y,use='pairwise.complete.obs')
-  idobscov <- diag(1/sqrt(diag(obscov)),ncol(obscov))
-  rescov <- cov(matrix(object$kalman$errprior,ncol=ncol(obscov)),use='pairwise.complete.obs')
-  narescov <- which(is.na(rescov))
-  rescov[narescov] <- 0
   
-  out$residCovStd <- round(idobscov %*% rescov %*% idobscov ,3)
-  out$residCovStd[narescov] <- NA
-  dimnames(out$residCovStd) <- list(object$ctstanmodel$manifestNames,object$ctstanmodel$manifestNames)
-  out$resiCovStdNote <- 'Standardised covariance of residuals'
+  
+  e <- ctExtract(object) 
+  
+  if(residualcov){ #cov of residuals
+    obscov <- cov(object$data$Y,use='pairwise.complete.obs')
+    idobscov <- diag(1/sqrt(diag(obscov)),ncol(obscov))
+    rescov <- cov(matrix(object$stanfit$kalman$errprior,ncol=ncol(obscov)),use='pairwise.complete.obs')
+    narescov <- which(is.na(rescov))
+    rescov[narescov] <- 0
+    
+    out$residCovStd <- round(idobscov %*% rescov %*% idobscov ,3)
+    out$residCovStd[narescov] <- NA
+    dimnames(out$residCovStd) <- list(object$ctstanmodel$manifestNames,object$ctstanmodel$manifestNames)
+    out$resiCovStdNote <- 'Standardised covariance of residuals'
   }
   
-  parnames <- object$setup$matsetup$parname[object$setup$matsetup$when==0 & object$setup$matsetup$param > 0]
-  parindices <- object$setup$matsetup$param[object$setup$matsetup$when==0 & object$setup$matsetup$param > 0]
-  pars <- cbind(parnames,parindices)
-  pars<-pars[!duplicated(pars[,1,drop=FALSE]),,drop=FALSE]
-  parnames <- pars[as.numeric(pars[,2,drop=FALSE]) >0, 1]
+  ms=object$setup$matsetup
+  parnames = getparnames(object)
   # parnames <- unique(parnames)
-  parnamesiv <- parnames[object$data$indvaryingindex]
+  parnamesiv <- getparnames(object,reonly = TRUE)
   
   #### generate covcor matrices of raw and transformed subject level params
   
@@ -73,15 +141,11 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=4,parmatrices=TRUE,prio
     if(nindvarying>1){
       
       #raw pop distribution params
-      # browser()
       dimrawpopcorr <- dim(e$rawpopcorr)
-      # if(!'stanfit' %in% class(object$stanfit)) 
-        rawpopcorr= array(e$rawpopcorr,dim=c(dimrawpopcorr[1],1,dimrawpopcorr[2] * dimrawpopcorr[3]))
-      # if('stanfit' %in% class(object$stanfit)) rawpopcorr= rstan::extract(object$stanfit,pars='rawpopcorr',permuted=FALSE)
-
+      rawpopcorr= array(e$rawpopcorr,dim=c(dimrawpopcorr[1],1,dimrawpopcorr[2] * dimrawpopcorr[3]))
       rawpopcorrout <- suppressWarnings(monitor(rawpopcorr, digits_summary=digits,warmup=0,print = FALSE)[lower.tri(diag(nindvarying)),c(monvars,'n_eff','Rhat'),drop=FALSE])
-      if(!'stanfit' %in% class(object$stanfit)) rawpopcorrout <- rawpopcorrout[,-which(colnames(rawpopcorrout) %in% c('n_eff','Rhat')),drop=FALSE]
-
+      if(optimize) rawpopcorrout <- rawpopcorrout[,-which(colnames(rawpopcorrout) %in% c('n_eff','Rhat')),drop=FALSE]
+      
       rownames(rawpopcorrout) <- matrix(paste0('',parnamesiv,'__',rep(parnamesiv,each=length(parnamesiv))),
         length(parnamesiv),length(parnamesiv))[lower.tri(diag(nindvarying)),drop=FALSE]
       
@@ -99,8 +163,8 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=4,parmatrices=TRUE,prio
   
   if(object$ctstanmodel$n.TIpred > 0) {
     
-    if('stanfit' %in% class(object$stanfit)){
-      rawtieffect <- rstan::extract(object$stanfit,permuted=FALSE,pars='TIPREDEFFECT')
+    if(!optimize){
+      rawtieffect <- rstan::extract(object$stanfit$stanfit,permuted=FALSE,pars='TIPREDEFFECT')
       tidiags <- suppressWarnings(monitor(rawtieffect,warmup=0,digits_summary = digits,print = FALSE))
     }
     
@@ -108,104 +172,55 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=4,parmatrices=TRUE,prio
     tieffectnames <- paste0('tip_',rep(object$ctstanmodel$TIpredNames,each=length(parnames)),'_',parnames)
     dimnames(tieffect)<-list(c(),c(),tieffectnames)
     tipreds = suppressWarnings(monitor(tieffect,warmup = 0,print = FALSE)[,monvars,drop=FALSE])
-    if('stanfit' %in% class(object$stanfit)) tipreds <- cbind(tipreds,tidiags[,c('n_eff','Rhat'),drop=FALSE])
+    if(!optimize) tipreds <- cbind(tipreds,tidiags[,c('n_eff','Rhat'),drop=FALSE])
     tipreds <- tipreds[c(object$data$TIPREDEFFECTsetup)>0,,drop=FALSE]
     z = tipreds[,'mean'] / tipreds[,'sd'] 
     out$tipreds= round(cbind(tipreds,z),digits) #[order(abs(z)),]
   }
   
-
+  
   
   if(parmatrices){
+    Mean=ctStanContinuousPars(object,calcfunc = mean,calcfuncargs=list(),timeinterval=timeinterval)
+    sd=ctStanContinuousPars(object,calcfunc = sd,calcfuncargs = list(na.rm=TRUE),timeinterval=timeinterval)
+    `2.5%` = ctStanContinuousPars(object,calcfunc = quantile,calcfuncargs = list(probs=.025),timeinterval=timeinterval)
+    `50%` = ctStanContinuousPars(object,calcfunc = quantile,calcfuncargs = list(probs=.5),timeinterval=timeinterval)
+    `97.5%` = ctStanContinuousPars(object,calcfunc = quantile,calcfuncargs = list(probs=.975),timeinterval=timeinterval)
     
-    # #check if stanfit object can be used
-    # sf <- object$stanfit
-    # npars <- try(get_num_upars(sf),silent=TRUE) #$stanmodel)
-    # 
-    # if(class(npars)=='try-error'){ #in case R has been restarted or similar
-    #   standataout <- object$standata
-    #   smf <- stan_reinitsf(object$stanmodel,standataout)
-    # }
-    object$standata$savescores <- 0L
-    object$standata$gendata <- 0L
-    object$standata$dokalman <- 0L
-    object$standata$popcovn <- 5L
-    sf <- stan_reinitsf(object$stanmodel,data=object$standata)
-    parmatlists <- try(apply(ctStanRawSamples(object),
-      # sample(x = 1:dim(e$rawpopmeans)[1],
-      #   size = dim(e$rawpopmeans)[1],  #min(parmatsamples,
-      #   replace = FALSE),],
-      1,ctStanParMatrices,fit=object,timeinterval=timeinterval,sf=sf))
+    d <- data.frame(ctModelUnlist(Mean,matnames = names(Mean)))
+    colnames(d)[colnames(d) %in% 'value'] <- 'Mean'
+    lapply(c('sd','2.5%','50%','97.5%'),function(x) d[[x]] <<-round(ctModelUnlist(get(x),names(Mean))$value,digits))
+    d$param <- NULL
+    d$Mean <- round(d$Mean,digits)
+    rm(sd)
     
-    if(!'try-error' %in% class(parmatlists)[1]){
-      parmatarray <- array(unlist(parmatlists),dim=c(length(unlist(parmatlists[[1]])),length(parmatlists)))
-      parmats <- matrix(NA,nrow=length(unlist(parmatlists[[1]])),ncol=7)
-      rownames(parmats) <- paste0('r',1:nrow(parmats))
-      counter=0
-      for(mati in 1:length(parmatlists[[1]])){
-        if(all(dim(parmatlists[[1]][[mati]]) > 0)){
-          for(coli in 1:ncol(parmatlists[[1]][[mati]])){
-            for(rowi in 1:nrow(parmatlists[[1]][[mati]])){
-              counter=counter+1
-              new <- matrix(c(
-                rowi,
-                coli,
-                mean(parmatarray[counter,],na.rm=TRUE),
-                sd(parmatarray[counter,],na.rm=TRUE),
-                quantile(parmatarray[counter,],probs=c(.025,.5,.975),na.rm=TRUE)),
-                nrow=1)
-              try(rownames(parmats)[counter] <- names(parmatlists[[1]])[mati])
-              try(parmats[counter,]<-new)
-            }}}}
-      
-      colnames(parmats) <- c('Row','Col', 'Mean','Sd','2.5%','50%','97.5%')
-      
-      #remove certain parmatrices lines
-      removeindices <- which(rownames(parmats) == 'MANIFESTVAR' & parmats[,'Row'] != parmats[,'Col'])
-      
-      removeindices <- c(removeindices,which((rownames(parmats) %in% c('MANIFESTVAR','T0VAR','DIFFUSION','dtDIFFUSION','asymDIFFUSION',
-        'T0VARcor','DIFFUSIONcor','DIFFUSIONcov','dtDIFFUSIONcor','asymDIFFUSIONcor') &  parmats[,'Row'] < parmats[,'Col'])))
-      
-      removeindices <- c(removeindices,which((rownames(parmats) %in% c('T0VARcor','DIFFUSIONcor','dtDIFFUSIONcor','asymDIFFUSIONcor') & 
-          parmats[,'Row'] == parmats[,'Col'])))
-      
-      parmats <- parmats[-removeindices,]
-      
-      out$parmatrices=round(parmats,digits=digits)
-      
-      out$parmatNote=paste0('Population mean parameter matrices calculated with time interval of ', timeinterval,' for discrete time (dt) matrices. ',
-        'Covariance related matrices shown as covariance matrices, correlations have (cor) suffix. Asymptotic (asym) matrices based on infinitely large time interval.')
-    }
-    if('try-error' %in% class(parmatlists)[1]) out$parmatNote = 'Could not calculate parameter matrices'
+    out$parmatrices=d
   }
-    
   
   
-  if('stanfit' %in% class(object$stanfit)){
+  
+  if(!optimize){
     # browser()
     popsd=smr$summary[c(grep('^popsd',rownames(smr$summary),fixed=FALSE)),
       c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE] #[ object$data$indvaryingindex,,drop=FALSE]
     rownames(popsd)=parnames[ object$data$indvaryingindex]
-    # popmeans=smr$summary[c(grep('hmean_',rownames(smr$summary))),
-    #   c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE]
     popmeans=smr$summary[c(grep('popmeans[', rownames(smr$summary),fixed=TRUE)),
       c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE]
     popmeans=popmeans[(nrow(popmeans)/2+1):nrow(popmeans),,drop=FALSE]
     rownames(popmeans) <- parnames
     
-
+    loglik = data.frame(mean=mean(e$ll),sd=sd(e$ll), max=max(e$ll))
     logposterior=smr$summary[c(grep('lp',rownames(smr$summary))),
       c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE]
   }
   
-  if(!'stanfit' %in% class(object$stanfit)){ #if optimized / importance sampled
+  if(optimize){ #if optimized / importance sampled
     
     if(!is.null(iter)){ popsd <- suppressWarnings(monitor(array(
       e$popsd,dim=c(dim(e$popsd)[1],1,dim(e$popsd)[2])),warmup=0,print=FALSE))
     popsd=popsd[, monvars,drop=FALSE]
     rownames(popsd)=parnamesiv
     }
-    
     popmeans=suppressWarnings(monitor(array(e$popmeans,dim=c(dim(e$popmeans)[1],1,dim(e$popmeans)[2])),warmup=0,print=FALSE))
     rownames(popmeans) = parnames #names(e)[grep('hmean_',names(e))]
     popmeans = popmeans[,monvars,drop=FALSE]
@@ -222,29 +237,18 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=4,parmatrices=TRUE,prio
   
   out$popNote=paste0('popmeans are reported as specified in ctModel -- covariance related matrices are in sd / unconstrained correlation form -- see $parmatrices for simpler interpretations!')
   
-  if(!'stanfit' %in% class(object$stanfit)) {
+  if(optimize) {
     
     out$loglik=loglik
     out$npars = npars
     out$aic = aic
   }
   out$logposterior=logposterior
+  if(optimize) out$nsamples <- nrow(object$stanfit$samples)
   
   if(!parmatrices) out$parmatNote <- 'For additional summary matrices, use argument: parmatrices = TRUE'
   
   
-  
-  # out$posteriorpredictive=round(smr$summary[c(grep('stateppll',rownames(smr$summary))),
-  #     c('mean','sd','2.5%','50%','97.5%','n_eff','Rhat'),drop=FALSE],3)
-  # }
-  
-  
-  # if(!'stanfit' %in% class(object$stanfit)){ #optimization summary
-  #   out=list()
-  #   out$popmeans=object$stanfit$transformedpars[grep('hmean_',rownames(object$stanfit$transformedpars)),]
-  #   out$popsd=object$stanfit$transformedpars[grep('hsd_',rownames(object$stanfit$transformedpars)),]
-  #   out$logprob=round(-object$stanfit$optimfit$value)
-  # }
   
   return(out)
 }

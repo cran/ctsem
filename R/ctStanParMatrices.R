@@ -25,8 +25,6 @@ ctStanParMatrices <- function(fit, parvalues, timeinterval=1, sf=NA){
   fit$standata$gendata <- 0L
   fit$standata$dokalman <- 0L
   nlatent = fit$standata$nlatent
-  # browser()
-  # if(length(parvalues)!=fit$data$nparams) stop('length of parvalues != number of free params (',fit$data$nparams,') in model!')
   if(suppressWarnings(is.na(sf))) sf <- stan_reinitsf(fit$stanmodel,data=fit$standata) #suppressOutput(sf <- suppressWarnings(sampling(,iter=1,control=list(max_treedepth=1),chains=1)))
   # npars <- get_num_upars(sf)
   # pars <- c(parvalues,rep(0,npars - fit$data$nparams))
@@ -36,7 +34,8 @@ ctStanParMatrices <- function(fit, parvalues, timeinterval=1, sf=NA){
    whichmatrices='all'
   
   if(whichmatrices[1] == 'all') {
-    whichmatrices <- sort(c(unique(fit$ctstanmodel$pars$matrix),'DIFFUSIONcov','DIFFUSIONcor','asymDIFFUSION','asymDIFFUSIONcor','T0VARcor','asymCINT'))
+    whichmatrices <- sort(c(unique(fit$ctstanmodel$pars$matrix),
+      'DIFFUSIONcov','DIFFUSIONcor','asymDIFFUSION','asymDIFFUSIONcor','T0cov','T0VARcor','asymCINT','MANIFESTcov'))
     if(fit$ctstanmodel$continuoustime) whichmatrices <- c(whichmatrices, 
       'dtDRIFT','dtDIFFUSION','dtCINT')
   } else whichmatrices <- unique(c(whichmatrices, fit$setup$matrices$base)) #need base matrices for computations
@@ -50,13 +49,14 @@ ctStanParMatrices <- function(fit, parvalues, timeinterval=1, sf=NA){
   }
 
   #because of intoverpop
-  out$DRIFT <- out$DRIFT[1:nlatent,1:nlatent,drop=FALSE]
+  # out$DRIFT <- out$DRIFT[1:nlatent,1:nlatent,drop=FALSE]
   out$T0VAR <- out$T0VAR[1:nlatent,1:nlatent,drop=FALSE]
   out$T0MEANS <- out$T0MEANS[1:nlatent,,drop=FALSE]
   
   
   #cholesky factor fix
-  out$MANIFESTVAR=out$MANIFESTVAR %*% t(out$MANIFESTVAR) #cholesky factor inside stanfit...
+  out$MANIFESTVAR=out$MANIFESTcov #cholesky factor inside stanfit...
+  out$DIFFUSION=out$DIFFUSIONcov
   
   #dimension naming (latent row object, manifest column object, etc
   for(lro in c('DRIFT','DIFFUSION','CINT','T0VAR','T0MEANS','asymDIFFUSION',if('TDPREDEFFECT' %in% model$pars$matrix) 'TDPREDEFFECT')){
@@ -95,7 +95,7 @@ ctStanParMatrices <- function(fit, parvalues, timeinterval=1, sf=NA){
   if('asymCINT' %in% whichmatrices) out$asymCINT = matrix(out$asymCINT,ncol=1)#-solve(out$DRIFT) %*% out$CINT
   
   if('T0VARcor' %in% whichmatrices) {
-    out$T0VARcor = suppressWarnings(stats::cov2cor(out$T0VAR))
+    out$T0VARcor = suppressWarnings(stats::cov2cor(out$T0cov))
     out$T0VARcor[is.na(out$T0VARcor)] <- 0
   }
 

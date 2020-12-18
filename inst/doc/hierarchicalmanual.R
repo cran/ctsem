@@ -65,11 +65,14 @@ head(model$pars,4)
 
 ## ----fitting,include=FALSE,cache=TRUE-------------------------------------------------------------
 if(w32chk()){
-suppressWarnings(fit<-ctStanFit(datalong = ctstantestdat, ctstanmodel = model,optimize=TRUE,savescores=TRUE))
+suppressWarnings(fit<-ctStanFit(datalong = ctstantestdat, 
+  ctstanmodel = model,optimize=TRUE,
+  # savescores=TRUE,savesubjectmatrices = TRUE, 
+  nopriors=FALSE))
 }
 
 ## ----fittingshow,include=TRUE,eval=FALSE----------------------------------------------------------
-#  fit<-ctStanFit(datalong = ctstantestdat, ctstanmodel = model)
+#  fit<-ctStanFit(datalong = ctstantestdat, ctstanmodel = model, nopriors=FALSE)
 
 ## ----output,eval=FALSE----------------------------------------------------------------------------
 #  summary(fit, timeinterval = 1)
@@ -104,14 +107,14 @@ ctStanTIpredeffects(fit, plot = TRUE, whichpars=c('dtDRIFT[2,1]','CINT'),
 if(w32chk()){
 model$pars$indvarying[7] <- TRUE
 p <- plot(model, rows=7,rawpopsd=1, plot=FALSE)[[1]] + 
-  ggplot2::theme(legend.position = "none")+ggtitle('Default prior')
+  ggplot2::theme(legend.position = "none")+ggplot2::ggtitle('Default prior')
 
 model$pars$transform[7]<- '2 * param -1'
 
 p2 <- plot(model, rows=7,rawpopsd=1,plot=FALSE)[[1]]
 
 p3 <- g_legend(p2)
-p2 <- p2 + ggplot2::theme(legend.position ='none')+ggtitle('Modified prior')
+p2 <- p2 + ggplot2::theme(legend.position ='none')+ggplot2::ggtitle('Modified prior')
 gridExtra::grid.arrange(p,p2,p3,layout_matrix=matrix(c(3,1,1,1,1,1,1,1,3,2,2,2,2,2,2,2),ncol=2))
 }
 

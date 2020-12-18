@@ -2,6 +2,22 @@ vgrep <- function(patterns,x){
   unique(unlist(sapply(patterns,function(pattern) grep(pattern,x))))
 }
 
+mupd <- function(m, nr=NA,nc=NA, upd=NA, sr=NA,sc=NA){
+  if(is.na(nr)) nr <- max(nrow(upd)+sr-1,nrow(m))
+  if(is.na(nc)) nc <- max(ncol(upd)+sc-1,nrow(m))
+  mo <- rbind(
+    cbind(m, matrix(0,nrow(m),nc-ncol(m))),
+    matrix(0,nr-nrow(m),nc))
+  if(!is.na(upd)) mo[sr:(sr+nrow(upd)-1),sc:(ncol(upd)+sc-1)] <- upd
+  return(mo)
+}
+
+diagt <- function(d){
+  m <- diag(0,length(d))
+  m[diag(1,length(d))==1] <- d
+  return(m)
+}
+
 findmatrixslots <- function(pars,l){
   p<-list()
   for(pi in pars){
@@ -62,6 +78,17 @@ w32chk <- function(){
 }
 
 
+removeOutliers <- function(dat,multiplier,by=2){
+  dat2 <- array(apply(dat,by,function(x){
+    s=sd(x,na.rm=TRUE)
+    m=mean(x,na.rm=TRUE)
+    message("Removed ", sum(abs(x-m) > (multiplier*s),na.rm=TRUE)," outliers...")
+    x[abs(x-m) > (multiplier*s)] <- NA
+    return(x)
+  }),dim=dim(dat))
+}
+
+
 testall<- function(cores=4,folder = '/tests/testthat',examples=TRUE){
   requireNamespace('testthat')
   Sys.setenv(NOT_CRAN='true')
@@ -71,6 +98,7 @@ testall<- function(cores=4,folder = '/tests/testthat',examples=TRUE){
   runex <- grep('runExamples',tests)
   tests <- c(tests[runex],tests[-runex]) #do examples first
   if(!examples) tests <- tests[-grep('runExamples',tests)]
+  a=Sys.time()
 
   if(cores > 1){
     cl <- parallel::makeCluster(cores,outfile='')
@@ -94,6 +122,7 @@ testall<- function(cores=4,folder = '/tests/testthat',examples=TRUE){
   out2 <- do.call(what = rbind,lapply(out,utils::getS3method('as.data.frame','testthat_results')))
   dev.off()
   print(out2[,colnames(out2)!='result'])
+  print(Sys.time()-a)
   if(cores > 1) parallel::stopCluster(cl)
   return(invisible(out2))
 }
@@ -158,14 +187,7 @@ if(1==99) Row <- Col <- NULL
       if(is.null(dout)) dout <- x else dout <- rbind(dout,x,fill=TRUE)
   }
   
-  # 
-  # ggplot(data=subset(dout,Element %in% 'ysmooth' & Sample == 1),aes(x=Time,y=value,colour=Subject))+
-  # # stat_quantile(quantiles=seq(.01,.99,.01),
-  # #   aes(alpha=1-(abs(.5-(..quantile..)))),method='rqss')+
-  #   geom_line()+
-  #   geom_ribbon(aes(ymin=value-sd,ymax=value+sd,fill=Subject),alpha=.2,linetype=0)+
-  #   theme_minimal()+
-  #   facet_wrap(vars(Row))
+  dout <- data.frame(dout) #because of weird temporal data.table behaviour
   class(dout) <- c('ctKalmanDF',class(dout))
 return(dout)
 }
@@ -363,7 +385,7 @@ ctDensity<-function(x,bw='auto',plot=FALSE,...){
 
 
 
-ctDensityList<-function(x,xlimsindex='all',ylimsindex='all',cut=FALSE,plot=FALSE,smoothness=1,
+ctDensityList<-function(x,xlimsindex='all',ylimsindex='all',cut=FALSE,plot=FALSE,
   grouplabels=names(x),
   ylab='Density',
   xlab='Par. Value',probs=c(.05,.95),main='',colvec=NA){

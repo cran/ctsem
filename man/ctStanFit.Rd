@@ -24,11 +24,13 @@ ctStanFit(
   cores = ifelse(optimize, getOption("mc.cores", 2L), "maxneeded"),
   inits = NULL,
   forcerecompile = FALSE,
+  saveCompile = TRUE,
   savescores = FALSE,
   savesubjectmatrices = FALSE,
   gendata = FALSE,
   control = list(),
   verbose = 0,
+  vb = FALSE,
   ...
 )
 }
@@ -77,9 +79,6 @@ otherwise use the HMC sampler from Stan, which is (much) slower, but generally m
 \item{optimcontrol}{list of parameters sent to \code{\link{stanoptimis}} governing optimization / importance sampling.}
 
 \item{nlcontrol}{List of non-linear control parameters. 
-\code{nldynamics} defaults to "auto", but may also be a logical. Set to FALSE to use estimator that assumes linear dynamics, 
-TRUE to use non-linear estimator. "auto" selects linear when the model is obviously linear, 
-otherwise nonlinear -- nonlinear is slower.
 \code{maxtimestep} must be a positive numeric,  specifying the largest time
 span covered by the numerical integration. The large default ensures that for each observation time interval, 
 only a single step of exponential integration is used. When \code{maxtimestep} is smaller than the observation time interval, 
@@ -101,11 +100,16 @@ up to the number of chains, or a positive integer. If \code{optimize=TRUE}, more
 \item{forcerecompile}{logical. For development purposes. 
 If TRUE, stan model is recompiled, regardless of apparent need for compilation.}
 
+\item{saveCompile}{if TRUE and compilation is needed / requested, writes the stan model to
+the parent frame as ctsem.compiled (unless that object already exists and is not from ctsem), to avoid unnecessary recompilation.}
+
 \item{savescores}{Logical. If TRUE, output from the Kalman filter is saved in output. For datasets with many variables
 or time points, will increase file size substantially.}
 
-\item{savesubjectmatrices}{Logical. If TRUE, subject specific matrices are saved -- only relevant when either time dependent predictors
-are used, or individual differences are obtained via sampling (not via optimization, where they are integrated over).}
+\item{savesubjectmatrices}{Logical. If TRUE, subject specific matrices are saved -- 
+only relevant when either time dependent predictors or individual differences are 
+used. Can increase memory usage dramatically in large models, and can be computed after fitting using ctExtract
+or ctStanSubjectPars .}
 
 \item{gendata}{Logical -- If TRUE, uses provided data for only covariates and a time and missingness structure, and 
 generates random data according to the specified model / priors. 
@@ -118,6 +122,8 @@ regarding warmup / sampling behaviour. Unless specified, values used are:
 list(adapt_delta = .8, adapt_window=2, max_treedepth=10, adapt_init_buffer=2, stepsize = .001)}
 
 \item{verbose}{Integer from 0 to 2. Higher values print more information during model fit -- for debugging.}
+
+\item{vb}{Logical. Use variational Bayes algorithm from stan? Only kind of working, not recommended.}
 
 \item{...}{additional arguments to pass to \code{\link[rstan]{stan}} function.}
 }

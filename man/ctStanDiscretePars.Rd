@@ -6,27 +6,24 @@
 \usage{
 ctStanDiscretePars(
   ctstanfitobj,
-  subjects = "all",
+  subjects = "popmean",
   times = seq(from = 0, to = 10, by = 0.1),
-  quantiles = c(0.025, 0.5, 0.975),
-  nsamples = 500,
+  nsamples = 100,
   observational = FALSE,
   standardise = FALSE,
   cov = FALSE,
   plot = FALSE,
+  cores = 2,
   ...
 )
 }
 \arguments{
 \item{ctstanfitobj}{Continuous time model fit from \code{\link{ctStanFit}}}
 
-\item{subjects}{Either 'all', to take the average over all subjects, or a vector of integers denoting which
+\item{subjects}{Either 'popmean', to use the population mean parameter, or a vector of integers denoting which
 subjects.}
 
 \item{times}{Numeric vector of positive values, discrete time parameters will be calculated for each.}
-
-\item{quantiles}{Which quantiles to return. If plotting, specify 3 quantiles, 
-the 2nd will be plotted as a line with 1 and 3 as uncertainty bounds.}
 
 \item{nsamples}{Number of samples from the stanfit to use for plotting. Higher values will
 increase smoothness / accuracy, at cost of plotting speed. Values greater than the total
@@ -44,6 +41,9 @@ asymDIFFUSION matrix.}
 \item{plot}{Logical. If TRUE, plots output using \code{\link{ctStanDiscreteParsPlot}}
 instead of returning output.}
 
+\item{cores}{Number of cpu cores to use for computing subject matrices. 
+If subject matrices were saved during fiting, not used.}
+
 \item{...}{additional plotting arguments to control \code{\link{ctStanDiscreteParsPlot}}}
 }
 \description{
@@ -54,7 +54,7 @@ from ctStanFit, for specified subjects.
 if(w32chk()){
 
 ctStanDiscretePars(ctstantestfit,times=seq(.5,4,.1), 
- plot=TRUE,indices='all')
+ plot=TRUE,indices='CR')
  
 #modify plot
 require(ggplot2)
@@ -62,5 +62,6 @@ g=ctStanDiscretePars(ctstantestfit,times=seq(.5,4,.1),
  plot=TRUE,indices='CR')
 g= g+ labs(title='Cross effects')
 print(g)
+
 }
 }

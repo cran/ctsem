@@ -8,8 +8,9 @@ ctModelBuildPopCov <- function(ctm,linearise){ #for latex
 }
 
 getPopEffectsFromFit <- function(x,linearise=TRUE,digits=3){
+  # browser()
   ms=ctMatsetupFreePars(x$setup$matsetup)
-  e=ctExtract(x)
+  e=x$stanfit$transformedparsfull#ctExtract(x)
   if(x$standata$ntipred > 0){
     if(linearise) timat <- e$linearTIPREDEFFECT
     if(!linearise) timat <- e$TIPREDEFFECT
@@ -18,21 +19,17 @@ getPopEffectsFromFit <- function(x,linearise=TRUE,digits=3){
     timat <- timat[,apply(x$standata$TIPREDEFFECTsetup,1,function(x) any(x!=0)),,drop=FALSE]
   } else timat <- diag(0,0)
   
-  if(!is.null(e$rawpopcov)){ 
-    
-    if(!linearise) popcov <- e$rawpopcov
+  if(!is.null(e$rawpopc) && !is.null(e$popcov)){ 
+    if(!linearise) popcov <- matrix(e$rawpopc[1,4,,],dim(e$rawpopc)[3])
     if(linearise) {
-      popcov <- e$popcov
-      #stan_constrainsamples(x$stanmodel,x$standata,rbind(x$stanfit$rawest),
-        # cores=1,pcovn =1000,dokalman=FALSE,savesubjectmatrices = FALSE)$popcov
-      # popcov <- round(ctCollapse(e$popcov,1,mean),digits=digits)
+      popcov <- matrix(e$popcov[1,,],dim(e$popcov)[3])
       if(x$standata$intoverpop==1){
         t0index <- ms$indvarying[ms$param > 0 & ms$row <= x$standata$nlatent & ms$matrix %in% 1 & ms$indvarying > 0]
-        popcov[,t0index,t0index] <- e$pop_T0VAR[,
+        popcov[t0index,t0index] <- e$pop_T0VAR[1,
           t0index,t0index] #is this correct...?
       }
     }
-      dimnames(popcov) <- list(iter=1:(dim(popcov)[1]),
+      dimnames(popcov) <- list(#iter=1:(dim(popcov)[1]),
         ms$parname[as.logical(ms$indvarying)],
         ms$parname[as.logical(ms$indvarying)] )
     
@@ -58,14 +55,14 @@ ctModelBuildTIeffects <- function(ctm){ #for latex
 }
 
 ctMatsetupFreePars <- function(m,intoverpop){
-    m=m[m$when==0 & m$param > 0,,drop=FALSE]
+    m=m[m$when %in% c(0,-1) & m$param > 0,,drop=FALSE]
     m=m[match(unique(m$param),m$param),,drop=FALSE]
     m = m[order(m$param),,drop=FALSE]
 }
 
 ctMatvalueFreePars <- function(ms,mv){
-  mv=mv[ms$when==0 & ms$param > 0,,drop=FALSE]
-  ms=ms[ms$when==0 & ms$param > 0,,drop=FALSE]
+  mv=mv[ms$when %in% c(0,-1) & ms$param > 0,,drop=FALSE]
+  ms=ms[ms$when %in% c(0,-1) & ms$param > 0,,drop=FALSE]
   mv=mv[match(unique(ms$param),ms$param),,drop=FALSE]
   mv = mv[order(ms$param),,drop=FALSE]
 }
@@ -244,14 +241,21 @@ ctModelLatex<- function(x,matrixnames=TRUE,digits=3,linearise=class(x) %in% 'ctS
   
   if(equationonly) compile <- FALSE
   
+  texPrep <- function(x){ #replaces certain characters with tex safe versions
+    for(i in 1:length(x)){
+    x[i]=gsub('_', '\\_',x[i],fixed=TRUE)
+    x[i]=gsub('^', '\\textasciicircum',x[i],fixed=TRUE)
+    }
+    return(x)
+  }
+  
   bmatrix = function(x, digits=NULL,nottext=FALSE, ...) {
     if(!is.null(x)){
       if(!nottext){
         for(i in 1:length(x)){
           if(is.na(suppressWarnings(as.numeric(x[i]))) & #if x[i] cannot be numeric and 
               grepl('\\',x[i],fixed=TRUE) == FALSE) {
-            x[i]=gsub('_', '\\_',x[i],fixed=TRUE)
-            x[i]=gsub('^', '\\textasciicircum',x[i],fixed=TRUE)
+            x[i] = texPrep(x[i])
             x[i] = paste0('\\text{',x[i],'}')
           }
         }
@@ -388,13 +392,14 @@ if (minimal){
   out= paste0(out,tablestring,'\n',equationstring)
 } else {
   showd <- ifelse(continuoustime,"\\mathrm{d}","") #for continuous or discrete system
+  
 out <- paste0(out, "
  \\begin{",textsize,"}
  \\setcounter{MaxMatrixCols}{200}
   \\begin{align*}
   ",if(dopop) paste0("\\parbox{10em}{\\centering{Subject\\linebreak parameter\\linebreak distribution:}}
              &\\underbrace{",bmatrix(matrix(paste0('\\text{',
-             gsub('_','\\_',colnames(popcov),fixed=TRUE),'}_i')),nottext=T)," 
+             texPrep(colnames(popcov)),'}_i')),nottext=TRUE)," 
             }_{\\vect{\\phi}(i)} ",ifelse(linearise,"\\approx","\\sim"),
     ifelse(linearise,"","\\textrm{tform}\\left\\{"),
     " \\mathrm{N} \\left(
@@ -483,7 +488,8 @@ out <- paste0(out, "
     write(x = out,file = paste0(filename,'.tex'))
     if(compile){
       if(!grepl('SunOS',Sys.info()['sysname']) && requireNamespace('tinytex',quietly=TRUE)){
-        tinytex::pdflatex(file=paste0(filename,'.tex'), clean=TRUE)
+        tt=try(tinytex::pdflatex(file=paste0(filename,'.tex'), clean=TRUE))
+        if('try-error' %in% class(tt)) 'Error - Perhaps tinytex needs to be installed via: tinytex::install_tinytex()' 
         
       } else{
       hastex <- !Sys.which('pdflatex') %in% ''

@@ -260,6 +260,8 @@ sgdhess <- function(init,fitfunc,whichignore=c(),whichmcmcpars=NA,mcmcstep=.01,n
       if(is.na(whichmcmcpars[1])) lpg= fitfunc2(fullnewpars,whichmcmcpars)
       if(length(whichignore)>0) attributes(lpg)$gradient <- attributes(lpg)$gradient[-whichignore]
       
+
+      
       # if(i==1) {
       #   itertime <- as.numeric(Sys.time()-itertime)
       #   gamiter <- max(ceiling(10/itertime),gamiter)#

@@ -7,24 +7,17 @@
 ctStanDiscreteParsPlot(
   x,
   indices = "all",
-  add = FALSE,
-  legend = TRUE,
-  polygon = TRUE,
-  gg = TRUE,
-  plot = TRUE,
   quantiles = c(0.025, 0.5, 0.975),
-  times = seq(0, 10, 0.1),
   latentNames = "auto",
-  lwdvec = "auto",
-  colvec = "auto",
-  ltyvec = "auto",
-  plotcontrol = list(ylab = "Value", xlab = "Time interval", main =
-    "Regression coefficients", type = "l", xaxs = "i"),
-  grid = FALSE,
-  legendcontrol = list(x = "topright", bg = "white"),
+  ylab = "Coefficient",
+  xlab = "Time interval",
+  ylim = NA,
+  facets = NA,
+  splitSubjects = TRUE,
+  colour = "Effect",
+  title = "Temporal regressions | independent shock of 1.0",
   polygonalpha = 0.1,
-  polygoncontrol = list(steps = 20),
-  ...
+  ggcode = NA
 )
 }
 \arguments{
@@ -36,53 +29,34 @@ matrix specifying which indices of the output matrix to plot.
 'CR' specifies all off-diagonals,for discrete time cross regression parameters.
 'all' plots all AR and CR effects at once.}
 
-\item{add}{Logical. If FALSE, a new plot is generated, if TRUE, specified plot/s are
-overlayed on existing plot.}
-
-\item{legend}{Logical. If TRUE, generates a legend.}
-
-\item{polygon}{Logical. If TRUE, fills a polygon between the first and last specified quantiles.}
-
-\item{gg}{Logical -- use GGplot2 or not? if TRUE, other graphical parameters are ignored, and the
-ggplot object is returned and may be modified further.}
-
-\item{plot}{Logical. Only relevant with gg=TRUE.}
-
 \item{quantiles}{numeric vector of length 3, with values between 0 and 1, specifying which quantiles to plot.
 The default of c(.05,.5,.95) plots 95\% credible intervals and the posterior median at 50\%.}
-
-\item{times}{Numeric vector of positive values, discrete time parameters will be calculated for each.}
 
 \item{latentNames}{Vector of character strings denoting names for the latent variables. 
 'auto' just uses eta1 eta2 etc.}
 
-\item{lwdvec}{Either 'auto', or a vector of positive integers denoting line widths for each quantile.
-'auto' specifies c(1,3,1) if there are 3 quantiles to be plotted (default), otherwise simply 3.}
+\item{ylab}{y label.}
 
-\item{colvec}{Either 'auto', or a vector of color values denoting colors for each index to be plotted.
-'auto' generates colors using the \code{grDevices::rainbow} function.}
+\item{xlab}{x label.}
 
-\item{ltyvec}{Either 'auto', or a vector of line type integers (as for the lty parameter normally)
-denoting line types for each quantile.
-'auto' specifies c(3, 1, 3) if there are 3 quantiles to be plotted (default), otherwise simply 1.}
+\item{ylim}{Custom ylim.}
 
-\item{plotcontrol}{list of arguments to pass to plot function. 
-The following arguments are ignored: ylim,lwd,lty,col,x,y.}
+\item{facets}{May be 'Subject' or 'Effect'.}
 
-\item{grid}{Logical. Plot with a grid?}
+\item{splitSubjects}{if TRUE, subjects are plotted separately, if FALSE they are combined.}
 
-\item{legendcontrol}{list of arguments to pass to legend function. 'legend=' and 'text.col=' arguments
-will be ignored.}
+\item{colour}{Character string denoting how colour varies. 'Effect' or 'Subject'.}
 
-\item{polygonalpha}{Numeric between 0 and 1 to multiply the alpha (transparency) of colvec by for 
-the fill polygon.}
+\item{title}{Character string.}
 
-\item{polygoncontrol}{list of arguments to pass to ctPoly function (if polygon=TRUE).
-x,y, and col arguments will be ignored. Steps specifies the number of polygons to overlay to 
-create a graduated transparency. Set to 1 for a flat looking plot.}
+\item{polygonalpha}{Numeric between 0 and 1 to multiply the alpha of 
+the fill.}
 
-\item{...}{for plot adjustments a ggeval argument can be added, which should be based on the default code
-found in the ctsem:::ctPlotArrayGG function.}
+\item{ggcode}{if TRUE, returns a list containing the data.table to plot, and a character string that can be
+evaluated (with the necessary arguments such as ylab etc filled in). For modifying plots.}
+}
+\value{
+A ggplot2 object. This can be modified by the various ggplot2 functions, or displayed using print(x).
 }
 \description{
 Plots model implied regression strengths at specified times for 
@@ -94,7 +68,7 @@ x <- ctStanDiscretePars(ctstantestfit)
 ctStanDiscreteParsPlot(x, indices='CR')
 
 #to modify plot:
-g <- ctStanDiscreteParsPlot(x, indices='CR',plot=FALSE) + 
+g <- ctStanDiscreteParsPlot(x, indices='CR') + 
  ggplot2::labs(title='My ggplot modification')
 print(g)
 }

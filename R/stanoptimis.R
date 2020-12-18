@@ -189,6 +189,17 @@ jacrandom <- function(grfunc, est, eps=1e-4,
 }
 
 
+#' Sample more values from an optimized ctstanfit object
+#'
+#' @param fit fit object
+#' @param nsamples number of extra samples desired
+#' @param cores number of cores to use
+#'
+#' @return fit object with extra samples
+#' @export
+#'
+#' @examples
+#' if(w32chk()) newfit <- ctAddSamples(ctstantestfit, 10, 1)
 ctAddSamples <- function(fit,nsamples,cores=2){
   mchol <- t(chol(fit$stanfit$cov))
   
@@ -200,7 +211,9 @@ ctAddSamples <- function(fit,nsamples,cores=2){
   
   fit$stanfit$transformedpars=stan_constrainsamples(sm = fit$stanmodel,
     standata = fit$standata,samples=fit$stanfit$rawposterior,
-    savesubjectmatrices=FALSE,dokalman=FALSE,
+    savescores = fit$standata$savescores,
+    savesubjectmatrices=as.logical(fit$standata$savesubjectmatrices),
+    dokalman=as.logical(fit$standata$savesubjectmatrices),
     cores=cores)
   return(fit)
 }
@@ -226,7 +239,7 @@ parallelStanSetup <- function(cl, standata,split=TRUE){
     assign('smf',stan_reinitsf(sm,standata),pos = g)
     
     rm(standata,env=g)
-    rm(sm,env=g)
+    # rm(sm,env=g)
     # env <- new.env(parent=globalenv())
     # environment(parlp) <- env
     # assign('parlp',parlp,pos = g)
@@ -264,8 +277,9 @@ getcxxfun <- function(object) {
 stan_reinitsf <- function(model, data,fast=FALSE){
   if(fast) sf <- new(model@mk_cppmodule(model),data,0L,getcxxfun(model@dso))
   
-  if(!fast) suppressMessages(suppressWarnings(suppressOutput(sf<-rstan::sampling(model,iter=0,chains=0,init=0,data=data,check_data=FALSE,
-    control=list(max_treedepth=0),save_warmup=FALSE,test_grad=FALSE))))
+  if(!fast) suppressMessages(suppressWarnings(suppressOutput(sf<-
+      rstan::sampling(model,iter=0,chains=0,init=0,data=data,check_data=FALSE,
+        control=list(max_treedepth=0),save_warmup=FALSE,test_grad=FALSE))))
   
   return(sf)
 }
@@ -306,7 +320,7 @@ standatact_specificsubjects <- function(standata, subjects,timestep=NA){
 
 
 standatalongobjects <- function() {
-  longobjects <- c('subject','time','dokalmanrowsdata','nobs_y','ncont_y','nbinary_y','Y','tdpreds', 'whichobs_y','whichbinary_y','whichcont_y')
+  longobjects <- c('subject','time','dokalmanrows','nobs_y','ncont_y','nbinary_y','Y','tdpreds', 'whichobs_y','whichbinary_y','whichcont_y')
   return(longobjects)
 }
 
@@ -315,12 +329,11 @@ standatatolong <- function(standata, origstructure=FALSE,ctm=NA){
   names(long) <- standatalongobjects()
   
   if(origstructure){
-    colnames(long[['Y']]) <- colnames(standata$Y)
+    if(is.na(ctm[1])) stop('Missing ctm arg in standatatolong()')
+    colnames(long[['Y']]) <- ctm$manifestNames#colnames(standata$Y)
     long[['Y']][long[['Y']] %in% 99999] <- NA
-    if(!is.na(ctm[1])){
       colnames(long[['subject']]) <- ctm$subjectIDname
       colnames(long[['time']]) <- ctm$timeName
-    }
     longout <- data.frame(long[['subject']],long[['time']],long[['Y']])
     if(standata$ntdpred > 0){
       colnames(long[['tdpreds']]) <- colnames(standata$tdpreds)
@@ -395,18 +408,28 @@ standataFillTime <- function(standata, times){
 
 
 
-stan_constrainsamples<-function(sm,standata, samples,cores=2, cl=NA,savescores=FALSE,
+stan_constrainsamples<-function(sm,standata, samples,cores=2, cl=NA,
+  savescores=FALSE,
   savesubjectmatrices=TRUE,
-  dokalman=TRUE,onlyfirstrow=ifelse(savescores,FALSE,TRUE),pcovn=500,quiet=FALSE){
+  dokalman=TRUE,
+  onlyfirstrow=FALSE, #ifelse(any(savesubjectmatrices,savescores),FALSE,TRUE),
+  pcovn=500,
+  quiet=FALSE){
+  
   if(savesubjectmatrices && !dokalman){
     dokalman <- TRUE
     warning('savesubjectmatrices = TRUE requires dokalman=TRUE also!')
   }
   
+  # if(savesubjectmatrices && !savescores){
+  #   savescores <- TRUE
+  #   warning('savesubjectmatrices = TRUE requires savescores=TRUE also!')
+  # }
+  
   standata$savescores <- as.integer(savescores)
   standata$dokalman <- as.integer(dokalman)
   standata$savesubjectmatrices<-as.integer(savesubjectmatrices)
-  if(onlyfirstrow) standata$dokalmanrowsdata <- as.integer(c(1,diff(standata$subject)))
+  if(onlyfirstrow) standata$dokalmanrows <- as.integer(c(1,diff(standata$subject)))
   
   if(!quiet) message('Computing quantities for ', nrow(samples),' samples...')
   if(nrow(samples)==1) cores <- 1
@@ -437,13 +460,15 @@ stan_constrainsamples<-function(sm,standata, samples,cores=2, cl=NA,savescores=F
   env$standata <- standata
   env$sm <- sm
   env$samples <- samples
+  
   if(cores > 1 && all(is.na(cl))){
-    cl <- parallel::makeCluster(cores, type = "PSOCK",useXDR=TRUE)
+    cl <- parallel::makeCluster(cores, type = "PSOCK",useXDR=TRUE,outfile='')
     on.exit(try(parallel::stopCluster(cl),silent=TRUE),add = TRUE)
-    # parallel::clusterExport(cl2, c('sm','standata','samples'),environment())
-    # parallel::clusterApply(cl2,1:cores, function(x) library(ctsem))
   }
+  
   if(cores > 1) parallel::clusterExport(cl, 'standata',environment())
+  
+  # browser()
   transformedpars <- try(flexlapply(cl, 
     split(1:nrow(samples), sort((1:nrow(samples))%%cores)),
     tparfunc,cores=cores,parallel=cores > 1))
@@ -469,7 +494,9 @@ stan_constrainsamples<-function(sm,standata, samples,cores=2, cl=NA,savescores=F
     nresamples <- nrow(samples) 
   }
   
-  transformedpars=try(tostanarray(flesh=matrix(unlist(transformedpars),byrow=TRUE, nrow=nresamples), skeleton = est1))
+  
+  flesh=matrix(unlist(transformedpars),byrow=TRUE, nrow=nresamples)
+  transformedpars=try(tostanarray(flesh=flesh, skeleton = est1))
   
   return(transformedpars)
 }
@@ -477,6 +504,7 @@ stan_constrainsamples<-function(sm,standata, samples,cores=2, cl=NA,savescores=F
 
 
 tostanarray <- function(flesh, skeleton){
+  # browser()
   skelnames <- names(skeleton)
   skelstruc <- lapply(skeleton,dim)
   count=1
@@ -578,14 +606,20 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
     standata$ntipredeffects <- 0L
   }
   
-  if(standata$nindvarying > 0 && standata$intoverpop==0){ #detect subject level pars
-    stochastic <- TRUE
-    standata$doonesubject <- 1L
-    message('Using combined stochastic gradient descent + mcmc')
-    a1=standata$nparams+standata$nindvarying+
-      (standata$nindvarying^2-standata$nindvarying)/2
-    whichmcmcpars <- (a1+1):(a1+standata$nindvarying) #*standata$nsubjects)
-  } else whichmcmcpars <- NA
+  savesubjectmatrices <- standata$savesubjectmatrices
+  standata$savesubjectmatrices <- 0L #reinsert when saving samples
+  
+  #disabled attempt at stochastic grad with mcmc subject pars
+  # if(standata$nindvarying > 0 && standata$intoverpop==0){ #detect subject level pars
+  #   stochastic <- TRUE
+  #   standata$doonesubject <- 1L
+  #   message('Using combined stochastic gradient descent + mcmc')
+  #   a1=standata$nparams+standata$nindvarying+
+  #     (standata$nindvarying^2-standata$nindvarying)/2
+  #   whichmcmcpars <- (a1+1):(a1+standata$nindvarying) #*standata$nsubjects)
+  # } else 
+    whichmcmcpars <- NA #leftover necessity
+    
   
   smf <- stan_reinitsf(sm,standata)
   npars=rstan::get_num_upars(smf)
@@ -655,8 +689,10 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
 
         
         if("try-error" %in% class(out)) {
+          outerr <- out
           out <- -1e100
           attributes(out)$gradient <- rep(NaN, length(parm))
+          attributes(out)$err <- outerr
         }
         if(is.null(attributes(out)$gradient)) attributes(out)$gradient <- rep(NaN, length(parm))
         attributes(out)$gradient[is.nan(attributes(out)$gradient)] <-
@@ -685,7 +721,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       
       if(optimcores==1) target = singletarget #we use this for importance sampling
       if(cores > 1){ #for parallelised computation after fitting, if only single subject
-        clctsem=parallel::makeCluster(cores,useXDR=TRUE,type='PSOCK')
+        clctsem=parallel::makeCluster(cores,useXDR=TRUE,type='PSOCK',outfile='')
         on.exit(try({parallel::stopCluster(clctsem)},silent=TRUE),add=TRUE)
         parallel::clusterExport(clctsem,varlist = 'sm',envir = environment())
       }
@@ -700,14 +736,20 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
           a=Sys.time()
           if('list' %in% class(parm)){
             out2 <- parallel::parLapply(cl = clctsem,X = parm,parlp)
-            bestset <- which(unlist(out2)==max(unlist(out2)))#sapply(out,max))
-            # print(bestset)
+            bestset <- which(unlist(out2)==max(unlist(out2)))
             bestset <- bestset[1]
             parm <- parm[[bestset]]
             out <- out2[[bestset]]
             attributes(out)$bestset <- bestset
           } else {
             out2<- parallel::clusterCall(clctsem,parlp,parm)
+            tmp<-sapply(1:length(out2),function(x) {
+              if(!is.null(attributes(out2[[x]])$err)){
+                if(length(out2) > 1 && as.logical(verbose)) message('Error on core ', x,' but continuing:')
+                message(attributes(out2[[x]])$err)
+              }
+            })
+            # 
             out <- try(sum(unlist(out2)),silent=TRUE)
             attributes(out)$gradient <- try(apply(sapply(out2,function(x) attributes(x)$gradient,simplify='matrix'),1,sum))
           }
@@ -789,14 +831,14 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       )
       
       nopriorsbak <- standata$nopriors
-      taylorheun <- standata$taylorheun
+      # taylorheun <- standata$taylorheun
       finished <- FALSE
       
       if(carefulfit && !deoptim){ #init using priors
         message('Doing 1st pass with priors on reduced data set')
         
         standata$nopriors <- as.integer(0)
-        standata$taylorheun <- 1L
+        # standata$taylorheun <- 1L
         sdscale <- standata$sdscale
         # standata$sdscale <- sdscale * 1e-6
         # tipredeffectscale <- standata$tipredeffectscale
@@ -811,24 +853,25 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         if(optimcores > 1) parallelStanSetup(cl = clctsem,standata = standatasml,split=parsets<2)
         if(optimcores==1) smf<-stan_reinitsf(sm,standatasml)
         
-        if(!stochastic) {
+        # if(!stochastic) {
           optimfit <- mize(init, fg=mizelpg, max_iter=99999,
             method="L-BFGS",memory=100,
             line_search='Schmidt',c1=1e-10,c2=.9,step0='schmidt',ls_max_fn=999,
             abs_tol=1e-4,grad_tol=0,rel_tol=0,step_tol=0,ginf_tol=0)
           optimfit$value = optimfit$f
-        }
-        
-        if(stochastic) {
-          optimfit <- sgd(init, fitfunc = function(x) target(x),
-            parsets=parsets,
-            whichignore = unlist(parsteps),whichmcmcpars=whichmcmcpars,nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
-            plot=plot,itertol=1e-1,deltatol=1e-2,maxiter=500)
-        }
+        # }
+
+        # if(stochastic) {
+        #   optimfit <- sgd(init, fitfunc = function(x) target(x),
+        #     parsets=parsets,
+        #     whichignore = unlist(parsteps),nconvergeiter = 10,
+        #     whichmcmcpars=whichmcmcpars,nsubjects=ifelse(is.na(whichmcmcpars[1]),NA,standata$nsubjects),
+        #     plot=plot,itertol=1,deltatol=1,maxiter=500)
+        # }
         
         standata$nopriors <- as.integer(nopriorsbak)
         # if(standata$ntipred ==0)
-        standata$taylorheun <- as.integer(taylorheun)
+        # standata$taylorheun <- as.integer(taylorheun)
         standata$sdscale <- sdscale
         
         if(length(parsteps)>0) init[-unlist(parsteps)] = optimfit$par else init=optimfit$par
@@ -849,6 +892,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
           abs_tol=NULL,grad_tol=NULL,
           rel_tol=tol*ifelse(!finished,100,1),
           step_tol=NULL,ginf_tol=NULL)
+        
         optimfit$value = -optimfit$f
         init = optimfit$par
         if(is.infinite(bestfit)) stochastic<-TRUE
@@ -860,7 +904,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         optimfit <- sgd(init, fitfunc = target,
           parsets=parsets,
           itertol = ifelse(!finished,1e-1,1e-3),
-          deltatol=ifelse(!finished,1e-2,1e-5),
+          deltatol=ifelse(!finished,1e-1,1e-5),
           # itertol = ifelse(standata$ntipred >0,1e-1,1e-3),
           # deltatol=ifelse(standata$ntipred >0,1e-2,1e-5),
           whichignore = unlist(parsteps),whichmcmcpars=whichmcmcpars,
@@ -869,7 +913,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         if(length(parsteps)>0) init[-unlist(parsteps)] = optimfit$par else init=optimfit$par
       }
       
-      
+      # 
       if(length(parsteps) > 0){
         message('Freeing parameters...')
         finished <- FALSE
@@ -981,16 +1025,16 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       est2=init #because init contains the fixed values #unconstrain_pars(smf, est1)
       if(length(parsteps)>0) est2[-parsteps] = optimfit$par else est2=optimfit$par
       
-      if(standata$nindvarying > 0 && standata$intoverpop==0){ #recompose into single model
-        standata$doonesubject <- 0L
-        a1=standata$nparams+standata$nindvarying+
-          (standata$nindvarying^2-standata$nindvarying)/2
-        whichmcmcpars <- (a1+1):(a1+standata$nindvarying*standata$nsubjects)
-        est3=est2[-whichmcmcpars]
-        est3=c(est3,(optimfit$mcmcpars))
-        est2=est3
-        if(standata$ntipredeffects > 0) est3 <- c(est3,est2[(a1+1):length(a1)])
-      }
+      # if(standata$nindvarying > 0 && standata$intoverpop==0){ #recompose into single model
+      #   # standata$doonesubject <- 0L
+      #   a1=standata$nparams+standata$nindvarying+
+      #     (standata$nindvarying^2-standata$nindvarying)/2
+      #   whichmcmcpars <- (a1+1):(a1+standata$nindvarying*standata$nsubjects)
+      #   est3=est2[-whichmcmcpars]
+      #   est3=c(est3,(optimfit$mcmcpars))
+      #   est2=est3
+      #   if(standata$ntipredeffects > 0) est3 <- c(est3,est2[(a1+1):length(a1)])
+      # }
       npars = length(est2)
     }
     
@@ -1223,7 +1267,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
           if('all' %in% whichpars) whichpars <- 1:length(pars)
           base <- optimfit$value
           
-          if(!is.na(hesscl[1]))  target <- function(x){ #if cluster is passed, create target function, otherwise use old target
+          if(!is.na(hesscl[1])) target <- function(x){ #if cluster is passed, create target function, otherwise use old target
             if(length(parsteps)>0){
               pars <- est2
               pars[-parsteps] <- x
@@ -1256,11 +1300,11 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
               stepchange = 0
               stepchangemultiplier = 1
               while(!accepted && count < 15){
-                if(count>8) stepsize=stepsize*-1 #is this good?
+                # if(count>8) stepsize=stepsize*-1 #is this good?
                 stepchangemultiplier <- max(stepchangemultiplier,.11)
                 count <- count + 1
-                lp[[di]] <- target(pars+uppars*stepsize*directions[di])
-                accepted <- !'try-error' %in% class(lp[[di]])
+                lp[[di]] <-  suppressMessages(suppressWarnings(target(pars+uppars*stepsize*directions[di])))
+                accepted <- !'try-error' %in% class(lp[[di]]) && all(!is.na(attributes(lp[[di]])$gradient))
                 if(accepted){
                   lpdiff <- base[1] - lp[[di]][1]
                   # if(lpdiff > 1e100) 
@@ -1272,6 +1316,8 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
                   }
                   if(lpdiff > lpdifmax){
                     if(verbose) message('Decreasing step')
+                    
+                    
                     if(stepchange == 1) stepchangemultiplier = stepchangemultiplier * .5
                     stepchange <- -1
                     stepsize <- stepsize*(1-stepchangemultiplier)+ (stepsize*.1)*stepchangemultiplier
@@ -1289,32 +1335,33 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
                 } else stepsize <- stepsize * 1e-3
                 # if(count > 1) print(paste0(count,'___',stepsize,'___',lpdiff))
               }
-              step <<- stepsize
+              if(stepsize < step) step <<- step *.1
+              if(stepsize > step) step <<- step *10
               steplist[[di]] <- stepsize
             }
-            # 
-            grad<- attributes(lp[[1]])$gradient / steplist[[di]] * directions[di]
-            if(length(directions) > 1) grad <- (grad + attributes(lp[[2]])$gradient / (steplist[[di]]*-1))/2
             
-            # hessout[,i] <-rbind(grad)
+            grad<- attributes(lp[[1]])$gradient / steplist[[di]] * directions[di]
+            if(any(is.na(grad))) warning('NA gradient encountered at param ',i)
+            if(length(directions) > 1) grad <- (grad + attributes(lp[[2]])$gradient / (steplist[[di]]*-1))/2
+
             return(grad)
           }
           ) #end flexapply
-          # 
+      
           out=(hessout+t(hessout))/2
-          # attributes(out)$steplist=steplist
-          # })
           return(out)
         }
 
         hess1 <- jac(pars = grinit,parsteps=parsteps,
-          step = rep(1e-3,length(grinit)),cl=hesscl,verbose=verbose,directions=1)
+          step = 1e-3,cl=hesscl,verbose=verbose,directions=1)
         hess2 <- jac(pars = grinit,parsteps=parsteps,#fgfunc = fgfunc,
-          step = rep(1e-3,length(grinit)),cl=hesscl,verbose=verbose,directions=-1)
-        # 
+          step = 1e-3,cl=hesscl,verbose=verbose,directions=-1)
         
         hess1good <- diag(hess1) < -1e-8
         hess2good <- diag(hess2) < -1e-8
+        
+        hess1good[is.na(hess1good)] <- FALSE
+        hess2good[is.na(hess2good)] <- FALSE
         
         hess <- hess1 
         hess[,!hess1good & !hess2good] <- (hess1[,!hess2good & !hess1good] + 
@@ -1385,17 +1432,17 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
         
         
         
-        
-        if(standata$intoverpop == 0 && standata$nindvarying > 0){
-          mcmcsamps <- matrix(rnorm(finishsamples*length(whichmcmcpars)),nrow=finishsamples,ncol=length(whichmcmcpars))
-          mcmccov = cov(mcmcsamps)
-          mcmcchol = diag(1,length(whichmcmcpars))
-          fullchol <- matrix(0,nrow(mchol)+nrow(mcmcchol),nrow(mchol)+nrow(mcmcchol))
-          fullchol[whichmcmcpars,whichmcmcpars] <- mcmcchol
-          fullchol[-whichmcmcpars,-whichmcmcpars] <- mchol
-          mcov <- fullchol %*% t(fullchol)
-          mchol <- fullchol
-        }
+        # 
+        # if(standata$intoverpop == 0 && standata$nindvarying > 0){
+        #   mcmcsamps <- matrix(rnorm(finishsamples*length(whichmcmcpars)),nrow=finishsamples,ncol=length(whichmcmcpars))
+        #   mcmccov = cov(mcmcsamps)
+        #   mcmcchol = diag(1,length(whichmcmcpars))
+        #   fullchol <- matrix(0,nrow(mchol)+nrow(mcmcchol),nrow(mchol)+nrow(mcmcchol))
+        #   fullchol[whichmcmcpars,whichmcmcpars] <- mcmcchol
+        #   fullchol[-whichmcmcpars,-whichmcmcpars] <- mchol
+        #   mcov <- fullchol %*% t(fullchol)
+        #   mchol <- fullchol
+        # }
       }
       
       
@@ -1568,22 +1615,28 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
       }
     }
   }#end while no better fit
-  
   if(!estonly){
     if(!is) lpsamples <- NA else lpsamples <- unlist(target_dens)[resample_i]
     
-    transformedpars=stan_constrainsamples(sm = sm,standata = standata,
-      savesubjectmatrices = FALSE, dokalman=FALSE,
-      samples=resamples,cores=cores, cl=clctsem)
+    message('Computing posterior with ',nrow(resamples),' samples')
+    standata$savesubjectmatrices=savesubjectmatrices
+    
+    if(!savesubjectmatrices) sdat=standatact_specificsubjects(standata,1) #only use 1 subject
+    if(savesubjectmatrices) sdat=standata
+    
+    transformedpars=stan_constrainsamples(sm = sm,standata = sdat,
+      savesubjectmatrices = savesubjectmatrices, savescores = standata$savescores,
+      dokalman=as.logical(standata$savesubjectmatrices),
+      samples=resamples,cores=cores, cl=clctsem, quiet=TRUE)
     
     if(cores > 1) {
       parallel::stopCluster(clctsem)
       smf <- stan_reinitsf(sm,standata)
     }
     
-    transformedparsfull=stan_constrainsamples(sm = sm,standata = standata,
-      savesubjectmatrices = TRUE, dokalman=TRUE,savescores = TRUE,
-      samples=matrix(est2,nrow=1),cores=1, quiet = TRUE)
+    # transformedparsfull=stan_constrainsamples(sm = sm,standata = standata,
+    #   savesubjectmatrices = TRUE, dokalman=TRUE,savescores = TRUE,
+    #   samples=matrix(est2,nrow=1),cores=1, quiet = TRUE)
     
     
     
@@ -1599,11 +1652,15 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
     try(colnames(transformedpars_old)<-c('2.5%','mean','97.5%'),silent=TRUE)
     stanfit=list(optimfit=optimfit,stanfit=stan_reinitsf(sm,standata), rawest=est2, rawposterior = resamples, cov=mcov,
       transformedpars=transformedpars,transformedpars_old=transformedpars_old,
-      transformedparsfull=transformedparsfull,
+      # transformedparsfull=transformedparsfull,
       standata=list(TIPREDEFFECTsetup=standata$TIPREDEFFECTsetup,ntipredeffects = standata$ntipredeffects),
       isdiags=list(cov=mcovl,means=delta,ess=ess,qdiag=qdiag,lpsamples=lpsamples ))
   }
-  if(estonly) stanfit=list(optimfit=optimfit,stanfit=smf, rawest=est2)
+  
+  if(estonly) {
+    smf <- stan_reinitsf(sm,standata)
+    stanfit=list(optimfit=optimfit,stanfit=smf, rawest=est2)
+  }
   optimfinished <- TRUE #disable exit message re pars
   return(stanfit)
 }
