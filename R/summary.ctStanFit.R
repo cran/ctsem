@@ -32,7 +32,8 @@ ctStanSubjectPars <- function(fit,pointest=TRUE,cores=2,nsamples='all'){
   pnames <- getparnames(fit,subjvariationonly = TRUE)
   m <- fit$ctstanmodelbase$pars
   if(pointest) tfp <- fit$stanfit$transformedparsfull else {
-    tfp <- ctExtract(fit,subjectMatrices = TRUE,cores=cores)
+    gc()
+    tfp <- ctExtract(fit,subjectMatrices = TRUE,cores=cores,nsamples=nsamples)
   }
   p <- array(NA, dim=c(dim(tfp$pop_DRIFT)[1],fit$standata$nsubjects,length(pnames)))
   dimnames(p) <- list(iter=1:dim(p)[1],subject=1:dim(p)[2],param=1:dim(p)[3])
@@ -193,6 +194,7 @@ summary.ctStanFit<-function(object,timeinterval=1,digits=4,parmatrices=TRUE,prio
     d$param <- NULL
     d$Mean <- round(d$Mean,digits)
     rm(sd)
+    d <- d[!d$matrix %in% c('DIFFUSION','T0VAR'),]
     
     out$parmatrices=d
   }

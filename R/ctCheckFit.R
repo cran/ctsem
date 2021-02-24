@@ -264,7 +264,7 @@ ctStanFitMelt <- function(fit, maxsamples='all'){
   datasources <- c('Data','StatePred','Residuals')
   if(!is.null(fit$generated)) datasources <- c(datasources,'PostPred')
   if(!is.null(fit$priorpred)) datasources <- c(datasources,'PriorPred')
-  
+
   datbase <- data.table(standatatolong(standata = fit$standata,origstructure = TRUE,ctm = fit$ctstanmodel))
   datbase[ ,WhichObs:=(1:.N),by=eval(fit$ctstanmodelbase$subjectIDname)]
   datbase <- data.frame(datbase)
@@ -347,10 +347,12 @@ ctStanFitMelt <- function(fit, maxsamples='all'){
 #' @param aggregate If TRUE, duplicate observation types are aggregated over using aggfunc. For example,
 #' if by = 'time' and there are 8 time points per subject, but breaks = 2, 
 #' there will be 4 duplicate observation types per 'row' that will be collapsed. In most cases it is helpful to not collapse. 
-#' @param groupby Logical. Affects variable ordering in covariance plots.
+#' @param groupbysplit Logical. Affects variable ordering in covariance plots. 
+#' Defaults to FALSE, grouping by variable, and within variable by split.
 #' @param byNA Logical. Create an extra break for when the split variable is missing?
 #' @param lag Integer vector. lag = 1 creates additional variables for plotting, prefixed by 'lag1_', containing the prior row of observations
 #' for that subject.
+#' @param lagcovplot Logical. Output lagged covariance type plots?
 #' @param smooth For bivariate plots, use a smoother for estimation?
 #' @param k Integer denoting number of knots to use in the smoothing spline.
 #' @param breaks Integer denoting number of discrete breaks to split variables by (when covariance plotting).
@@ -371,19 +373,17 @@ ctCheckFit <- function(fit,
   by=fit$ctstanmodelbase$timeName,
   TIpredNames=fit$ctstanmodelbase$TIpredNames,
   nsamples=10, covplot=FALSE, corr=TRUE, combinevars=NA, fastcov=FALSE,
-  aggfunc=mean,aggregate=TRUE,
-  groupby='split', byNA=TRUE,lag=0,
-  smooth=TRUE, k=10,breaks=4,entropy=FALSE,reg=FALSE,verbose=0, indlines=30){
+  lagcovplot=FALSE,
+  aggfunc=mean,aggregate=FALSE,
+  groupbysplit=FALSE, byNA=TRUE,lag=0,
+  smooth=TRUE, k=4,breaks=4,entropy=FALSE,reg=FALSE,verbose=0, indlines=30){
   if(!'ctStanFit' %in% class(fit)) stop('Not a ctStanFit object')
-  
   covORcor <- function(m){
     if(corr) return(cov2cor(m)) else return(m)
   }
-  
-  DataSource <-Sample<-NULL
-  
+
+  DataSource <-Sample<-Lag <- Row <- Sig. <- Sig <- NULL
   dat <- ctStanFitMelt(fit = fit,maxsamples = nsamples)
-  
   
   
   byc=unique(c('Sample','WhichObs','DataSource',fit$ctstanmodel$timeName))
@@ -391,17 +391,14 @@ ctCheckFit <- function(fit,
 
   if(is.na(combinevars[1])){
     combinevars = setNames(
-      colnames(dat)[!colnames(dat) %in% byc],colnames(dat)[!colnames(dat) %in% byc])
-    combinevars<-c(combinevars,LogLik='LogLik')
+      colnames(dat)[!colnames(dat) %in% bycid],colnames(dat)[!colnames(dat) %in% bycid])
+    # combinevars<-c(combinevars,LogLik='LogLik')
   }
-  
   dat <- ctDataMelt(dat=dat,id=fit$ctstanmodelbase$subjectIDname, by=byc,combinevars = combinevars)
   dat$Sample <- factor(dat$Sample)
   dat$DataSource <- factor(dat$DataSource)
 
-  # ?acf
-  
-  
+
   wdat=dcast(dat,paste0(
    paste0(bycid,collapse='+'),
     '~variable'),value.var = 'value',fun.aggregate = mean,na.rm=TRUE)
@@ -417,13 +414,15 @@ ctCheckFit <- function(fit,
     lagcols=(paste0("lag",  rep(lag, times = length(prelagcols)),'_',rep(prelagcols, each = length(lag))))
     
     wdat[, eval(lagcols) :=  
-        shift(.SD, lag), by=c(fit$ctstanmodel$subjectIDname,'Sample','DataSource'),.SDcols=prelagcols]
+        shift(.SD, n=lag,type='lead'), by=c(fit$ctstanmodel$subjectIDname,'Sample','DataSource'),.SDcols=prelagcols]
   }
   
+  if(covplot && by %in% names(combinevars)){ #then we need to make a copy for the splitting variable
+    wdat[[paste0(by,'_split')]] <- wdat[[by]]
+    by <- paste0(by,'_split')
+  }
+  # browser()
   dat <- melt(wdat,id.vars=unique(c(bycid,by)))
-  
-  
-  if(is.na(combinevars[1])) combinevars <- setNames(unique(dat$variable), unique(dat$variable))
   
   if(!data) dat<-dat[!DataSource %in% 'Data']
   if(!priorpred) dat<-dat[!DataSource %in% 'PriorPred']
@@ -445,13 +444,12 @@ ctCheckFit <- function(fit,
     discdat[variable %in% TIpredNames & WhichObs > 1] <- NA #remove later tipreds to avoid duplicate cov columns
     
     nontivars <- unique(discdat$variable)[!unique(discdat$variable) %in% TIpredNames]
-    
-    if(is.double(dat[[by]])){
+
       if(requireNamespace('arules')){
-        discdat[[by]] <- arules::discretize(dat[[by]], #discretize
+        discdat[[paste0(by)]] <- arules::discretize(dat[[by]], #discretize
           method='cluster',breaks = breaks,labels=FALSE)
       } else stop('arules package needed for discretization!')
-    }
+    
     if(covplot){
       corlist <- list()
       datasources <- as.character(unique(dat$DataSource))
@@ -460,8 +458,10 @@ ctCheckFit <- function(fit,
         wdat <- dcast(discdat[DataSource==dsi],
           paste0(
             fit$ctstanmodelbase$subjectIDname,
-            '+Sample',if(!aggregate) '+WhichObs','~variable + ',by),fun.aggregate=aggfunc,na.rm=TRUE)
-        
+            '+Sample',
+            if(!aggregate) '+WhichObs', #this caused problems, why was it in?
+            '~variable + ', by),fun.aggregate=aggfunc,na.rm=TRUE)
+ 
         
         #put loglik on one side
         if('LogLik_1' %in% colnames(wdat)) wdat <- cbind(wdat[,colnames(wdat) %in% paste0('LogLik_',1:breaks),with=FALSE],
@@ -469,7 +469,7 @@ ctCheckFit <- function(fit,
         
         if(byNA) breakset <-c(1:breaks,NA) else breakset=1:breaks #some values can't be placed in a by column if by = NA
         
-        if(groupby == 'split'){
+        if(groupbysplit){
           colorder <- unlist(lapply(breakset, function(b) grep(paste0('\\_',b,'$'),x=colnames(wdat))))
           wdat <- wdat[,colorder,with=FALSE]
         } else if(!byNA) wdat <- wdat[,-grep('\\_NA%',colnames(wdat)),with=FALSE] #if not seperating by group, still remove NA by relations if needed
@@ -479,7 +479,7 @@ ctCheckFit <- function(fit,
             colnames(wdat)[ colnames(wdat) %in% paste0(x,'_1')] <<- x
           }
         })
-        
+        if(breaks==1) colnames(wdat) <- gsub("\\_\\d+$","",colnames(wdat))
         wdat <- cbind(wdat[,c(which(colnames(wdat) %in% TIpredNames), which(!colnames(wdat) %in% TIpredNames)),with=FALSE])
         
         if(!fastcov) corlist[[dsi]] <- covml(
@@ -490,6 +490,8 @@ ctCheckFit <- function(fit,
         if(fastcov) corlist[[dsi]] <- cov(
           data.frame(wdat)[,!colnames(wdat) %in% c('Sample',fit$ctstanmodelbase$subjectIDname),drop=FALSE],
           use='pairwise.complete.obs')
+        
+        if(corr) corlist[[dsi]] <- cov2cor(corlist[[dsi]])
         
         # if(covsplitdiffs){
         #   
@@ -505,14 +507,15 @@ ctCheckFit <- function(fit,
         # }
         
       } #finish datasource loop
-      # 
+      
       if(corr) covplotlims <- c(-1,1) else covplotlims <- NA
-      # 
+      
+      if(!lagcovplot){
       for(i in seq_along(corlist)){ #regular corplots
         cplot=corplotmelt(meltcov(covORcor(corlist[[datasources[i]]])),
           label=paste0(ifelse(corr,'Corr.','Cov.')),limits=covplotlims)
         cplot = cplot + ggplot2::labs(title=paste0(datasources[i],
-          ifelse(corr,' correlations',' covariances'),if(breaks > 0) paste0(', split by ', by)))
+          ifelse(corr,' correlations',' covariances'),if(breaks > 1) paste0(', split by ', by)))
         print(cplot)
       }
       for(i in seq_along(corlist)){
@@ -521,14 +524,53 @@ ctCheckFit <- function(fit,
             coli <- colnames(corlist[[datasources[i]]])[
               colnames(corlist[[datasources[i]]]) %in% colnames(corlist[[datasources[j]]])
             ]
-            cplot=corplotmelt(meltcov(covORcor(corlist[[datasources[i]]][coli,coli,drop=FALSE]) - 
-                covORcor(corlist[[datasources[j]]][coli,coli,drop=FALSE])),
+            cplot=corplotmelt(meltcov(corlist[[datasources[i]]][coli,coli,drop=FALSE] - 
+                corlist[[datasources[j]]][coli,coli,drop=FALSE]),
               label=paste0(ifelse(corr,'Corr.','Cov.'),' diff.'),limits=covplotlims)
-            cplot = cplot + ggplot2::labs(title=paste0(datasources[i],' - ',datasources[j] ,' correlations, split by ', by))
+            cplot = cplot + ggplot2::labs(title=paste0(datasources[i],' - ',datasources[j],
+              ifelse(corr,' correlations',' covariances'),if(breaks > 1) paste0(', split by ', by)))
             print(cplot)
           }
         }
       }
+      }
+     
+      if(lagcovplot){
+        for(ci in seq_along(corlist)){
+          if(ci==1) lagdat <-data.frame(corlist[[ci]],DataSource = names(corlist)[ci], 
+            Row=rownames(corlist[[ci]])) else{
+          lagdat <- rbind(lagdat,data.frame(corlist[[ci]],
+            DataSource = names(corlist)[ci],Row=rownames(corlist[[ci]])))
+          }
+        }
+        lagdat$Lag <- 0
+        l=regmatches(x = lagdat$Row,m = regexpr(pattern = '^lag\\d+_',lagdat$Row))
+        l=gsub('lag','',l)
+        l=gsub('\\_','',l)
+        lagdat$Lag[grepl('^lag\\d+\\_',lagdat$Row)] <- as.numeric(l)
+        lagdat <- lagdat[,-grep('^lag\\d+\\_',colnames(lagdat))]
+        lagdat$Row <- gsub('^lag\\d+\\_','',lagdat$Row)
+        lagdat <- melt(data.table(lagdat),id.vars = c('Row','Lag','DataSource'))
+        lagdat$variable <- gsub('\\_1$','',lagdat$variable)
+        lagdat <- lagdat[!lagdat$Row %in% TIpredNames,]
+        
+        combinevars <- combinevars[!names(combinevars) %in% c(TIpredNames,by)] #because discretized / not in cov
+
+        for(vi in names(combinevars)){    
+g=ggplot(data = lagdat[lagdat$variable %in% vi,],
+  mapping = aes(x=Lag,y=value,colour=DataSource, linetype=DataSource))+geom_line(size=1)+
+  facet_wrap(facets = vars(Row))+theme_minimal()+ylab(label = ifelse(corr,'Correlation','Covariance'))+
+  scale_y_continuous(minor_breaks = c(-.5,.5),breaks=seq(-1,1,1))+
+  scale_x_continuous(minor_breaks=NULL,breaks=seq(0,max(lag), ceiling(max(lag)/5)))+
+    ggtitle(label = paste0(vi,' ',ifelse(corr,'Correlations','Covariances')))
+if(corr) g <- g+coord_cartesian(ylim=c(-1,1))
+print(g)
+# if('try-error' %in% class(g) ) browser()
+        }
+
+        
+      }
+      
     }
     # if(entropy){
     #   # 
@@ -608,15 +650,15 @@ ctCheckFit <- function(fit,
     if(indlines > 0){
       individualInt <- eval(parse(text=paste0('interaction(dat$',fit$ctstanmodelbase$subjectIDname,',dat$Sample, dat$DataSource)')))
       dat$individualInt <- individualInt
-      # ids <- sapply(unique(dat$DataSource),function(x){
-      #   sample(unique(dat$individualInt[dat$DataSource %in% x]), 
-      #   min(indlines,length(unique(dat$individualInt[dat$DataSource %in% x]))),replace = FALSE)
-      # })
       ids <- unique(dat[[fit$ctstanmodelbase$subjectIDname]])
-      ids <- sample(ids,  min(indlines,length(ids)),replace = FALSE)
-      g = g + geom_line(data=dat[manifest==TRUE &dat[[fit$ctstanmodelbase$subjectIDname]] %in% ids & dat$Sample %in% 1],
+      ids=sample(ids,  min(indlines,length(ids)),replace = FALSE)
+      ids <- unlist(lapply(unique(dat$DataSource),function(ds){
+        dat$individualInt[dat$DataSource %in% ds][ 
+          match(ids, dat[[fit$ctstanmodelbase$subjectIDname]][dat$DataSource %in% ds])]
+      }))
+      g = g + geom_line(data=dat[manifest==TRUE &dat$individualInt %in% ids],
         mapping = aes(group=individualInt),
-        alpha= max(.1,(.5/sqrt(indlines))),
+        alpha= max(.2,(.8/sqrt(indlines))),
         linetype=1,#3,#ifelse(nsamples==1,1,0),
         # stat="smooth",#se = FALSE,#nsamples==1,
         size=.1

@@ -128,7 +128,6 @@ ctModelLatex<- function(x,matrixnames=TRUE,digits=3,linearise=class(x) %in% 'ctS
   filename=paste0('ctsemTex',as.numeric(Sys.time())),tex=TRUE, equationonly=FALSE, compile=TRUE, open=TRUE,
   minimal=FALSE){
   #library(ctsem)
-  
   dopopcov <- FALSE
   
   if('ctStanFit' %in% class(x)){
@@ -146,7 +145,7 @@ ctModelLatex<- function(x,matrixnames=TRUE,digits=3,linearise=class(x) %in% 'ctS
       
       if(!linearise) popcov <- round(ctCollapse(e$rawpopcov,1,mean),digits)
       if(linearise) {
-        popcov <- stan_constrainsamples(x$stanmodel,x$standata,rbind(x$stanfit$rawest),
+        popcov <- stan_constrainsamples(x$stanmodel,x$standata,matrix(x$stanfit$rawest,nrow=1),
           cores=1,pcovn =1000,dokalman=FALSE,savesubjectmatrices = FALSE)$popcov
         popcov <- round(ctCollapse(e$popcov,1,mean),digits=digits)
       if(x$standata$intoverpop==1){
@@ -487,25 +486,20 @@ out <- paste0(out, "
     on.exit(setwd(oldwd))
     write(x = out,file = paste0(filename,'.tex'))
     if(compile){
-      if(!grepl('SunOS',Sys.info()['sysname']) && requireNamespace('tinytex',quietly=TRUE)){
-        tt=try(tinytex::pdflatex(file=paste0(filename,'.tex'), clean=TRUE))
-        if('try-error' %in% class(tt)) 'Error - Perhaps tinytex needs to be installed via: tinytex::install_tinytex()' 
-        
-      } else{
       hastex <- !Sys.which('pdflatex') %in% ''
       a=try(tools::texi2pdf(file=paste0(filename,'.tex'),quiet=FALSE, clean=TRUE))
-      if('try-error' %in% class(a) && !hastex) {
+      if('try-error' %in% class(a)) {
+        
+        if(!grepl('SunOS',Sys.info()['sysname']) && requireNamespace('tinytex',quietly=TRUE)){
+          a=try(tinytex::pdflatex(file=paste0(filename,'.tex'), clean=TRUE))
+          if('try-error' %in% class(a)) 'Error - Perhaps tinytex needs to be installed via: tinytex::install_tinytex()' 
+        } else {
         open <- FALSE
         message('Tex compiler not found -- you could install the tinytex package using:\ninstall.packages("tinytex")\ntinytex::install_tinytex()')
-        # dotiny <- readline('Y/N?')
-        # if(dotiny %in% c('Y','y')){
-        #   utils::install.packages('tinytex')
-        #   if(requireNamespace('tinytex',quietly=TRUE)) tinytex::install_tinytex()
-        # }
+        }
       }
-      } #end else
       
-      if(interactive() && open) try(openPDF(paste0(filename,'.pdf')))
+      if(!'try-error' %in% class(a) && interactive() && open) try(openPDF(paste0(filename,'.pdf')))
     }
     
   }

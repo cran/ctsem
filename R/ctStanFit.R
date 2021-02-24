@@ -28,7 +28,7 @@ ctStanFitUpdate <- function(oldfit, data=NA, recompile=FALSE,refit=FALSE,...){
   }
   if(length(oldfit$stanfit$stanfit@sim) > 0) refit=FALSE
   args$fit <- refit
-  args$init <- oldfit$stanfit$rawest
+  args$inits <- oldfit$stanfit$rawest
   args$ctstanmodel <- oldfit$ctstanmodelbase
   
   newargs <- as.list(args(ctStanFit))
@@ -548,7 +548,6 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     # }
     
     ctm$modelmats <- ctStanModelMatrices(ctm)
-    # browser()
     ctm <- ctStanCalcsList(ctm) #get extra calculations and adjust model spec as needed???
     
     #store values in ctm
@@ -607,8 +606,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     # print(standata$savesubjectmatrices)
     
     #####post model / data checks
-    if(cores=='maxneeded') cores=max(1,min(c(chains,parallel::detectCores()-1))) else cores <-max(1, min(cores,parallel::detectCores()-1))
-    
+    if(cores=='maxneeded') cores=max(1,min(c(chains,parallel::detectCores()-1)))
     
     if(is.logical(stanmodeltext)) {
       stanmodeltext<- ctStanModelWriter(ctm, gendata, ctm$modelmats$extratforms,ctm$modelmats$matsetup)
@@ -743,6 +741,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
         optimcontrol$sm=sm
         optimcontrol$init=inits
         optimcontrol$plot=plot
+        optimcontrol$matsetup <- data.frame(ctm$modelmats$matsetup)
         
         # opcall <- paste0('stanoptimis(standata = standata,sm = sm,init = inits,plot=plot,',
         #   paste0(gsub('list(','',paste0(deparse(optimcontrol),collapse=''),fixed=TRUE)))
@@ -755,7 +754,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
           ctm$modelmats$TIPREDEFFECTsetup <- stanfit$standata$TIPREDEFFECTsetup
           ms <- ctm$modelmats$matsetup
           ms$tipred <- 0L
-          parswithtipreds <- unique(ms$param[ms$param >0 & ms$when %in% c(0,-1) & ms$copyrow < 1])
+          parswithtipreds <- sort(unique(ms$param[ms$param >0 & ms$when %in% c(0,-1) & ms$copyrow < 1]))
           parswithtipreds<-parswithtipreds[apply(stanfit$standata$TIPREDEFFECTsetup,1,sum)>0]
           ms$tipred[ms$param >0 & ms$when %in% c(0,-1) & ms$copyrow < 1 & ms$param %in% parswithtipreds] <- 1L
           ctm$modelmats$matsetup <- ms
@@ -776,7 +775,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
       extratforms=ctm$modelmats$extratforms)
     if(fit) {
        stanfit$transformedparsfull <- suppressMessages(stan_constrainsamples(sm = sm,standata = standata,
-        savesubjectmatrices = TRUE, samples = matrix(stanfit$rawest,1),cores=1,savescores=TRUE,pcovn=500))
+        savesubjectmatrices = TRUE, samples = matrix(stanfit$rawest,1),cores=1,savescores=TRUE,pcovn=5000))
        
       out <- list(args=args,
         setup=setup,
