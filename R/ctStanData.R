@@ -1,15 +1,8 @@
 ctStanData <- function(ctm, datalong,optimize,derrind='all'){
   
-  if(is.null(datalong[[ctm$timeName]]) && ctm$continuoustime == FALSE) {
-    datalong <- data.frame(datalong)
-    datalong[ctm$timeName] <- 1:nrow(datalong)
-  }
-  datalong <- datalong[,c(ctm$timeName,ctm$subjectIDname,
-    ctm$manifestNames,ctm$TDpredNames,ctm$TIpredNames)]
 
-  
   nsubjects <- length(unique(datalong[, ctm$subjectIDname])) 
-
+  
   mats <- ctStanMatricesList()
   
   #simply exponential?
@@ -66,7 +59,7 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
   ndiffusion=length(derrind)
   
   
-
+  
   nindvarying <- max(ctm$modelmats$matsetup$indvarying)
   nparams <- max(ctm$modelmats$matsetup$param[ctm$modelmats$matsetup$when %in% c(0,-1)])
   nmatrices <- length(mats$base)
@@ -93,10 +86,10 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
         
         meandat <- data.table((datalong))[ , lapply(.SD, function(x) 
           mean(x,na.rm=TRUE)) , 
-          by=c("id")]
+          by=c(ctm$subjectIDname)]
         sddat <- data.table((datalong))[ , lapply(.SD, function(x) 
           sd(x,na.rm=TRUE)) , 
-          by=c("id")]
+          by=c(ctm$subjectIDname)]
         sddat<-sddat[,!colnames(sddat) %in% ctm$subjectIDname,with=FALSE]
         meandat <- meandat[,apply(meandat,2,sd,na.rm=TRUE) > 1e-4,with=FALSE]
         sddat <- sddat[,apply(sddat,2,sd,na.rm=TRUE) > 1e-4,with=FALSE]
@@ -333,8 +326,13 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
   standata$statedep <- statedep
   # standata$nstatedep <- as.integer(length(statedep))
   # standata$multiplicativenoise <- multiplicativenoise
-  standata$choleskymats<- ifelse(ctm$covmattransform=='unconstrainedcorr',0L,1L)
-  if(!ctm$covmattransform %in% c('unconstrainedcorr','cholesky')) stop('covtransform must be either "unconstrainedcorr" or "cholesky"')
+  standata$choleskymats<- 0L
+  if(!is.null(ctm$covmattransform)){
+    if(ctm$covmattransform=='rawcorr_indep') standata$choleskymats<- -1L
+    if(ctm$covmattransform=='cholesky') standata$choleskymats<- 1L
+    if(!ctm$covmattransform %in% c('rawcorr','rawcorr_indep','cholesky')) stop(
+      'covtransform must be either "rawcorr", "rawcorr_indep", or "cholesky"')
+  }
   
   standata$matsetup <- apply(ctm$modelmats$matsetup[,-1],c(1,2),as.integer,.drop=FALSE) #remove parname and convert to int
   standata$matvalues <- apply(ctm$modelmats$matvalues,c(1,2),as.numeric)
@@ -416,7 +414,7 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
   # standata$whenvecs[6,] <- as.integer(1:ncol(standata$whenvecs))
   
   #special matrix adjustments
-  standata$whenmat[mc[names(mc) == 'asymDIFFUSION'],] <- 
+  standata$whenmat[mc[names(mc) == 'asymDIFFUSIONcov'],] <- 
     apply(standata$whenmat[ mc[names(mc) %in% c('DIFFUSION','DRIFT')],],2,max)
   standata$whenmat[mc[names(mc) == 'asymCINT'],] <- 
     apply(standata$whenmat[mc[names(mc) %in% c('CINT','DRIFT')],],2,max)
@@ -428,7 +426,9 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
   
   #laplace priors
   standata$laplaceprior <- rep(0L,standata$nparams)
+  standata$laplacetipreds <- 0L
   if(!is.null(ctm$laplaceprior)){
+    if('tipreds' %in% ctm$laplaceprior) standata$laplacetipreds <- 1L
     ms <- data.frame(standata$matsetup)
     standata$laplaceprior[
       ms$param[

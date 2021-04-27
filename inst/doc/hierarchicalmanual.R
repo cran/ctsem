@@ -224,8 +224,9 @@ summary(ssfit)$popmeans
 #  
 #  #output
 #  summary(ssfit)$popmeans
+#  
 
-## ----nl,eval=FALSE,results='hide',echo=-1,messages=FALSE,cache=TRUE, fig.width=8, fig.height=4,fig.cap='Nonlinear oscillation example'----
+## ----nl,eval=FALSE,results='hide',messages=FALSE,cache=TRUE---------------------------------------
 #  sunspots<-sunspot.year
 #  sunspots<-sunspots[50: (length(sunspots) - (1988-1924))]
 #  id <- 1
@@ -237,7 +238,7 @@ summary(ssfit)$popmeans
 #    latentNames=c('ss_level', 'ss_velocity'),
 #    LAMBDA=c( 1, 'ma1|log(1+exp(param))'),
 #    DRIFT=c(0, 1,
-#      '-log1p_exp(freqintercept + freqbystate *  ss_level)','a22'),
+#      '-log1p_exp(freqintercept + freqbylevel *  ss_level)','a22'),
 #    MANIFESTMEANS=c('m1|param * 10 + 44'),
 #    MANIFESTVAR=diag(0,1), #As per original spec
 #    CINT=0,
@@ -245,25 +246,7 @@ summary(ssfit)$popmeans
 #      0, "diffusion"),
 #    PARS=c('freqintercept', 'freqbylevel'))
 #  
-#  # slower fitting version (extended state space), but no need to recompile
-#  m <- ctModel(type='stanct',
-#    manifestNames='sunspots',
-#    latentNames=c('ss_level', 'ss_velocity','freqstate'),
-#    LAMBDA=c( 1, 'ma1|log(1+exp(param))',0),
-#    DRIFT=c(0, 1, 0,
-#      '-log1p_exp(freqstate)','a22',0,
-#      'freqbylevel',0,'freqstate_dependence'),
-#    MANIFESTMEANS=c('m1|param * 10 + 44'),
-#    MANIFESTVAR=diag(0,1), #As per original spec
-#    CINT=c(0,0,'freqstate_cint'),
-#    DIFFUSION=c(0, 0,0,
-#      0, "diffusion",0,
-#      0,0,0))
-#  
-#  ssfitnl <- ctStanFit(datalong, m, optimcontrol=list(stochastic=TRUE))
-#  
-#  ctKalman(ssfitnl,kalmanvec=c('y','yprior'),timestep=.1,
-#    timerange = c(1750,1950),plot=TRUE)
+#  ssfitnl <- ctStanFit(datalong, m)
 
 ## ----transforms,  fig.width=8, fig.height=6, fig.cap='Depiction of the prior distributions and sampling process through which individual specific parameters are determined. Note that the population sd is strictly positive, however the density plots involve some smoothing."'----
 #set plotting parameters

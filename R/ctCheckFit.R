@@ -192,7 +192,7 @@ ctSaturatedFit <- function(fit,conditional=FALSE,reg=0, hmc=FALSE,
   
   covf$test <- 1-pchisq(
     covf$ll-fit$stanfit$transformedparsfull$ll,
-    df=covf$npars)
+    df=covf$npars-length(fit$stanfit$rawest))
   covf$aicdiff = 
     (2*length(fit$stanfit$rawest) - 2*fit$stanfit$transformedparsfull$ll) -
     (2 * covf$npars - 2* covf$ll)
@@ -372,15 +372,18 @@ ctCheckFit <- function(fit,
   data=TRUE, postpred=TRUE, priorpred=FALSE, statepred=FALSE, residuals=FALSE,
   by=fit$ctstanmodelbase$timeName,
   TIpredNames=fit$ctstanmodelbase$TIpredNames,
-  nsamples=10, covplot=FALSE, corr=TRUE, combinevars=NA, fastcov=FALSE,
+  nsamples=30, covplot=FALSE, corr=TRUE, combinevars=NA, fastcov=FALSE,
   lagcovplot=FALSE,
   aggfunc=mean,aggregate=FALSE,
   groupbysplit=FALSE, byNA=TRUE,lag=0,
   smooth=TRUE, k=4,breaks=4,entropy=FALSE,reg=FALSE,verbose=0, indlines=30){
+  
   if(!'ctStanFit' %in% class(fit)) stop('Not a ctStanFit object')
   covORcor <- function(m){
     if(corr) return(cov2cor(m)) else return(m)
   }
+  
+  if(lagcovplot) covplot<-TRUE
 
   DataSource <-Sample<-Lag <- Row <- Sig. <- Sig <- NULL
   dat <- ctStanFitMelt(fit = fit,maxsamples = nsamples)

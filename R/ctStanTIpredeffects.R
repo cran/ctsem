@@ -19,8 +19,8 @@
 #' predictor has been included, then you can specify both the linear and squared version. 
 #' The x axis of the plot (if generated) will be based off the first indexed predictor. To 
 #' check what predictors are in the model, run \code{fit$ctstanmodel$TIpredNames}.
-#' @param parmatrices Logical. If TRUE (default), the \code{\link{ctStanParMatrices}} function
-#' is used to return an expanded range of possible matrices of interest.
+#' @param parmatrices Logical. If TRUE (default), system matrices rather than specific parameters
+#' are referenced -- e.g. 'DRIFT' instead of a parameter name like drift12.
 #' @param whichpars if parmatrices==TRUE, character vector specifying which matrices, and potentially which 
 #' indices of the matrices, to plot. c('dtDRIFT[2,1]', 'DRIFT') would output for row 2 and column 1 of 
 #' the discrete time drift matrix, as well as all indices of the continuous time drift matrix. 
@@ -53,7 +53,7 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
   includeMeanUncertainty=FALSE,
   whichTIpreds=1,parmatrices=TRUE, whichpars='all', nsamples=100, timeinterval=1,
   nsubjects=20,filter=NA,plot=FALSE){
-
+  
   ctspec <- fit$ctstanmodel$pars
   e<-ctExtract(fit)
   rawpopmeans <- e$rawpopmeans
@@ -64,12 +64,14 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
   #sample
   niter<-dim(e$rawpopmeans)[1]
   if(nsamples=='all' || nsamples > niter) nsamples <- niter
-  rawpopmeans <- rawpopmeans[sample(x = 1:niter, nsamples,replace = FALSE),]
+  samplerows <- sample(x = 1:niter, nsamples,replace = FALSE)
   
   message(sprintf('Getting %s samples by %s subjects for %s total samples', nsamples,nsubjects, nsamples*nsubjects))
   
-  if(!includeMeanUncertainty) rawpopmeans <- matrix(apply(rawpopmeans,2,median),byrow=TRUE,nrow=nrow(rawpopmeans),ncol=ncol(rawpopmeans))
- 
+  if(!includeMeanUncertainty) rawpopmeans <- matrix(apply(rawpopmeans,2,median),byrow=TRUE,nrow=nsamples,ncol=ncol(rawpopmeans))
+  
+  if(includeMeanUncertainty)   rawpopmeans <- rawpopmeans[samplerows,,drop=FALSE]
+  
   if(any(!is.na(filter))) tipreds <- eval(parse(text=paste0('tipreds[tipreds[,',filter[1],']',filter[2],',,drop=FALSE]')))
   tipreds <- tipreds[,whichTIpreds,drop=FALSE]
   if(nsubjects=='all') nsubjects = nrow(tipreds)
@@ -81,7 +83,7 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
   
   
   tieffect<-e$TIPREDEFFECT[,,whichTIpreds,drop=FALSE]
-
+  
   tiorder<-order(tipreds[,1])
   tipreds<-tipreds[tiorder,,drop=FALSE] #order tipreds according to first one
   
@@ -92,7 +94,7 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
       rawpopmeans[iterx,,drop=FALSE] + t(matrix(tieffect[iterx,,,drop=FALSE],nrow=dim(tieffect)[2]) %*% tix)
     },.drop=FALSE)
   },.drop=FALSE)
-
+  
   
   if(!parmatrices) {
     if(all(whichpars=='all')) whichpars=which(apply(tieffect,2,function(x) any(x!=0)))
@@ -113,11 +115,11 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
       noeffect<-aaply(1:npars, 1,function(pari){ #for each param
         param <- rawpopmeans[,pari]
         out=tform(param, 
-        fit$setup$popsetup$transform[whichpars[pari]], 
-        fit$setup$popvalues$multiplier[whichpars[pari]],
-        fit$setup$popvalues$meanscale[whichpars[pari]],
-        fit$setup$popvalues$offset[whichpars[pari]], 
-        fit$setup$popvalues$inneroffset[whichpars[pari]], fit$setup$extratforms) 
+          fit$setup$popsetup$transform[whichpars[pari]], 
+          fit$setup$popvalues$multiplier[whichpars[pari]],
+          fit$setup$popvalues$meanscale[whichpars[pari]],
+          fit$setup$popvalues$offset[whichpars[pari]], 
+          fit$setup$popvalues$inneroffset[whichpars[pari]], fit$setup$extratforms) 
         return(out)
       })
       effect<-effect-array(noeffect,dim=dim(effect))
@@ -128,42 +130,38 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
   if(parmatrices)  {
     rawpopmeans <- rawpopmeans[rep(1:nrow(rawpopmeans),each=nsubjects),] #match rows of rawpopmeans and raweffect
     raweffect <- matrix(raweffect,ncol=dim(raweffect)[4])
+    
+    rawsamps=ctStanRawSamples(fit)
+    parmeans=apply(rawsamps,2,mean)
+    newsamples <- matrix(sapply(1:nrow(rawpopmeans), function(x) { #for each param vector
+      c(raweffect[x,],parmeans[-1:-ncol(raweffect)])
+    }),byrow=TRUE,nrow=nrow(rawpopmeans))
 
-#adjust for speed
-  fit$standata$savescores <- 0L
-  fit$standata$gendata <- 0L
-  fit$standata$dokalman <- 0L
-  fit$standata$popcovn <- 2L
-  sf <- stan_reinitsf(fit$stanmodel,data=fit$standata)
-  # whichmatrices <- sapply(whichpars,function(x) {
-  #   x=gsub(pattern = '[','',x,fixed=TRUE)
-  #   x=gsub(pattern = ']','',x,fixed=TRUE)
-  #   x=gsub(pattern = '[0-9]','',x)
-  #   x=gsub(pattern = ',','',x,fixed=TRUE)
-  # })
-  parmeans=apply(ctStanRawSamples(fit),2,mean)
+    
+    newpars <- stan_constrainsamples(sm = fit$stanmodel,standata = fit$standata,
+      samples = newsamples,cores = 1,savescores = FALSE,
+      savesubjectmatrices = FALSE,dokalman = FALSE,pcovn = 2,quiet = FALSE)
+
     parmatlists<-lapply(1:nrow(rawpopmeans), function(x) { #for each param vector
-      out = ctStanParMatrices(fit,  c(raweffect[x,],parmeans[-1:-ncol(raweffect)]), timeinterval=timeinterval,sf = sf)#rawpopmeans[x,] +
+      out = ctStanParMatrices(fit,  newpars, parindex=x, timeinterval=timeinterval)
       return(out)
     })
-    # 
-    
-    # parmatlists <- apply(e$rawpopmeans,1,ctStanParMatrices,model=object,timeinterval=timeinterval)
+
     parmatarray <- array(unlist(parmatlists),dim=c(length(unlist(parmatlists[[1]])),length(parmatlists)))
     parmats <- matrix(0,nrow=0,ncol=2)
     counter=0
     for(mati in 1:length(parmatlists[[1]])){
       if(all(dim(parmatlists[[1]][[mati]]) > 0)){
-      for(coli in 1:ncol(parmatlists[[1]][[mati]])){
-        for(rowi in 1:nrow(parmatlists[[1]][[mati]])){
-          counter=counter+1
-          new <- matrix(c(
-            rowi,
-            coli),
-            nrow=1)
-          rownames(new) = paste0(names(parmatlists[[1]])[[mati]])
-          parmats<-rbind(parmats, new)
-        }}}}
+        for(coli in 1:ncol(parmatlists[[1]][[mati]])){
+          for(rowi in 1:nrow(parmatlists[[1]][[mati]])){
+            counter=counter+1
+            new <- matrix(c(
+              rowi,
+              coli),
+              nrow=1)
+            rownames(new) = paste0(names(parmatlists[[1]])[[mati]])
+            parmats<-rbind(parmats, new)
+          }}}}
     colnames(parmats) <- c('Row','Col') 
     
     rownames(parmatarray) <- paste0(rownames(parmats),'[',parmats[,'Row'],',',parmats[,'Col'],']')
@@ -171,10 +169,10 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
     #remove certain parmatrices lines
     removeindices <- which(rownames(parmats) == 'MANIFESTVAR' & parmats[,'Row'] != parmats[,'Col'])
     
-    removeindices <- c(removeindices,which((rownames(parmats) %in% c('MANIFESTVAR','T0VAR','DIFFUSION','dtDIFFUSION','asymDIFFUSION',
-      'T0VARcor','DIFFUSIONcor','dtDIFFUSIONcor','asymDIFFUSIONcor') &  parmats[,'Row'] < parmats[,'Col'])))
+    removeindices <- c(removeindices,which((rownames(parmats) %in% c('MANIFESTcov','T0cov','DIFFUSIONcov','dtDIFFUSIONcov','asymDIFFUSIONcov',
+      'T0cor','DIFFUSIONcor','dtDIFFUSIONcor','asymDIFFUSIONcor') &  parmats[,'Row'] < parmats[,'Col'])))
     
-    removeindices <- c(removeindices,which((rownames(parmats) %in% c('T0VARcor','DIFFUSIONcor','dtDIFFUSIONcor','asymDIFFUSIONcor') & 
+    removeindices <- c(removeindices,which((rownames(parmats) %in% c('T0cor','DIFFUSIONcor','dtDIFFUSIONcor','asymDIFFUSIONcor') & 
         parmats[,'Row'] == parmats[,'Col'])))
     
     parmatarray <- parmatarray[-removeindices,]
@@ -201,7 +199,7 @@ ctStanTIpredeffects<-function(fit,returndifference=FALSE, probs=c(.025,.5,.975),
   )
   
   colnames(tipreds) <- colnames(fit$data$tipredsdata)[whichTIpreds]
-
+  
   names(attributes(out)$dimnames) <- c('Parameter','param',paste(colnames(tipreds),collapse=''))
   out <- list(y=aperm(out, c(3,2,1)), x=tipreds[,1,drop=FALSE])
   
