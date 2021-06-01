@@ -14,8 +14,6 @@
 ctExtract <- function(object,subjectMatrices=FALSE,cores=2,nsamples='all'){
   if(!class(object) %in% c('ctStanFit', 'stanfit')) stop('Not a ctStanFit or stanfit object')
   
-  
-  
   if(length(object$stanfit$stanfit@sim)==0){
     samps <- object$stanfit$rawposterior
     if(!nsamples %in% 'all') samps <- samps[sample(1:nrow(samps),nsamples),,drop=FALSE]

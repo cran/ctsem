@@ -7,6 +7,7 @@
 ctFitMultiModel(
   mlist,
   datalong,
+  prefix = "",
   type = "stanct",
   cores = 2,
   summaryOutput = TRUE,
@@ -19,6 +20,8 @@ ctFitMultiModel(
 \item{mlist}{Named list of models}
 
 \item{datalong}{ctsem long format data}
+
+\item{prefix}{prefix for output files.}
 
 \item{type}{'stanct' for continuous time or 'standt' for discrete time}
 

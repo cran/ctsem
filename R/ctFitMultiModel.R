@@ -7,6 +7,7 @@
 #' @param summaryOutput Generate summary output into ctSummary folder? Large datasets can take some time. 
 #' @param saveFits Save fit objects to working directory?
 #' @param summaryArgs Additional arguments for ctSummarise.
+#' @param prefix prefix for output files.
 #' @param ... Additional arguments for ctStanFit. 
 #'
 #' @return List containing a named list of model fits ($fits), and a compare object ($compare)
@@ -38,7 +39,7 @@
 #' }
  
  
-ctFitMultiModel <- function(mlist, datalong, type='stanct',cores=2, summaryOutput=TRUE, 
+ctFitMultiModel <- function(mlist, datalong, prefix='',type='stanct',cores=2, summaryOutput=TRUE, 
   saveFits = TRUE, summaryArgs = list(),...){
   
   newfit <- function(model,name){ #function to convert old model to new form, fit with and without covariates, summarise, and save.
@@ -47,7 +48,7 @@ ctFitMultiModel <- function(mlist, datalong, type='stanct',cores=2, summaryOutpu
     
     if(summaryOutput){
       summaryArgs$cores <- cores
-      summaryArgs$name <- name
+      summaryArgs$name <- paste0(prefix,name)
       summaryArgs$sf <- fit
       do.call(ctSummarise, summaryArgs)
     }
@@ -67,7 +68,7 @@ ctFitMultiModel <- function(mlist, datalong, type='stanct',cores=2, summaryOutpu
   mcompare <- mcompare[order(mcompare$aic),]
   
   if(summaryOutput){
-  sink(file = 'mcompare.txt')
+  sink(file = paste0(prefix,'_compare.txt'))
   print(mcompare)
   sink()
   }

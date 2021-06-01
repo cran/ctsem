@@ -66,7 +66,7 @@ head(model$pars,4)
 ## ----fitting,include=FALSE,cache=TRUE-------------------------------------------------------------
 if(w32chk()){
 suppressWarnings(fit<-ctStanFit(datalong = ctstantestdat, 
-  ctstanmodel = model,optimize=TRUE,
+  ctstanmodel = model,optimize=TRUE,cores=1,
   # savescores=TRUE,savesubjectmatrices = TRUE, 
   nopriors=FALSE))
 }
@@ -81,9 +81,9 @@ suppressWarnings(fit<-ctStanFit(datalong = ctstantestdat,
 #  ctStanContinuousPars(fit,calcfunc = quantile, calcfuncargs = list(probs=.975))
 
 ## ----plots1,echo=2,fig.width=5, fig.height=3,fig.cap='Discrete-time cross-effect dynamics of the estimated system for a range of time intervals, with 95\\% credible intervals.'----
-if(w32chk()){
+if(w32chk()){try({
 ctStanDiscretePars(fit, plot=TRUE, indices = 'CR')
-}
+})}
 
 ## ----outputposterior, echo=2,fig.width=6, fig.height=3, fig.cap='Prior and posterior densities relevant to the first variables manifest intercept.'----
 if(w32chk()){

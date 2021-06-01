@@ -18,13 +18,13 @@ test_that("anomauth", {
     MANIFESTVAR=diag(0,2),
     Tpoints=5)
 
-   sm <- ctStanModel(AnomAuthmodel)
-  sm$pars$indvarying<- FALSE
+   sm1 <- ctStanModel(AnomAuthmodel)
+  sm1$pars$indvarying<- FALSE
   a=Sys.time()
   # sink('bad.txt')
   sf=ctStanFit(ctDeintervalise(ctWideToLong(AnomAuth,Tpoints = AnomAuthmodel$Tpoints,n.manifest = 2)),
-    ctstanmodel = sm, optimize=TRUE,verbose=1,savescores = FALSE,cores=cores,nopriors=TRUE,#forcerecompile = T,
-    optimcontrol=list(finishsamples=500),plot=0,fit=T)
+    ctstanmodel = sm1, optimize=TRUE,verbose=0,savescores = FALSE,cores=cores,nopriors=TRUE,#forcerecompile = T,
+    optimcontrol=list(finishsamples=500),plot=0,fit=TRUE)
   # sink()
   print(Sys.time()-a)
   testthat::expect_equal(23415.929,-2*sf$stanfit$optimfit$value,tolerance=.0001)
