@@ -10,7 +10,7 @@ sgd <- function(init,fitfunc,whichignore=c(),nsubsets=1,nsubjects=NA,ndatapoints
   nconvergeiter=30, 
   worsecountconverge=1000,
   lpnoisethresh= .1,#length(init)*.01,
-  itertol=1e-3, deltatol=1e-5, parrangetol=1e-4){
+  itertol=1e-3, deltatol=1e-5, parrangetol=1e-3){
   
   if(nsubsets>1){
     oldsubsetilp <- -Inf
@@ -176,13 +176,13 @@ sgd <- function(init,fitfunc,whichignore=c(),nsubsets=1,nsubjects=NA,ndatapoints
           class(lpg) !='try-error' && 
           !is.nan(lpg[1]) && 
           all(!is.nan(attributes(lpg)$gradient)) &&
-          (nsubsets > 1 || i ==1 || lpg[1] > (min(tail(lp,20))-notacceptedcount))  #no subset lp check
+          (nsubsets > 1 || i ==1 || lpg[1] > (min(tail(lp,20))-notacceptedcount-1))  #no subset lp check
         # (i < warmuplength || ( exp(lpg[1] - lp[i-1]) > runif(1,0,1))) #sd(tail(lp,100))*8+
       ){
         accepted <- TRUE
       } 
       if(!accepted){
-        if(nsubsets==1) gsmooth= gsmooth*gmemory2^2 + (1-gmemory2^2) * g #increase influence of last gradient at inflections
+        #if(nsubsets==1) gsmooth= gsmooth*gmemory2^2 + (1-gmemory2^2) * g #increase influence of last gradient at inflections
         step <- step * .5
         deltaold <- deltaold * 0
         if(nsubsets > 1) pars =bestpars* .8 + apply(parstore,2,mean)*.2
@@ -199,7 +199,7 @@ sgd <- function(init,fitfunc,whichignore=c(),nsubsets=1,nsubjects=NA,ndatapoints
         
       }
       if(plot && !accepted) {
-        message(paste0('iter ', i,' not accepted!'))
+        message(paste0('iter ', i,' not accepted! lp = ', lpg[1]))
         # 
       }
     } #end acceptance loop
@@ -384,11 +384,13 @@ sgd <- function(init,fitfunc,whichignore=c(),nsubsets=1,nsubjects=NA,ndatapoints
     
     #check convergence
     if(nsubsets==1 && i > 30 && max(tail(lp,nconvergeiter)) ==max(lp)){
-      # if( (i - bestiter) > nconvergeiter*5 && 
-      #     mean(sign(diff(tail(lp,nconvergeiter)))) < .3) converged <- TRUE #time since best
-      lpdiff=max(tail(lp,nconvergeiter)) - min(tail(lp,nconvergeiter))
+      if( (i - bestiter) > nconvergeiter*3 &&
+          mean(sign(diff(tail(lp,nconvergeiter)))) < .3) converged <- TRUE #time since best
+      lpdiff=max(tail(lp,nconvergeiter)) - min(tail(lp,nconvergeiter)) #variability over convergerange
       if(lpdiff < itertol & lpdiff > 0) converged <- 1
-      if(abs(max(diff(tail(lp,nconvergeiter)))) < deltatol) converged <- 2
+      if(abs(max(diff(tail(lp,nconvergeiter)))) < deltatol) converged <- 2 #change from step to step
+      prevbest=max(head(lp,length(lp)-nconvergeiter))
+      if(i > (nconvergeiter*2)) if(max(lp)-prevbest > 0 && max(lp)-prevbest < itertol) converged <- 6
       if(!is.na(parrangetol)){
         if(max(apply(parstore,1,range)) < parrangetol) converged <- 3
       }
@@ -434,11 +436,12 @@ sgd <- function(init,fitfunc,whichignore=c(),nsubsets=1,nsubjects=NA,ndatapoints
     }
   }
   convergemessages <- c(
-    'Converged -- lp change within itertol',
+    'Converged -- lp variability within itertol',
     'Converged -- no lp changes greater than deltatol',
     'Converged -- parameter changes within parrangetol',
     'Converged -- count of non-improving iterations exceeded',
-    'Converged -- lp and par change within tolerances')
+    'Converged -- lp and par change within tolerances',
+    'Converged -- lp change within itertol')
   if(converged > 0) message(convergemessages[converged]) else message('Max iterations reached')
   out=list(itervalues = lp, value = max(lp),
     par=bestpars,parstore=parstore,gstore=gstore,lpstore=tail(lp,nstore))

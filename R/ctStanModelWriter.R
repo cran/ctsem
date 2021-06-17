@@ -1027,7 +1027,7 @@ ctStanModelWriter <- function(ctm, gendata, extratforms,matsetup,savemodel=TRUE,
     T0cov = sdcovsqrt2cov(T0VAR,choleskymats); 
 
     if(intoverpop && nindvarying > 0){ //adjust cov matrix for transforms
-    ',if(!gendata) paste0('if(si==0) rawpopcovchol = cholesky_decompose(T0cov[intoverpopindvaryingindex, intoverpopindvaryingindex]);'),'
+    ',if(!gendata) paste0('if(si==0) rawpopcovchol = cholesky_decompose(makesym(T0cov[intoverpopindvaryingindex, intoverpopindvaryingindex],verbose,1));'),'
       for(ri in 1:size(matsetup)){
         if(matsetup[ri,7]==1){ //if t0means
           if(matsetup[ri,5]) { //and indvarying
@@ -1241,7 +1241,7 @@ if(verbose > 1){
       if(verbose > 1) print(" After K rowi =",rowi, "  si =", si, "  state =",state,"  etacov ",etacov,"  K[,o] ",K[,o]);
         
   //likelihood stuff
-      if(nbinary_y[rowi] > 0) ',ifelse(savemodel,'llrow[rowi]','ll'),' += sum(log(Y[rowi,o1d] .* (syprior[o1d]) + (1-Y[rowi,o1d]) .* (1-syprior[o1d]))); 
+      if(nbinary_y[rowi] > 0) ',ifelse(savemodel,'llrow[rowi]','ll'),' += sum(log(1e-10+Y[rowi,o1d] .* (syprior[o1d]) + (1-Y[rowi,o1d]) .* (1-syprior[o1d]))); 
 
       if(size(o0d) > 0 && (llsinglerow==0 || llsinglerow == rowi)){
         if(intoverstates==1) ypriorcov_sqrt[o0d,o0d]=cholesky_decompose(ycov[o0d,o0d]); //removed makesym
@@ -1251,6 +1251,7 @@ if(verbose > 1){
          //ll+= -sum(log(diagonal(ypriorcov_sqrt[o0d,o0d]))); //account for transformation of scale in loglik
          //counter += ncont_y[rowi];
       }
+      if(verbose > 1) print(llrow[rowi]);
       
     }//end si > 0 nobs > 0 section
   } // end measurement init loop and dokalmanrows section here to collect matrices
@@ -1401,21 +1402,59 @@ int[] whichequals(int[] b, int test, int comparison){  //return array of indices
   }
 
  
-   matrix constraincorsqrt(matrix mat,int choleskymats){ //converts from unconstrained lower tri matrix to cor
-    matrix[rows(mat),cols(mat)] o;
+  matrix constraincorsqrt(matrix mat,int step){ //converts from unconstrained lower tri matrix to cor
+    int d=rows(mat);
+    matrix[d,d] o;
+    vector[d] ss = rep_vector(0,d);
+    vector[d] s = rep_vector(0,d);
+    real r;
+    real r3;
+    real r4;
+    real r1;
+    real r2;
 
-    for(i in 1:rows(o)){ //set upper tri to lower
-      for(j in 1:rows(mat)){
+     for(i in 1:d){ 
+      for(j in 1:d){
         if(j > i){
-          o[j,i] =  inv_logit(mat[j,i])*2-1; //divide by i for approx whole matrix equiv priors  
-          o[i,j] = 0;
+          o[j,i] =  inv_logit(mat[j,i])*2-1;
         }
       }
-      o[i,i]=0; 
-      o[i,i] = 1-sqrt(sum(square(o[i,]))+1e-10);
+     }
+    
+    for(i in 1:d){
+      for(j in 1:d){
+        if(j > i) {
+          ss[i] =ss[i] +square(o[j,i]);
+          s[i] =s[i]+ o[j,i];
+        }
+        if(j < i){
+          ss[i] = ss[i]+ square(o[i,j]);
+          s[i] = s[i]+ o[i,j];
+        }
+      }
+      s[i]=s[i]+1e-5;
+      ss[i]=ss[i]+1e-5;
     }
+
+    
+    for(i in 1:d){
+      o[i,i]=0;
+      r1=sqrt(ss[i]);
+      r2=s[i];
+      
+       r3=(fabs(r2))/(r1)-1;
+      r4=sqrt(log1p_exp(2*(fabs(r2)-r2-1)-4));
+      r=(r4*((r3))+1)*r4+1;
+      r=(sqrt(ss[i]+r));
+      for(j in 1:d){
+        if(j > i)  o[i,j]=o[j,i]/r;
+        if(j < i) o[i,j] = o[i,j] /r;
+      }
+      o[i,i]=sqrt(1-sum(square(o[i,]))+1e-5);
+    }
+
     return o;
-  } 
+}  
 
   matrix sdcovsqrt2cov(matrix mat, int choleskymats){ //covariance from cholesky or unconstrained cor sq root
     if(choleskymats< 1) {

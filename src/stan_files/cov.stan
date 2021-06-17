@@ -1,25 +1,62 @@
 functions{
   
-    matrix constraincorsqrt(vector rawcor, int r){ //converts from unconstrained lower tri vec to cor sqrt
-    int counter = 0;
-    vector[r] ones = rep_vector(1, r);
-    matrix[r, r] o;
-    
-    for(i in 2:r){ //constrain and set upper tri to lower
-      for(j in 1:i - 1){
-        counter += 1;
-        o[i, j] = inv_logit(rawcor[counter]) * 2 - 1;  // can change cor prior here
-        o[j, i] = o[i, j];
+  matrix constraincorsqrt(vector rawcor, int d, int symm){ //converts from unconstrained lower tri vec to cor sqrt
+  int counter = 0;
+  matrix[d,d] o;
+  vector[d] ss = rep_vector(0,d);
+  vector[d] s = rep_vector(0,d);
+  real r;
+  real r3;
+  real r4;
+  real r1;
+  real r2;
+  
+  for(i in 1:d){ //set upper tri to lower
+  for(j in 1:d){
+    if(j > i){
+      counter+=1;
+      o[j,i] =  rawcor[counter];//inv_logit(rawcor[counter])*2-1; //divide by i for approx whole matrix equiv priors  
+    }
+  }
+  }
+  
+  for(i in 1:d){
+    for(j in 1:d){
+      if(j > i) {
+        ss[i] =ss[i] +square(o[j,i]);
+        s[i] =s[i]+ o[j,i];
+      }
+      if(j < i){
+        ss[i] = ss[i]+ square(o[i,j]);
+        s[i] = s[i]+ o[i,j];
       }
     }
-    for (i in 1:r){
-      o[i, i] = .999;
-      o[i, ] /= sqrt(sum(square(o[i, ])) + 1e-10);
-    }
-
-    return o;
+    s[i]=s[i]+1e-5;
+    ss[i]=ss[i]+1e-5;
   }
-
+  
+  
+  for(i in 1:d){
+    o[i,i]=0;
+    r1=sqrt(ss[i]);
+    r2=s[i];
+    
+    r3=(fabs(r2))/(r1)-1;
+    r4=sqrt(log1p_exp(2*(fabs(r2)-r2-1)-4));
+    r=(r4*((r3))+1)*r4+1;
+    r=(sqrt(ss[i]+r));
+    for(j in 1:d){
+      if(j > i)  o[i,j]=o[j,i]/r;
+      if(j < i) o[i,j] = o[i,j] /r;
+    }
+    o[i,i]=sqrt(1-sum(square(o[i,]))+1e-5);
+  }
+  
+  return o;
+  return o;
+  }
+  
+  
 }
 data{
   int d;
@@ -30,6 +67,7 @@ data{
   real reg;
   int corpriortype;
   int indep;
+  int symm;
 }
 parameters{
   vector[d] mu;
@@ -45,15 +83,15 @@ transformed parameters{
   vector[n] llrow=rep_vector(0,n);
   
   if(!indep){
-    mcor=tcrossprod(constraincorsqrt(rawcor,d));
+    mcor=tcrossprod(constraincorsqrt(rawcor,d, symm));
     if(corpriortype==1)  corprior=normal_lpdf(rawcor| 0, 1); //mean(fabs(rawcor))
     if(corpriortype==2) corprior= normal_lpdf(to_vector(mcor) | 0, 1);
     if(corpriortype==3) corprior= normal_lpdf(eigenvalues_sym(mcor) | 0, 1);
   }
-    
+  
   covm = diag_matrix(exp(logsd)+1e-5) * mcor * diag_matrix(exp(logsd)+1e-5);
   
-    for(i in 1:n){
+  for(i in 1:n){
     if(nobs[i]>0){
       llrow[i]= multi_normal_lpdf(dat[i,obs[i,1:nobs[i]]] | mu[obs[i,1:nobs[i]]], 
       covm[obs[i,1:nobs[i]], obs[i,1:nobs[i]]]);
@@ -64,7 +102,7 @@ model{
   target += sum(llrow);
   if(reg!=0)  target+= reg*corprior + reg*sdprior;
 }
-  
-  
-  
-  
+
+
+
+
