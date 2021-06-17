@@ -1,4 +1,4 @@
-acb399c9bd74c714a62e522e2546c970 *DESCRIPTION
+0ab288bbbaba698f7b904a3cf6b12739 *DESCRIPTION
 f036a182219e7fb4342259992068987a *NAMESPACE
 a24866d29feb25b3f7864595b8b3a974 *NEWS
 e5a30875edf099765b867635a5cf09f6 *R/JKalman.R
@@ -30,7 +30,7 @@ a250febf329fb3ce3f58d9496a25e9a3 *R/ctStanFit.R
 d7d633a949434b07085b6b8b76547447 *R/ctStanGenerateFromFit.R
 150ada06084db62b9664f857cd1d3396 *R/ctStanKalman.R
 aef24f575d602639aeb7deb12b1d6885 *R/ctStanModel.R
-5a07d59266c57de0a17b7933d8b95283 *R/ctStanModelWriter.R
+9ce5b2cbfd0230b7df59452520dc89a6 *R/ctStanModelWriter.R
 078567d0285cb95a92509a2ccb7b26e9 *R/ctStanParMatrices.R
 08792e4904d3af5b44963d2d83709cb0 *R/ctStanPlotPost.R
 c5ae456c09db3c0d28bf7612d7caeffd *R/ctStanPostPredict.R
@@ -84,7 +84,7 @@ fa0c3e77a75242b33409e49b153434f9 *data/datastructure.rda
 69bf503e1c8a947c9a358186759c2fe5 *data/longexample.rda
 efff50095c89aaaca5e85e36b39ba822 *inst/CITATION
 6b4cef6efbfad52bd1c9af0937080789 *inst/doc/hierarchicalmanual.R
-4cf50fd5b94829eceed5b4e0334c8ea3 *inst/doc/hierarchicalmanual.pdf
+816f5378bbcbb0d18d6f8fd8c70720f5 *inst/doc/hierarchicalmanual.pdf
 147755327c90a7dbdc52bdd9c31ccb78 *inst/doc/hierarchicalmanual.rnw
 b2d28a6833d8a2df31d5be8c2f17137b *man/AnomAuth.Rd
 073dce4c9ff3b7046735d97d6638a798 *man/Oscillating.Rd
@@ -159,15 +159,16 @@ e39dcbc80d722ac76e7dbb490965f2f7 *man/summary.ctStanFit.Rd
 ad47f88f0dfcf6c425d409408194a6b3 *src/init.cpp
 4a937e0ef2274ad1cc7580c43345c8ca *src/stan_files/chunks/license.stan
 d075ef200d729b9097aea0a3b727821e *src/stan_files/cov.stan
-7cebf136d35b13f20c8da6cc68ddb184 *src/stan_files/ctsm.stan
-b417d81698085cf1c418ce99c79146e1 *src/stan_files/ctsmgen.stan
+cf50a8c3b85dbc1a6750e655f4ced105 *src/stan_files/ctsm.stan
+bc57e45368549b0bae974948b53d2c00 *src/stan_files/ctsmgen.stan
 76ca350c5cce00f4bb99cf4538fd7de8 *tests/testthat.R
+ad77116b37e76a0e21140fa28f5d3d83 *tests/testthat/test-corrcheck.R
 0d6010690ff26444e08f433a874fa877 *tests/testthat/test-ctLOO.R
 7c4da451ca21b62f23f9416da2c90922 *tests/testthat/test-ctRaschExampleTest.R
 c82e241c8e0ad519ec7838d2a28345f4 *tests/testthat/test-dtVct.R
 eafe037ee02d4c19b94f04a4d58371d3 *tests/testthat/test-fixedvalsunspot.R
 5b9e62bd87a8582138b4904cba3cbd42 *tests/testthat/test-intervalise.R
-41f075e0daddd34202792ae500de39ae *tests/testthat/test-knownFits.R
+9b764d63729d91853cbca655ae093eba *tests/testthat/test-knownFits.R
 cd37eaccd408a3434a804a3d5cb3910c *tests/testthat/test-nonlinearVlinear.R
 1670a8c1d40ff9a2f3bd2689f26244ad *tests/testthat/test-reshaping.R
 1e8d7fa746dcf69dbcbf9cb88b5504b5 *tests/testthat/test-runExamples.R
