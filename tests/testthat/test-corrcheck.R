@@ -47,5 +47,68 @@ if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
     
     
   })
+  
+  test_that("corrCheckHighDim", {
+    set.seed(1)
+    
+    cmat <- diag(.5,10) + 1 
+    cmat=t(chol(cmat %*% t(cmat)))
+    
+    cmat2 <- diag(.5,10) + 1
+    cmat2[5:10,] <- cmat2[5:10,] * -1
+    cmat2=t(chol(cmat2 %*% t(cmat2)))
+    cov2cor(tcrossprod(cmat2))
+    
+    gm <- ctModel(LAMBDA = diag(1,10),DRIFT=diag(-1,10),
+      T0VAR=cmat,
+      DIFFUSION=diag(1,10),Tpoints=2)
+    d1 <- data.frame(ctGenerate(ctmodelobj = gm,n.subjects = 1000,burnin = 0))
+    
+    gm <- ctModel(LAMBDA = diag(1,10),DRIFT=diag(-1,10),
+      T0VAR=cmat2,
+      DIFFUSION=diag(1,10),Tpoints=2)
+    d2 <- data.frame(ctGenerate(ctmodelobj = gm,n.subjects = 1000,burnin = 0))
+    
+    d2$id <- d2$id + 2000
+    d <- rbind(d1,d2)
+    d$TI1 <- 0
+    d$TI1[d$id > 2000] <- 1
+  
+    
+    
+    
+    m <- ctModel(LAMBDA = diag(1,10),DRIFT=diag(-1,10),type='standt',
+      # MANIFESTMEANS = 0,
+      DIFFUSION=diag(1,10),T0MEANS=0,
+      TIpredNames = 'TI1',
+      MANIFESTMEANS=0,
+      MANIFESTVAR = 0)
+    
+    f <- ctStanFit(datalong = d,ctstanmodel = m,nopriors=F,cores=6)
+    
+    p <- ctStanContinuousPars(f)
+    
+    t0cov <- p$T0cov
+    t0cor <- cov2cor(t0cov)
+    et0cov <- tcrossprod(gm$T0VAR)
+    et0cor <- cov2cor(tcrossprod(gm$T0VAR))
+    
+    f$stanfit$rawposterior=f$stanfit$rawposterior[1:5,]
+    
+    e=ctExtract(f,subjectMatrices = T,cores=1)
+    cov2cor(e$subj_T0cov[1,1,,])
+    cov2cor(e$subj_T0cov[1,301,,])
+    
+    
+    #cov check
+    testthat::expect_equivalent(cov2cor(e$subj_T0cov[1,1001,,]),
+      cov2cor(tcrossprod(cmat2)),tol=.005)
+    
+    #cor check
+    testthat::expect_equivalent(cov2cor(e$subj_T0cov[1,1,,]),
+      cov2cor(tcrossprod(cmat)),tol=.005)
+    
+    
+  })
 }
 

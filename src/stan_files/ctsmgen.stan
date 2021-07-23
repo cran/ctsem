@@ -23,7 +23,7 @@ int[] whichequals(int[] b, int test, int comparison){  //return array of indices
   }
 
  
-  matrix constraincorsqrt(matrix mat,int step){ //converts from unconstrained lower tri matrix to cor
+  matrix constraincorsqrt(matrix mat){ //converts from unconstrained lower tri matrix to cor
     int d=rows(mat);
     matrix[d,d] o;
     vector[d] ss = rep_vector(0,d);
@@ -32,44 +32,33 @@ int[] whichequals(int[] b, int test, int comparison){  //return array of indices
     real r3;
     real r4;
     real r1;
-    real r2;
-
-     for(i in 1:d){ 
-      for(j in 1:d){
-        if(j > i){
-          o[j,i] =  inv_logit(mat[j,i])*2-1;
-        }
-      }
-     }
     
     for(i in 1:d){
       for(j in 1:d){
         if(j > i) {
-          ss[i] =ss[i] +square(o[j,i]);
-          s[i] =s[i]+ o[j,i];
+          ss[i] +=square(mat[j,i]);
+          s[i] +=mat[j,i];
         }
         if(j < i){
-          ss[i] = ss[i]+ square(o[i,j]);
-          s[i] = s[i]+ o[i,j];
+          ss[i] += square(mat[i,j]);
+          s[i] += mat[i,j];
         }
       }
-      s[i]=s[i]+1e-5;
-      ss[i]=ss[i]+1e-5;
+      s[i] += 1e-5;
+      ss[i] += 1e-5;
     }
 
     
     for(i in 1:d){
       o[i,i]=0;
       r1=sqrt(ss[i]);
-      r2=s[i];
-      
-       r3=(fabs(r2))/(r1)-1;
-      r4=sqrt(log1p_exp(2*(fabs(r2)-r2-1)-4));
+      r3=(fabs(s[i]))/(r1)-1;
+      r4=sqrt(log1p_exp(2*(fabs(s[i])-s[i]-1)-4));
       r=(r4*((r3))+1)*r4+1;
       r=(sqrt(ss[i]+r));
       for(j in 1:d){
-        if(j > i)  o[i,j]=o[j,i]/r;
-        if(j < i) o[i,j] = o[i,j] /r;
+        if(j > i)  o[i,j]=mat[j,i]/r;
+        if(j < i) o[i,j] = mat[i,j] /r;
       }
       o[i,i]=sqrt(1-sum(square(o[i,]))+1e-5);
     }
@@ -80,9 +69,9 @@ int[] whichequals(int[] b, int test, int comparison){  //return array of indices
   matrix sdcovsqrt2cov(matrix mat, int choleskymats){ //covariance from cholesky or unconstrained cor sq root
     if(choleskymats< 1) {
       //if(choleskymats== -1){
-        return(tcrossprod(diag_pre_multiply(diagonal(mat),constraincorsqrt(mat,choleskymats))));
+        return(tcrossprod(diag_pre_multiply(diagonal(mat),constraincorsqrt(mat))));
       //} else {
-      //  return(quad_form_diag(constraincorsqrt(mat,choleskymats),diagonal(mat)));
+      //  return(quad_form_diag(constraincorsqrt(mat),diagonal(mat)));
       //}
       } else return(tcrossprod(mat));
   }
@@ -343,6 +332,11 @@ data {
   vector[nindvarying] sdscale;
   int indvaryingindex[nindvarying];
   int notindvaryingindex[nparams-nindvarying];
+  
+//  int nt0varstationary;
+//  int nt0meansstationary;
+//  int t0varstationary [nt0varstationary, 2];
+//  int t0meansstationary [nt0meansstationary, 2];
 
   int nobs_y[ndatapoints];  // number of observed variables per observation
   int whichobs_y[ndatapoints, nmanifest]; // index of which variables are observed per observation
@@ -470,14 +464,14 @@ transformed parameters{
       for(i in 1:nindvarying){
         if(i > j){
           counter += 1;
-          rawpopcovbase[i,j]=sqrtpcov[counter];
-          rawpopcovbase[j,i]=0;//sqrtpcov[counter];
+          rawpopcovbase[i,j]=inv_logit(sqrtpcov[counter])*2-1;
+          rawpopcovbase[j,i]=0;// needed to avoid nan output;
         }
       }
     }
-    //if(choleskymats==0) rawpopcorr = constraincorsqrt(rawpopcovbase,choleskymats);
+    //if(choleskymats==0) rawpopcorr = constraincorsqrt(rawpopcovbase);
     //if(choleskymats== -1) 
-    rawpopcorr = tcrossprod( constraincorsqrt(rawpopcovbase,choleskymats));
+    rawpopcorr = tcrossprod( constraincorsqrt(rawpopcovbase));
     rawpopcov = makesym(quad_form_diag(rawpopcorr, rawpopsd +1e-8),verbose,1);
     rawpopcovchol = cholesky_decompose(rawpopcov); 
   }//end indvarying par setup
@@ -754,6 +748,7 @@ model{
     TIPREDEFFECT[tieffectindices[1:ntieffects]] *  tipredsdata[si]';
   }
 
+  // compute individual parameters that are not state dependent, either all (if si=0) or just update indvarying ones.
   indparams[whichequals(whenvecp[si ? 2 : 1], 0, 0)]= 
     parvectform(whichequals(whenvecp[si ? 2 : 1], 0, 0),rawindparams, 
     0, matsetup, matvalues, si, whenvecp[si ? 2 : 1]);
@@ -797,7 +792,7 @@ if(si==0 || sum(whenmat[54,{5}]) > 0 )Jy=mcalc(Jy,indparams, statetf,{0}, 54, ma
     if(verbose==2) print("indparams = ", indparams);
     
     
- // if(si==0 || (sum(whenmat[8,]) + statedep[8]) > 0 ) {
+ if(si==0 || (sum(whenmat[8,]) + statedep[8]) > 0 ) { // this causes problems but shouldnt -- is t0var being adjusted each iteration when it shouldnt?
    if(intoverpop && nindvarying > 0) T0VAR[intoverpopindvaryingindex, intoverpopindvaryingindex] = rawpopcovbase;
     T0cov = sdcovsqrt2cov(T0VAR,choleskymats); 
 
@@ -812,7 +807,30 @@ if(si==0 || sum(whenmat[54,{5}]) > 0 )Jy=mcalc(Jy,indparams, statetf,{0}, 54, ma
         }
       }
     }
-  //}
+ }
+  
+//      if(nt0varstationary > 0) {
+//    if(si==0 || (sum(whenmat[8,]) + statedep[8] + sum(whenmat[3,]) + statedep[3] + sum(whenmat[4,]) + statedep[4]) > 0 ){
+//      matrix[nlatent,nlatent] stationarycov;
+//      stationarycov = ksolve(DRIFT[derrind,derrind], sdcovsqrt2cov(DIFFUSION[derrind,derrind],choleskymats),verbose);
+//    for(ri in 1:nt0varstationary){ 
+//      T0cov[t0varstationary[ri,1],t0varstationary[ri,2] ] =  stationarycov[t0varstationary[ri,1],t0varstationary[ri,2] ];
+//    }
+//    }
+//  }
+//    if(si==0 || //on either pop pars only
+//  (  (sum(whenmat[3,])+sum(whenmat[7,])+statedep[3]+statedep[7]) > 0 && savesubjectmatrices) ){ // or for each subject
+//  if(continuoustime==1) asymCINT[,1] =  -DRIFT[1:nlatent,1:nlatent] \ CINT[ ,1 ];
+//  if(continuoustime==0) asymCINT[,1] =  add_diag(-DRIFT[1:nlatent,1:nlatent],1) \ CINT[,1 ];
+//  
+//  //  if(nt0meansstationary > 0){
+//    if(si==0 || (sum(whenmat[1,]) + statedep[1]) > 0) {
+//      for(ri in 1:nt0meansstationary){
+//        T0MEANS[t0meansstationary[ri,1]] = 
+//          asymCINT[t0meansstationary[ri,1] ];
+//      }
+//    }
+//  }
   
   if(si==0 || statedep[5] || (whenmat[32,5])) MANIFESTcov = sdcovsqrt2cov(MANIFESTVAR,choleskymats);
     
@@ -932,7 +950,7 @@ if(sum(whenmat[52,{2}]) > 0 )JAx=mcalc(JAx,indparams, statetf,{2}, 52, matsetup,
     if(ntdpred > 0) {
       int nonzerotdpred = 0;
       for(tdi in 1:ntdpred) if(tdpreds[rowi,tdi] != 0.0) nonzerotdpred = 1;
-      if(nonzerotdpred){
+      if(si==0 ||nonzerotdpred){
       
         statetf[whichequals(whenvecs[3],0,0)] = 
           parvectform( whichequals(whenvecs[3],0,0), state, 3, matsetup, matvalues, si, whenvecs[3]);
@@ -1107,11 +1125,12 @@ if(sum(whenmat[54,{4}]) > 0 )Jy=mcalc(Jy,indparams, statetf,{4}, 54, matsetup, m
     
        // store system matrices
        
-  if(si==0 || //on either pop pars only
-    (  (sum(whenmat[3,])+sum(whenmat[7,])+statedep[3]+statedep[7]) > 0 && savesubjectmatrices) ){ // or for each subject
-    if(continuoustime==1) asymCINT[,1] =  -DRIFT[1:nlatent,1:nlatent] \ CINT[ ,1 ];
-    if(continuoustime==0) asymCINT[,1] =  add_diag(-DRIFT[1:nlatent,1:nlatent],1) \ CINT[,1 ];
-  }
+    if(si==0 || //on either pop pars only
+      (  (sum(whenmat[3,])+sum(whenmat[7,])+statedep[3]+statedep[7]) > 0 && savesubjectmatrices) ){ // or for each subject
+      if(continuoustime==1) asymCINT[,1] =  -DRIFT[1:nlatent,1:nlatent] \ CINT[ ,1 ];
+      if(continuoustime==0) asymCINT[,1] =  add_diag(-DRIFT[1:nlatent,1:nlatent],1) \ CINT[,1 ];
+    }
+
   
   if(!continuoustime){
     if(si==0 || //on either pop pars only
