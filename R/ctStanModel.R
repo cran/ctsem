@@ -1,7 +1,7 @@
 ctModelUnlist<-function(ctmodelobj,
   matnames=c('T0MEANS','LAMBDA','DRIFT','DIFFUSION','MANIFESTVAR','MANIFESTMEANS', 'CINT', 'TDPREDEFFECT', 'T0VAR','PARS')){
   out<-data.frame(matrix=as.character(NA), row=as.integer(NA), col=as.integer(NA), param=as.character(NA), value=as.numeric(NA),
-    stringsAsFactors =FALSE)
+    stringsAsFactors =FALSE) 
   out[1:sum(sapply(ctmodelobj[names(ctmodelobj) %in% matnames],length)),]=out
 
   rowcount <- 0
@@ -111,7 +111,7 @@ ctStanModel<-function(ctmodelobj, type='stanct',tipredDefault=TRUE){
           ctspec$transform[pi] <- 1
           ctspec$meanscale[pi] <- 2
           ctspec$multiplier[pi] <- 5
-          ctspec$offset[pi] <- 1e-6
+          ctspec$offset[pi] <- 1e-10
           if(ctspec$matrix[pi] %in% c('DIFFUSION')) ctspec$multiplier[pi] <-10
         }
       }
