@@ -1065,7 +1065,7 @@ ctStanModelWriter <- function(ctm, gendata, extratforms,matsetup,savemodel=TRUE,
 //    }
 //  }
   
-  if(si==0 || statedep[5] || (whenmat[32,5])) MANIFESTcov = sdcovsqrt2cov(MANIFESTVAR,choleskymats);
+  if(si==0 || statedep[5] || sum(whenmat[5,]) || sum(whenmat[32,])) MANIFESTcov = sdcovsqrt2cov(MANIFESTVAR,choleskymats);
     
     //if(verbose>1) print("nl T0cov = ", T0cov, "   J0 = ", J0);
     //etacov = quad_form(T0cov, J0\'); //probably unneeded, inefficient
@@ -1087,7 +1087,7 @@ if(verbose > 1) print ("below t0 row ", rowi);
       
       ',matcalcs('si',when=2, mats$diffusion,basemats=FALSE),'
       ',simplifystanfunction(paste0(ctm$modelmats$calcs$diffusion,';\n\n ',collapse=' '),simplify),'
-      if(si==0 ||statedep[4] || whenmat[4,2] || (T0check==1 && whenmat[4,5])){
+      if(si==0 ||statedep[4] || whenmat[4,2] || ( T0check >0 && whenmat[4,5])){
         DIFFUSIONcov[derrind,derrind] = sdcovsqrt2cov(DIFFUSION[derrind,derrind],choleskymats);
         if(!continuoustime) discreteDIFFUSION=DIFFUSIONcov;
       }
@@ -1095,7 +1095,8 @@ if(verbose > 1) print ("below t0 row ", rowi);
         if(continuoustime){
         
             if(si==0 || dtchange==1 || statedep[3]||statedep[4] || statedep[52] || //if first sub or changing every state
-              (T0check == 1 && (sum(whenmat[3,])+sum(whenmat[4,])) > 0)){ //or first time step of new sub with ind difs
+              whenmat[3,2] || whenmat[4,2] ||
+              (T0check == 1 && (whenmat[3,5]+whenmat[4,5]) > 0)){ //or first time step of new sub with ind difs
               
               if(difftype==0 || (statedep[3]==0 && statedep[4]==0)){
                 //discreteDRIFT = expm2(append_row(append_col(DRIFT[1:nlatent, 1:nlatent],CINT),nlplusonezerovec\') * dtsmall);
@@ -1105,7 +1106,9 @@ if(verbose > 1) print ("below t0 row ", rowi);
                   eJAx =  expm2(JAx * dtsmall);
                 } else eJAx[1:nlatent, 1:nlatent] = discreteDRIFT;
                                
-                if(si==0 || statedep[4]||statedep[52]|| (T0check==1 && (whenmat[4,5] || whenmat[3,5]))){ //if first pass, state dependent, or individually varying drift / diffusion
+                if(si==0 || statedep[4]||statedep[52]|| 
+                  (whenmat[4,2]+whenmat[3,2]) > 0 || 
+                  (T0check==1 && (whenmat[4,5] || whenmat[3,5]))){ //if first pass, state dependent, or individually varying drift / diffusion
                   asymDIFFUSIONcov[derrind,derrind] = ksolve(JAx[derrind,derrind], DIFFUSIONcov[derrind,derrind],verbose);
                 }
                 discreteDIFFUSION[derrind,derrind] =  asymDIFFUSIONcov[derrind,derrind] - 
@@ -1119,8 +1122,9 @@ if(verbose > 1) print ("below t0 row ", rowi);
             state[1:nlatent] *= discreteDRIFT\'; // ???compute before new diffusion calcs
             
             if(size(CINTnonzero)>0){
-              if(si==0 || dtchange==1 || statedep[3]|| statedep[7] || //if first sub or changing every state
-                (T0check == 1 && (sum(whenmat[3,])+sum(whenmat[7,])) > 0)){ //or first time step of new sub with ind difs
+              if(si==0 || dtchange==1 || statedep[3]|| statedep[7] || 
+                whenmat[3,2] || whenmat[7,2] || //if first sub or changing every state
+                (T0check == 1 && (whenmat[3,5]+whenmat[7,5]) > 0)){ //or first time step of new sub with ind difs
                 discreteCINT = (DRIFT \\ (discreteDRIFT-IIlatentpop[1:nlatent,1:nlatent])) * CINT[,1];
               }
               state[1:nlatent] += discreteCINT\';
@@ -1162,7 +1166,7 @@ if(verbose > 1) print ("below t0 row ", rowi);
         ',simplifystanfunction(paste0(ctm$modelmats$calcs$tdpred,';\n\n ',collapse=' '),simplify),'
 
         state[1:nlatent] +=   (TDPREDEFFECT * tdpreds[rowi])\'; //tdpred effect only influences at observed time point','
-        if(statedep[53]) etacov = quad_form_sym(makesym(etacov,verbose,1),Jtd\'); 
+        etacov = quad_form_sym(makesym(etacov,verbose,1),Jtd\');  //could speed up by detecting if non diagonal Jtd
       }
     }//end nonlinear tdpred
 
@@ -1192,7 +1196,7 @@ if(verbose > 1){
     
       ',finiteJy(),'
  
-   if(statedep[5]) MANIFESTcov = sdcovsqrt2cov(MANIFESTVAR,choleskymats);
+   if(statedep[5] || whenmat[5,4]) MANIFESTcov = sdcovsqrt2cov(MANIFESTVAR,choleskymats);
    if(si > 0 && dokalmanrows[rowi] ==1){   //if not just inits...
 
       if(intoverstates==1 || dosmoother==1) { //classic kalman

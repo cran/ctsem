@@ -93,7 +93,8 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='popmean',
   if(!ctstanfitobj$ctstanmodel$continuoustime) times <- unique(round(times))
   type='discreteDRIFT'
   collapseSubjects=TRUE #consider this for a switch
-  e<-ctExtract(ctstanfitobj,subjectMatrices = subjects[1]!='popmean',cores=cores)
+  e<-ctExtract(ctstanfitobj,subjectMatrices = subjects[1]!='popmean',cores=cores,
+    nsamples = min(nsamples,dim(ctstanfitobj$stanfit$transformedpars$pop_DRIFT)[1]))
   
   if(subjects[1] != 'popmean' && any(!is.integer(as.integer(subjects)))) stop('
   subjects argument must be either "all" or an integer denoting specific subjects')
@@ -194,7 +195,8 @@ ctStanDiscreteParsDrift<-function(ctpars,times, observational,  standardise,cov=
           }
           if(observational){
             Qcor<-cov2cor(matrix(ctpars$DIFFUSIONcov[i,min(j,nsubs$DIFFUSIONcov),,],nl,nl)+diag(1e-8,nl)) 
-            Qcor <- Qcor * sign(Qcor) #why was this squared before?
+            Qcor <- Qcor #* sign(Qcor) #why was this squared before?
+            # browser()
             ctpars$dtDRIFT[i,j,ti,,]  <- ctpars$dtDRIFT[i,j,ti,,]  %*% Qcor
           }
           if(cov) ctpars$dtDRIFT[i,j,ti,,]  <- tcrossprod(ctpars$dtDRIFT[i,j,ti,,] )
@@ -297,8 +299,7 @@ ctStanDiscreteParsPlot<- function(x,indices='all',
   
   g<-'ggplot2::ggplot(data = ym,mapping=aes(y=value,x=`Time interval`,
     colour=Effect,
-    fill=Effect,
-    type=Subject))+
+    fill=Effect))+
     theme_bw()+ylab(ylab)+
     ggplot2::labs(title = title)+  
     stat_summary( #ribbon
@@ -311,9 +312,7 @@ ctStanDiscreteParsPlot<- function(x,indices='all',
       alpha= polygonalpha,
       linetype=3)+
     stat_summary( #center line
-      fun.data = function(x) list(
-        y=quantile(x,quantiles[2])
-      ),
+      fun.data = function(x) list(y=quantile(x,quantiles[2])),
       geom = "line")'
   
   if(!is.na(facets)) g <- paste0(g,'+ facet_wrap(facets)')
