@@ -151,8 +151,8 @@ sgd <- function(init,fitfunc,whichignore=c(),nsubsets=1,nsubjects=NA,ndatapoints
       
       if(nsubsets > 1){
         if(i > 1) subsetiold <- subseti
-       subseti <- subsetorder[(i-1) %% (nsubsets * subsetrepeats) + 1]
-       
+        subseti <- subsetorder[(i-1) %% (nsubsets * subsetrepeats) + 1]
+        
         fullnewpars <- c(fullnewpars, subseti) #add subset par
       }
       # print(subsetorder[i %% (nsubsets) + 1])
@@ -174,7 +174,7 @@ sgd <- function(init,fitfunc,whichignore=c(),nsubsets=1,nsubjects=NA,ndatapoints
       
       
       if(lpg > -1e99 &&       #regular check
-          class(lpg) !='try-error' && 
+          !'try-error' %in% class(lpg) && 
           !is.nan(lpg[1]) && 
           all(!is.nan(attributes(lpg)$gradient)) &&
           (nsubsets > 1 || i ==1 || lpg[1] > (min(tail(lp,20))-notacceptedcount-1))  #no subset lp check
@@ -215,6 +215,7 @@ sgd <- function(init,fitfunc,whichignore=c(),nsubsets=1,nsubjects=NA,ndatapoints
     deltaold=delta
     oldg=g
     g=attributes(lpg)$gradient
+    if(any(g==0)) warning(paste0('Gradient of parameter ',paste0(which(g==0),collapse=', '), ' is exactly zero, maybe model problem?'))
     # g=sign(g)*(abs(g))#^(1/2)#sqrt
     gmemory2 = gmemory * min(i/warmuplength,1)^(1/8)
     roughnessmemory2 = roughnessmemory * min(i/warmuplength,1)^(1/8)
