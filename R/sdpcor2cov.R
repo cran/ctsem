@@ -23,8 +23,8 @@ sdpcor2cov <- function(mat, coronly=FALSE, cholesky=FALSE){
         for(rowi in coli:ndim){
           if(coli==1 && rowi > 1) mcholcor[rowi,coli] =  mat[rowi,coli]; 
           if(coli > 1){
-            if(rowi == coli) mcholcor[rowi,coli] = prod(sqrt(1.000001-mat[rowi,1:(coli-1)]^2));
-            if(rowi > coli) mcholcor[rowi,coli] = mat[rowi,coli] * prod(sqrt(1.000001-mat[rowi,1:(coli-1)]^2));
+            if(rowi == coli) mcholcor[rowi,coli] = prod(sqrt(1-mat[rowi,1:(coli-1)]^2));
+            if(rowi > coli) mcholcor[rowi,coli] = mat[rowi,coli] * prod(sqrt(1-mat[rowi,1:(coli-1)]^2));
           }
         }
       }

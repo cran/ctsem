@@ -18,19 +18,22 @@
 #' @return if plot=TRUE, nothing is returned and plots are created. Otherwise, a list containing ggplot objects is returned 
 #' and may be customized as desired.
 #' @examples
-#' if(w32chk()){
-#'
+#' \donttest{#'
 #' ctStanPostPredict(ctstantestfit,wait=FALSE, diffsize=2,resolution=100)
 #' }
 ctStanPostPredict <- function(fit,diffsize=1,jitter=.02, wait=TRUE,probs=c(.025,.5,.975),
   datarows='all',nsamples=500,resolution=100,plot=TRUE){
+  
   plots <-list()
   if(datarows[1]=='all') datarows <- 1:nrow(fit$data$Y)
   xmeasure=data.table(id=fit$standata$subject[datarows])
   if(1==99) id <- count <- Density <- param <- NULL
   xmeasure= xmeasure[, count := seq(.N), by = .(id)]$count
   
-  if(is.null(fit$generated$Y)) Ygen <- ctStanGenerateFromFit(fit,fullposterior=TRUE,nsamples=nsamples)$generated$Y else Ygen <- fit$generated$Y
+  if(is.null(fit$generated$Y) || dim(fit$generated$Y)[1] < nsamples){
+    Ygen <- ctStanGenerateFromFit(fit,fullposterior=TRUE,nsamples=nsamples)$generated$Y
+    } else Ygen <- fit$generated$Y
+  
   # Ygen<-aperm(Ygen,c(2,1,3)) #previously necessary but fixed generator
   Ygen <- Ygen[,datarows,,drop=FALSE]
   time <- fit$standata$time[datarows]
@@ -108,7 +111,7 @@ ctStanPostPredict <- function(fit,diffsize=1,jitter=.02, wait=TRUE,probs=c(.025,
           
           dygen<-diff(yp,lag = cdiffsize) 
           # yp[-1,i,,,drop=FALSE] - yp[-fit$data$ndatapoints,i,,,drop=FALSE]
-          dygendt <- dygen / diff(time,lag = cdiffsize)
+          dygendt <- dygen / matrix(diff(time,lag = cdiffsize),nrow=length(time)-cdiffsize,ncol=nsamples)
           dygendt<-dygendt[-subdiff,,drop=FALSE]
           
           # dydt<-diff(Ydat[,i], lag = cdiffsize)/diff(time,lag = cdiffsize)
