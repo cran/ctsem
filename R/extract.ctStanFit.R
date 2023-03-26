@@ -4,6 +4,7 @@
 #' @param subjectMatrices Calculate subject specific system matrices?
 #' @param cores Only used if subjectMatrices = TRUE . For faster computation use more cores.
 #' @param nsamples either 'all' or an integer denoting number of random samples to extract.
+#' @param subjects either 'all', or an integer vector denoting subjects to extract.
 #' @return Array of posterior samples.
 #' @aliases extract
 #' @examples
@@ -11,7 +12,7 @@
 #' e = ctExtract(ctstantestfit)
 #' }
 #' @export
-ctExtract <- function(object,subjectMatrices=FALSE,cores=2,nsamples='all'){
+ctExtract <- function(object,subjectMatrices=FALSE,cores=2,nsamples='all', subjects='all'){
   if(!class(object) %in% c('ctStanFit', 'stanfit')) stop('Not a ctStanFit or stanfit object')
   
   
@@ -20,6 +21,7 @@ ctExtract <- function(object,subjectMatrices=FALSE,cores=2,nsamples='all'){
     samps <- object$stanfit$rawposterior
     if(!nsamples %in% 'all') samps <- samps[sample(1:nrow(samps),nsamples),,drop=FALSE]
     if(subjectMatrices && object$standata$savesubjectmatrices==0){
+      if(!'all' %in% subjects) object$standata<- standatact_specificsubjects(standata = object$standata,subjects = subjects)
       out = stan_constrainsamples(sm = object$stanmodel,standata = object$standata,
         samples = samps,
         cores = cores,savescores = FALSE,savesubjectmatrices = subjectMatrices,

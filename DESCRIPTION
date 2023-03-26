@@ -1,10 +1,10 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 3.7.2
-Date: 2022-11-04
+Version: 3.7.6
+Date: 2023-03-23
 Authors@R: c(person("Charles", "Driver", role =
-    c("aut","cre","cph"),email="charles.driver@ibe.uzh.ch"),
+    c("aut","cre","cph"),email="charles.driver@ife.uzh.ch"),
     person("Manuel", "Voelkle", role = c("aut","cph")),
     person("Han", "Oud", role = c("aut","cph") ),
     person("Trustees of Columbia University",role='cph'))
@@ -26,27 +26,28 @@ Description: Hierarchical continuous (and discrete) time state space modelling, 
 License: GPL-3
 Depends: R (>= 3.5.0), Rcpp (>= 0.12.16)
 URL: https://github.com/cdriveraus/ctsem
-Imports: cOde, expm, data.table (>= 1.12.8), datasets, Deriv, ggplot2,
+Imports: cOde, data.table (>= 1.12.8), datasets, Deriv, expm, ggplot2,
         graphics, grDevices, MASS, Matrix, methods, mize, mvtnorm,
-        parallel, plyr, rstan (>= 2.19.0), stats, tools, utils,
-        RcppParallel, tibble
+        parallel, plyr, RcppParallel (>= 5.0.1), rstan (>= 2.21.0),
+        rstantools (>= 2.3.0), stats, tibble, tools, utils
 Encoding: UTF-8
 LazyData: true
 ByteCompile: true
 LinkingTo: BH (>= 1.66.0-1), Rcpp (>= 0.12.16), RcppEigen (>=
         0.3.3.4.0), RcppParallel (>= 5.0.1), rstan (>= 2.21),
         StanHeaders (>= 2.21.0), RcppParallel (>= 5.0.1)
-SystemRequirements: GNU make
-NeedsCompilation: yes
 Suggests: knitr, testthat, devtools, DEoptim, tinytex, lme4, shiny,
         gridExtra, arules
 VignetteBuilder: knitr
-RoxygenNote: 7.2.1
-Packaged: 2022-11-05 12:18:23 UTC; Driver
+RoxygenNote: 7.2.3
+SystemRequirements: GNU make
+NeedsCompilation: yes
+Biarch: true
+Packaged: 2023-03-24 21:05:43 UTC; Driver
 Author: Charles Driver [aut, cre, cph],
   Manuel Voelkle [aut, cph],
   Han Oud [aut, cph],
   Trustees of Columbia University [cph]
-Maintainer: Charles Driver <charles.driver@ibe.uzh.ch>
+Maintainer: Charles Driver <charles.driver@ife.uzh.ch>
 Repository: CRAN
-Date/Publication: 2022-11-06 05:10:11 UTC
+Date/Publication: 2023-03-26 17:10:02 UTC

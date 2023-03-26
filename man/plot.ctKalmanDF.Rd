@@ -48,7 +48,7 @@ Alternatively, a character vector specifying the manifest and latent names to pl
 \item{polygonalpha}{Numeric for the opacity of the uncertainty region.}
 
 \item{facets}{when multiple subjects are included in multivariate plots, the default is to facet plots 
-by variable type. This can be set to NA for no facets, or \code{vars(Subject)} for facetting by subject.}
+by variable type. This can be set to NA for no facets, or \code{ggplot2::vars(Subject)} for facetting by subject.}
 
 \item{...}{not used.}
 }
@@ -59,9 +59,6 @@ A ggplot2 object. Side effect -- Generates plots.
 Plots Kalman filter output from ctKalman.
 }
 \examples{
-if(w32chk()){
-
-
 ### Get output from ctKalman
 x<-ctKalman(ctstantestfit,subjects=2,timestep=.01)
 
@@ -73,5 +70,4 @@ ctKalman(ctstantestfit,subjects=2,
   kalmanvec=c('y','yprior'),
   elementNames=c('Y1','Y2'), 
   plot=TRUE,timestep=.01)
-}
 }

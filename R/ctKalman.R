@@ -74,6 +74,8 @@ ctKalmanTIP <- function(sf,tipreds='all',subject=1,timestep='auto',plot=TRUE,ret
 #' @param removeObs Logical. If TRUE, observations (but not covariates)
 #' are set to NA, so only expectations based on
 #' parameters and covariates are returned. 
+#' @param standardisederrors if TRUE, also include standardised error output (based on covariance
+#' per time point).
 #' @param plot Logical. If TRUE, plots output instead of returning it. 
 #' See \code{\link{plot.ctKalmanDF}} 
 #' (Stan based fit) for the possible arguments.
@@ -114,7 +116,8 @@ ctKalmanTIP <- function(sf,tipreds='all',subject=1,timestep='auto',plot=TRUE,ret
 #' @export
 
 ctKalman<-function(fit, timerange='asdata', timestep='auto',
-  subjects=fit$setup$idmap[1,1], removeObs = FALSE, plot=FALSE, realid=TRUE,...){
+  subjects=fit$setup$idmap[1,1], removeObs = FALSE, plot=FALSE, 
+  standardisederrors=TRUE,realid=TRUE,...){
   type=NA
   if('ctStanFit' %in% class(fit)) type='stan' 
   if('ctsemFit' %in% class(fit)) type ='omx'
@@ -126,8 +129,8 @@ ctKalman<-function(fit, timerange='asdata', timestep='auto',
   if(realid) subjects <- idmap[which(idmap[,1] %in% subjects),2]
   
   if(length(subjects) == 0){
-    if(all(is.integer(subjectsarg))){
-      subjects <- subjectsarg
+    if(all(!is.na(as.integer(subjectsarg)))){
+      subjects <- as.integer(subjectsarg)
       warning('Specified subjects not found in original id set -- assuming integers correspond to internal integer mapping. Consider setting realid=FALSE')
     } else stop('Specified subjects not found in original id set, and (some) are not integers...')
   }
@@ -159,7 +162,7 @@ ctKalman<-function(fit, timerange='asdata', timestep='auto',
       fit$standata$Y[] <- 99999
     }
     out <- ctStanKalman(fit,pointest=length(fit$stanfit$stanfit@sim)==0, 
-      collapsefunc=mean, indvarstates = FALSE) #extract state predictions
+      collapsefunc=mean, indvarstates = FALSE,standardisederrors = standardisederrors) #extract state predictions
     out$id <- idstore #as.integer(subjects[out$id]) #get correct subject indicators
     
     out <- meltkalman(out)
@@ -170,78 +173,6 @@ ctKalman<-function(fit, timerange='asdata', timestep='auto',
         match(out$Subject,idmap[,2]),1])
     }
   }
-  
-  # if(type !='stan'){
-  #   if(timestep=='auto') timestep=1
-  #   out<-list()
-  #   if(timerange[1] != 'asdata' & timestep[1] == 'asdata') stop('If timerange is not asdata, a timestep must be specified!')
-  #   
-  #   # if(!is.null(datalong)) { #adjust ids and colnames as needed
-  #   #   datalong <- makeNumericIDs(datalong, fit$ctstanmodel$subjectIDname,fit$ctstanmodel$timeName) #ensure id's are appropriate
-  #   #   colnames(datalong)[colnames(datalong)==fit$ctstanmodel$subjectIDname] <- 'subject'
-  #   #   colnames(datalong)[colnames(datalong)==fit$ctstanmodel$timeName] <- 'time'
-  #   # }
-  #   
-  #   # if(is.null(datalong)) { #get relevant data
-  #     
-  #     if(is.null(fit$mxobj$expectation$P0)) { #if not fit with kalman filter then data needs rearranging
-  #       datalong=suppressMessages(ctWideToLong(datawide = fit$mxobj$data$observed[subjects,,drop=FALSE],
-  #         Tpoints=fit$ctmodelobj$Tpoints,
-  #         n.manifest=fit$ctmodelobj$n.manifest,manifestNames = fit$ctmodelobj$manifestNames,
-  #         n.TDpred=fit$ctmodelobj$n.TDpred,TDpredNames = fit$ctmodelobj$TDpredNames,
-  #         n.TIpred = fit$ctmodelobj$n.TIpred, TIpredNames = fit$ctmodelobj$TIpredNames))
-  #       datalong <- suppressMessages(ctDeintervalise(datalong = datalong,id = 'id',dT = 'dT'))
-  #       datalong[,'id'] <- subjects[datalong[,'id'] ]
-  #     } else {
-  #       datalong=fit$mxobj$data$observed
-  #       datalong <- suppressMessages(ctDeintervalise(datalong = datalong,id = 'id',dT = 'dT1'))
-  #     }
-  #     colnames(datalong)[colnames(datalong) == 'id'] <- 'subject'
-  #     
-  #     
-  #   # }
-  #   
-  #   
-  #   
-  #   if(!all(subjects %in% datalong[,'subject'])) stop('Invalid subjects specified!')
-  #   
-  #   for(subjecti in subjects){
-  #     #setup subjects data, interpolating and extending as necessary
-  #     sdat=datalong[datalong[,'subject'] == subjecti,,drop=FALSE]
-  #     if(timestep != 'asdata' || timerange[1] != 'asdata') {
-  #       if(timerange[1]=='asdata') stimerange <- range(sdat[,'time']) else {
-  #         stimerange <- timerange
-  #         if(timerange[1] > min(sdat[,'time']) || timerange[2] < max(sdat[,'time']) ) stop('Specified timerange must contain all subjects time ranges!')
-  #       }
-  #       snewtimes <- seq(stimerange[1],stimerange[2],timestep)
-  #       snewdat <- array(NA,dim=c(length(snewtimes),dim(sdat)[-1]),dimnames=list(c(),dimnames(sdat)[[2]]))
-  #       snewdat[,'time'] <- snewtimes
-  #       snewdat[,fit$ctmodelobj$TDpredNames] <- 0
-  #       sdat <- rbind(sdat,snewdat)
-  #       sdat[,'time'] <- round(sdat[,'time'],10)
-  #       sdat<-sdat[!duplicated(sdat[,'time']),,drop=FALSE]
-  #       sdat <- sdat[order(sdat[,'time']),,drop=FALSE]
-  #       sdat[,c(fit$ctmodelobj$manifestNames,fit$ctmodelobj$TDpredNames)] [sdat[,c(fit$ctmodelobj$manifestNames,fit$ctmodelobj$TDpredNames)]==99999] <- NA
-  #       sdat[,'subject'] <- subjecti
-  #     }
-  #     
-  #     #get parameter matrices
-  #     # 
-  #     model <- summary(fit)
-  #     # model <- model$
-  #     
-  #     #get kalman estimates
-  #     
-  #     out[[paste('subject',subjecti)]]<-Kalman(kpars=model,
-  #       datalong=sdat,
-  #       manifestNames=fit$ctmodelobj$manifestNames,
-  #       latentNames=fit$ctmodelobj$latentNames,
-  #       TDpredNames=fit$ctmodelobj$TDpredNames,
-  #       idcol='subject',
-  #       timecol='time')
-  #   }
-  #   class(out) <- c('ctKalman',class(out))
-  # }#end old kalman
   
   if(plot) {
     plot(x=out,subjects=subjects,...)
@@ -273,16 +204,13 @@ ctKalman<-function(fit, timerange='asdata', timestep='auto',
 #' @param polygonsteps Number of steps to use for uncertainty band shading. 
 #' @param polygonalpha Numeric for the opacity of the uncertainty region.
 #' @param facets when multiple subjects are included in multivariate plots, the default is to facet plots 
-#' by variable type. This can be set to NA for no facets, or \code{vars(Subject)} for facetting by subject.
+#' by variable type. This can be set to NA for no facets, or \code{ggplot2::vars(Subject)} for facetting by subject.
 #' @param ... not used.
 #' @return A ggplot2 object. Side effect -- Generates plots.
 #' @method plot ctKalmanDF
 #' @export plot.ctKalmanDF
 #' @export
 #' @examples
-#' if(w32chk()){
-#'
-#' 
 #' ### Get output from ctKalman
 #' x<-ctKalman(ctstantestfit,subjects=2,timestep=.01)
 #' 
@@ -294,7 +222,6 @@ ctKalman<-function(fit, timerange='asdata', timestep='auto',
 #'   kalmanvec=c('y','yprior'),
 #'   elementNames=c('Y1','Y2'), 
 #'   plot=TRUE,timestep=.01)
-#' }
 plot.ctKalmanDF<-function(x, subjects=unique(x$Subject), kalmanvec=c('y','yprior'),
   errorvec='auto', errormultiply=1.96,plot=TRUE,elementNames=NA,
   polygonsteps=10,polygonalpha=.1,
@@ -379,8 +306,8 @@ plot.ctKalmanDF<-function(x, subjects=unique(x$Subject), kalmanvec=c('y','yprior
     theme_minimal()+
     guides(fill='none')
   
-  if(plot) suppressWarnings(print(g))
-  return(invisible(g))
+  # if(plot) suppressWarnings(print(g))
+  return(g)
   
 }
 

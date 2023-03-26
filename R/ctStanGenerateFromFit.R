@@ -8,20 +8,19 @@
 #' @return Matrix of generated data -- one dataset per iteration, according to original time and missingness structure.
 #' @export
 #' @examples
-#' if(w32chk()){
-#'
 #' gen <- ctStanGenerateFromFit(ctstantestfit, nsamples=3,fullposterior=TRUE,cores=1)
 #' plot(gen$generated$Y[3,,2],type='l') #Third random data sample, 2nd manifest var, all time points. 
-#' }
 ctStanGenerateFromFit<-function(fit,nsamples=200,fullposterior=FALSE, verboseErrors=FALSE,cores=2){
   
   if(!'ctStanFit' %in% class(fit)) stop('Not a ctStanFit object!')
   
-  if(nsamples > ncol(fit$stanfit$rawposterior)) fit <- ctAddSamples(fit,nsamples = nsamples,cores=1)
+  if(nsamples > ncol(fit$stanfit$rawposterior) & fullposterior & is.null(fit$stanfit$stanfit)) fit <- ctAddSamples(fit,nsamples = nsamples,cores=1)
+  
+  if(nsamples > ncol(fit$stanfit$rawposterior)) replace=TRUE else replace=FALSE #if nsamples still larger than available, use replacement
   
   if(!fullposterior){
     umat=matrix(fit$stanfit$rawest,nrow=length(fit$stanfit$rawest),ncol=nsamples)
-    } else umat=t(fit$stanfit$rawposterior)[,sample(1:nrow(fit$stanfit$rawposterior),size=nsamples),drop=FALSE]
+    } else umat=t(fit$stanfit$rawposterior)[,sample(1:nrow(fit$stanfit$rawposterior),size=nsamples,replace = replace),drop=FALSE]
   
   
   if(fit$setup$recompile) {

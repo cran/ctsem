@@ -218,11 +218,13 @@ jacrandom <- function(grfunc, est, eps=1e-4,
 #'
 #' @examples
 #' \dontrun{
-#' if(w32chk()) newfit <- ctAddSamples(ctstantestfit, 10, 1)
+#' newfit <- ctAddSamples(ctstantestfit, 10, 1)
 #' }
 ctAddSamples <- function(fit,nsamples,cores=2){
-  mchol <- t(chol(fit$stanfit$cov))
   
+  if(length(fit$stanfit$stanfit@sim) > 0) stop('ctStanFit object was sampled and not optimized, cannot add samples!')
+  
+  mchol <- t(chol(fit$stanfit$cov))
   resamples <- matrix(unlist(lapply(1:nsamples,function(x){
     fit$stanfit$rawest + (mchol) %*% t(matrix(rnorm(length(fit$stanfit$rawest)),nrow=1))
   } )),byrow=TRUE,ncol=length(fit$stanfit$rawest))
@@ -327,10 +329,7 @@ getcxxfun <- function(object) {
 #' @export
 #'
 #' @examples
-#' if(w32chk()){
-#'
 #' sf <- stan_reinitsf(ctstantestfit$stanmodel,ctstantestfit$standata)
-#' }
 stan_reinitsf <- function(model, data,fast=FALSE){
   if(fast) sf <- new(model@mk_cppmodule(model),data,0L,getcxxfun(model@dso))
   
@@ -372,10 +371,7 @@ flexlapplytext <- function(cl, X, fn,cores=1,...){
 #' @export
 #'
 #' @examples
-#' if(w32chk()){
-#'
 #' d <- standatact_specificsubjects(ctstantestfit$standata, 1:2)
-#' }
 standatact_specificsubjects <- function(standata, subjects,timestep=NA){
   long <- standatatolong(standata)
   long <- long[long$subject %in% subjects,]
@@ -384,6 +380,7 @@ standatact_specificsubjects <- function(standata, subjects,timestep=NA){
   if(standata$ntipred > 0) standatamerged$tipredsdata <- standatamerged$tipredsdata[unique(standatamerged$subject),,drop=FALSE]
   standatamerged$nsubjects <- as.integer(length(unique(standatamerged$subject)))
   standatamerged$subject <- array(as.integer(factor(standatamerged$subject)))
+  standatamerged$idmap <- standata$idmap[standata$idmap$new %in% subjects,]
   return(standatamerged)
 }  
 
@@ -1348,7 +1345,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,sampleinit=NA,
               grad<- attributes(lp[[1]])$gradient / steplist[[di]] * directions[di]
               if(any(is.na(grad))){
                 warning('NA gradient encountered at param ',i,immediate. =TRUE)
-                browser()
+                # browser()
               }
               if(length(directions) > 1) grad <- (grad + attributes(lp[[2]])$gradient / (steplist[[di]]*-1))/2
               

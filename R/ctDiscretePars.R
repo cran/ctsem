@@ -71,8 +71,6 @@ ctStanParnames <- function(x,substrings=c('pop_','popsd')){
 #'If subject matrices were saved during fiting, not used. 
 #'@param ... additional plotting arguments to control \code{\link{ctStanDiscreteParsPlot}}
 #'@examples
-#'if(w32chk()){
-#'
 #' ctStanDiscretePars(ctstantestfit,times=seq(.5,4,.1), 
 #'  plot=TRUE,indices='CR')
 #'  
@@ -82,8 +80,6 @@ ctStanParnames <- function(x,substrings=c('pop_','popsd')){
 #'  plot=TRUE,indices='CR')
 #'g= g+ labs(title='Cross effects')
 #'print(g)
-#'
-#'}
 #'@export
 ctStanDiscretePars<-function(ctstanfitobj, subjects='popmean', 
   times=seq(from=0,to=10,by=.1), 
@@ -93,11 +89,15 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='popmean',
   if(!ctstanfitobj$ctstanmodel$continuoustime) times <- unique(round(times))
   type='discreteDRIFT'
   collapseSubjects=TRUE #consider this for a switch
-  e<-ctExtract(ctstanfitobj,subjectMatrices = subjects[1]!='popmean',cores=cores,
-    nsamples = min(nsamples,dim(ctstanfitobj$stanfit$transformedpars$pop_DRIFT)[1]))
   
   if(subjects[1] != 'popmean' && any(!is.integer(as.integer(subjects)))) stop('
-  subjects argument must be either "all" or an integer denoting specific subjects')
+  subjects argument must be either "popmean" or an integer denoting specific subjects')
+  
+  extractSubjects <- subjects
+  if('popmean' %in% extractSubjects) extractSubjects <- 'all'
+  e<-ctExtract(ctstanfitobj,subjectMatrices = subjects[1]!='popmean',cores=cores,
+    nsamples = min(nsamples,dim(ctstanfitobj$stanfit$transformedpars$pop_DRIFT)[1]),
+    subjects=extractSubjects)
   
   nsubjects <- dim(e$subj_DRIFT)[2]
   if(is.null(nsubjects)) nsubjects=1
@@ -123,8 +123,10 @@ ctStanDiscretePars<-function(ctstanfitobj, subjects='popmean',
     if('popmean' %in% subjects || is.null(e[[paste0('subj_',matname)]])){
       ctpars[[matname]] <- e[[paste0('pop_',matname)]][samples,,,drop=FALSE]
     } else {
-      # browser()
-      ctpars[[matname]] <- e[[paste0('subj_',matname)]][samples,subjects,,,drop=FALSE]
+      if(dim(e[[paste0('subj_',matname)]])[2] != ctstanfitobj$standata$nsubjects){ #if we computed subject parameters for only the specified subjects
+        parsubjects <- 1:length(subjects)
+      } else parsubjects <- subjects
+      ctpars[[matname]] <- e[[paste0('subj_',matname)]][samples,parsubjects,,,drop=FALSE]
       # ctpars[[matname]]<-  array(ctpars[[matname]],dim=c(prod(dim(ctpars[[matname]])[1:2]),dim(ctpars[[matname]])[-1:-2]))
     }
     # ctpars[[matname]] <- ctpars[[matname]][sample(1:dim(ctpars[[matname]])[1],nsamples),,,drop=FALSE]
@@ -237,7 +239,6 @@ ctStanDiscreteParsDrift<-function(ctpars,times, observational,  standardise,cov=
 #'evaluated (with the necessary arguments such as ylab etc filled in). For modifying plots.
 #'@return A ggplot2 object. This can be modified by the various ggplot2 functions, or displayed using print(x).
 #'@examples
-#'if(w32chk()){
 #'x <- ctStanDiscretePars(ctstantestfit)
 #'ctStanDiscreteParsPlot(x, indices='CR')
 #'
@@ -245,8 +246,6 @@ ctStanDiscreteParsDrift<-function(ctpars,times, observational,  standardise,cov=
 #'g <- ctStanDiscreteParsPlot(x, indices='CR') + 
 #'  ggplot2::labs(title='My ggplot modification')
 #'print(g)
-#'
-#'}
 #'
 #'@export
 

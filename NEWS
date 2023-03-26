@@ -1,5 +1,12 @@
 ctsem news:
 
+24/3/2023
+####3.7.6####
+- Fix compile error for some higher dimensional non-linear models.
+- Fix NaN gradient error for certain non-linear measurement error models. 
+- Use Rstantools for compile specification to ensure future compatibility. 
+- Allow standardised error output from ctKalman.
+
 1/7/2022
 ####3.7.0####
 - Fix some plotting features, speed up random effects a little.

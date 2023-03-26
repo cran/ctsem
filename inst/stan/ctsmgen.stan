@@ -211,10 +211,9 @@ if(transform < 49 && offset != 0.0) param+=offset;
   }
   
   // improve PARS when = 100 thing here too
-   row_vector parvectform(int[] which, row_vector rawpar, int when, int[,] ms, data real[,] mval, int subi, int[] whenvec){
+   row_vector parvectform(int[] which, row_vector rawpar, int when, int[,] ms, data real[,] mval, int subi){
     row_vector[size(which)] parout;
     if(size(which)){
-      //int outwhen[size(whichequals(whenvec,0,0))] = whenvec[whichequals(whenvec,0,0)]; //outwhen is nonzero elements of whenvec
       for(whichout in 1:size(which)){
         int done=0; //only want to tform once, may be copies
       for(ri in 1:size(ms)){ //for each row of matrix setup
@@ -486,7 +485,7 @@ model{
 
   if(ntipred > 0){ 
     if(nopriors==0 && laplacetipreds==0) target+= priormod2 * normal_lpdf(tipredeffectparams / tipredeffectscale| 0, 1);
-    if(nopriors==0 && laplacetipreds==1) for(i in 1:ntipredeffects) target+= priormod2 * double_exponential_lpdf(pow(tipredeffectparams[i],1+.1/((tipredeffectparams[i]*100)^2+.1)) / tipredeffectscale| 0, 1);
+    if(nopriors==0 && laplacetipreds==1) for(i in 1:ntipredeffects) target+= priormod2 * double_exponential_lpdf(pow(fabs(tipredeffectparams[i]),1+.1/((tipredeffectparams[i]*100)^2+.1)) / tipredeffectscale| 0, 1);
     target+= normal_lpdf(tipredsimputed| 0, tipredsimputedscale); //consider better handling of this when using subset approach
   }
 
@@ -750,7 +749,7 @@ model{
   // compute individual parameters that are not state dependent, either all (if si=0) or just update indvarying ones.
   indparams[whichequals(whenvecp[si ? 2 : 1], 0, 0)]= 
     parvectform(whichequals(whenvecp[si ? 2 : 1], 0, 0),rawindparams', 
-    0, matsetup, matvalues, si, whenvecp[si ? 2 : 1])';
+    0, matsetup, matvalues, si)';
      
   if(whenmat[1, 5] >= (si ? 1 : 0)) T0MEANS = 
     mcalc(T0MEANS, indparams, statetf, {0}, 1, matsetup, matvalues, si); // base t0means to init
@@ -760,7 +759,7 @@ model{
   state=T0MEANS[,1]';
   
   statetf[whichequals(whenvecs[1],0,0)] = parvectform(whichequals(whenvecs[1],0,0),state, 1,
-    matsetup, matvalues, si, whenvecs[1]);   
+    matsetup, matvalues, si);   
     
   if(si==0 || sum(whenmat[10,{5,1}]) > 0 )PARS=mcalc(PARS,indparams, statetf,{0,1}, 10, matsetup, matvalues, si); 
  //initialise simple PARS then do complex PARS
@@ -786,8 +785,6 @@ if(si==0 || sum(whenmat[52,{5}]) > 0 )JAx=mcalc(JAx,indparams, statetf,{0}, 52, 
 if(si==0 || sum(whenmat[53,{5}]) > 0 )Jtd=mcalc(Jtd,indparams, statetf,{0}, 53, matsetup, matvalues, si); 
 if(si==0 || sum(whenmat[54,{5}]) > 0 )Jy=mcalc(Jy,indparams, statetf,{0}, 54, matsetup, matvalues, si); 
 
-     
-    if(si==0 || whenmat[5,5] || whenmat[5,4] || statedep[5]) MANIFESTcov = sdcovsqrt2cov(MANIFESTVAR,choleskymats);
     
     if(verbose==2) print("DRIFT = ",DRIFT);
     if(verbose==2) print("indparams = ", indparams);
@@ -810,31 +807,32 @@ if(si==0 || sum(whenmat[54,{5}]) > 0 )Jy=mcalc(Jy,indparams, statetf,{0}, 54, ma
     }
  }
   
-//      if(nt0varstationary > 0) {
-//    if(si==0 || (sum(whenmat[8,]) + statedep[8] + sum(whenmat[3,]) + statedep[3] + sum(whenmat[4,]) + statedep[4]) > 0 ){
-//      matrix[nlatent,nlatent] stationarycov;
-//      stationarycov = ksolve(DRIFT[derrind,derrind], sdcovsqrt2cov(DIFFUSION[derrind,derrind],choleskymats),verbose);
-//    for(ri in 1:nt0varstationary){ 
-//      T0cov[t0varstationary[ri,1],t0varstationary[ri,2] ] =  stationarycov[t0varstationary[ri,1],t0varstationary[ri,2] ];
-//    }
-//    }
-//  }
-//    if(si==0 || //on either pop pars only
-//  (  (sum(whenmat[3,])+sum(whenmat[7,])+statedep[3]+statedep[7]) > 0 && savesubjectmatrices) ){ // or for each subject
-//  if(continuoustime==1) asymCINT[,1] =  -DRIFT[1:nlatent,1:nlatent] \ CINT[ ,1 ];
-//  if(continuoustime==0) asymCINT[,1] =  add_diag(-DRIFT[1:nlatent,1:nlatent],1) \ CINT[,1 ];
-//  
-//  //  if(nt0meansstationary > 0){
-//    if(si==0 || (sum(whenmat[1,]) + statedep[1]) > 0) {
-//      for(ri in 1:nt0meansstationary){
-//        T0MEANS[t0meansstationary[ri,1]] = 
-//          asymCINT[t0meansstationary[ri,1] ];
-//      }
-//    }
-//  }
+// if(nt0varstationary > 0) {
+//   if(si==0 || (sum(whenmat[8,]) + statedep[8] + sum(whenmat[3,]) + statedep[3] + sum(whenmat[4,]) + statedep[4]) > 0 ){
+//     matrix[nlatent,nlatent] stationarycov;
+//     stationarycov = ksolve(DRIFT[derrind,derrind], sdcovsqrt2cov(DIFFUSION[derrind,derrind],choleskymats),verbose);
+//   for(ri in 1:nt0varstationary){ 
+//     T0cov[t0varstationary[ri,1],t0varstationary[ri,2] ] =  stationarycov[t0varstationary[ri,1],t0varstationary[ri,2] ];
+//   }
+//   }
+// }
+// 
+// if(nt0meansstationary > 0){
+//   if(si==0 || //on either pop pars only
+//     ( (sum(whenmat[3,])+sum(whenmat[7,])+statedep[3]+statedep[7]) > 0) && savesubjectmatrices ){ // or for each subject
+//     
+//     if(continuoustime) asymCINT[,1] =  -DRIFT[1:nlatent,1:nlatent] \ CINT[ ,1 ];
+//     if(!continuoustime) asymCINT[,1] =  add_diag(-DRIFT[1:nlatent,1:nlatent],1) \ CINT[,1 ];
+// 
+//     if(si==0 || (sum(whenmat[1,]) + statedep[1]) > 0) {
+//       for(ri in 1:nt0meansstationary){
+//         T0MEANS[t0meansstationary[ri,1]] = 
+//           asymCINT[t0meansstationary[ri,1] ];
+//       }
+//     }
+//   }
+// }
 
-    //if(verbose>1) print("nl T0cov = ", T0cov, "   J0 = ", J0);
-    //etacov = quad_form(T0cov, J0'); //probably unneeded, inefficient
     etacov=T0cov;
     } //end T0 matrices
     
@@ -858,7 +856,7 @@ if(verbose > 1) print ("below t0 row ", rowi);
       if(statei>0)  state[statei] += Jstep;
       
         statetf[whichequals(whenvecs[2],0,0)] = 
-          parvectform(whichequals(whenvecs[2],0,0),state, 2, matsetup, matvalues, si, whenvecs[2]);
+          parvectform(whichequals(whenvecs[2],0,0),state, 2, matsetup, matvalues, si);
           
         //initialise PARS first, and simple PARS before complex PARS
         if(statedep[10] || whenmat[10,2]) PARS=mcalc(PARS,indparams, statetf,{2}, 10, matsetup, matvalues, si); 
@@ -959,7 +957,7 @@ if(verbose > 1) print ("below t0 row ", rowi);
       if(si==0 ||nonzerotdpred){
       
         statetf[whichequals(whenvecs[3],0,0)] = 
-          parvectform( whichequals(whenvecs[3],0,0), state, 3, matsetup, matvalues, si, whenvecs[3]);
+          parvectform( whichequals(whenvecs[3],0,0), state, 3, matsetup, matvalues, si);
           
         //initialise PARS first, and simple PARS before complex PARS
         if(statedep[10] || whenmat[10,3]) PARS=mcalc(PARS,indparams, statetf,{3}, 10, matsetup, matvalues, si); 
@@ -1007,7 +1005,7 @@ if(verbose > 1){
       
             
         statetf[whichequals(whenvecs[4],0,0)] = 
-          parvectform( whichequals(whenvecs[4],0,0), state, 4, matsetup, matvalues, si, whenvecs[4]);
+          parvectform( whichequals(whenvecs[4],0,0), state, 4, matsetup, matvalues, si);
           
         //initialise PARS first, and simple PARS before complex PARS
         if(statedep[10] || whenmat[10,4]) PARS=mcalc(PARS,indparams, statetf,{4}, 10, matsetup, matvalues, si); 
@@ -1041,7 +1039,7 @@ if(verbose > 1){
     if(verbose>1) print("Jy ",Jy);
   } //end measurement init
       
-  if(statedep[5] || whenmat[5,4]) MANIFESTcov = sdcovsqrt2cov(MANIFESTVAR,choleskymats);
+  if(si==0 || whenmat[5,5] || whenmat[5,4] || statedep[5]) MANIFESTcov = sdcovsqrt2cov(MANIFESTVAR,choleskymats);
 
  
   if(si > 0 && (nobs_y[rowi] > 0 || dosmoother)){   //if not just inits...
