@@ -11,8 +11,9 @@ test_that("anomauth", {
     library(ctsem)
     library(testthat)
     
-  #library(ctsem);cores=12
     cores=2
+  #library(ctsem);cores=12
+
   data(AnomAuth)
   AnomAuthmodel<-ctModel(LAMBDA=matrix(c(1, 0, 0, 1), nrow=2, ncol=2),  
     n.latent=2,n.manifest=2, 
@@ -61,7 +62,7 @@ if( .Machine$sizeof.pointer != 4){
   sf=ctStanFit(ctDeintervalise(ctWideToLong(Oscillating,Tpoints = oscillatingm$Tpoints,n.manifest = 1)),
     cores=2,verbose=0,
     # optimcontrol=list(carefulfit=T),
-    ctstanmodel = sm, optimize=TRUE,savescores = FALSE,nopriors=TRUE)
+    ctstanmodel = sm, optimize=TRUE,savescores = FALSE,priors=FALSE)
   expect_equal(-3461.936,-2*sf$stanfit$optimfit$value,tolerance=.01)
   
 }

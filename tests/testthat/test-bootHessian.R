@@ -13,7 +13,7 @@ if(FALSE){
       cint <- t0m/2+rnorm(nsubjects)
       # cor(t0m,cint)
       for(subi in 1:nsubjects){
-        gm <- ctModel(Tpoints=10,
+        gm <- suppressMessages(ctModel(Tpoints=10,
           LAMBDA=matrix(1), 
           DRIFT= -1,
           T0MEANS = t0m[subi],
@@ -21,9 +21,10 @@ if(FALSE){
           MANIFESTVAR = 0.5,
           T0VAR = 0,
           MANIFESTMEANS = 0,
-          CINT=cint[subi])
+          CINT=cint[subi]))
         
-        dd <- data.frame(ctGenerate(ctmodelobj = gm,n.subjects = 1,burnin = 0,dtmean = 1,logdtsd = 0))
+        dd <- suppressMessages(data.frame(ctGenerate(ctmodelobj = gm,n.subjects = 1,
+          burnin = 0,dtmean = 1,logdtsd = 0)))
         dd$id <- subi
         if(subi==1) d <- dd else d <- rbind(d,dd)
       }
@@ -31,18 +32,18 @@ if(FALSE){
       m <- ctModel(type='stanct',LAMBDA=matrix(1),CINT='cint',MANIFESTMEANS=0)
       # m$pars$indvarying=F
       
-      f <- ctStanFit(datalong = d,ctstanmodel = m,cores=1,nopriors=F,optimcontrol=list(carefulfit=F,stochastic=F,finishsamples=5000))
+      f <- ctStanFit(datalong = d,ctstanmodel = m,cores=1,priors=TRUE,optimcontrol=list(carefulfit=F,stochastic=F,finishsamples=5000))
       s=summary(f)
-      print(s)
+      # print(s)
       
       scores=t(ctsem:::scorecalc(standata = f$standata,est = f$stanfit$rawest,stanmodel = f$stanmodel,subjectsonly = T,cores=1))
       
-      fc <- ctStanFit(datalong = d,ctstanmodel = m,cores=1,nopriors=F,optimcontrol=list(carefulfit=F,stochastic=F,finishsamples=5000,bootstrapUncertainty=F))
+      fc <- ctStanFit(datalong = d,ctstanmodel = m,cores=1,priors=TRUE,optimcontrol=list(carefulfit=F,stochastic=F,finishsamples=5000,bootstrapUncertainty=F))
       sc=summary(fc)
       # print(sc)
       
-      print(sc$popmeans)
-      print(s$popmeans)
+      # print(sc$popmeans)
+      # print(s$popmeans)
       colnames(sc$popmeans) <- paste0(colnames(sc$popmeans),'c')
       colnames(sc$rawpopcorr) <- paste0(colnames(sc$rawpopcorr),'c')
       colnames(sc$popsd) <- paste0(colnames(sc$popsd),'c')
@@ -86,7 +87,7 @@ if(FALSE){
       }
     }
     rownames(coverage) <- rownames(truepars)
-    print(coverage)
+    # print(coverage)
     
     
     

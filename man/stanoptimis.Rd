@@ -15,13 +15,15 @@ stanoptimis(
   tol = 1e-10,
   decontrol = list(),
   stochastic = TRUE,
-  nopriors = FALSE,
+  priors = TRUE,
   carefulfit = TRUE,
   bootstrapUncertainty = FALSE,
   subsamplesize = 1,
-  finitediff = FALSE,
   parsteps = c(),
   plot = FALSE,
+  hessianType = "numerical",
+  stochasticHessianSamples = 50,
+  stochasticHessianEpsilon = 1e-05,
   is = FALSE,
   isloopsize = 1000,
   finishsamples = 1000,
@@ -60,24 +62,27 @@ minima / difficult optimization.}
 \item{stochastic}{Logical. Use stochastic gradient descent instead of mize (bfgs) optimizer.
 Still experimental, worth trying for either robustness checks or problematic, high dimensional, nonlinear, problems.}
 
-\item{nopriors}{logical. If TRUE, a nopriors integer is set to 1 (TRUE) in the standata object -- only has an effect if 
+\item{priors}{logical. If TRUE, a priors integer is set to 1 (TRUE) in the standata object -- only has an effect if 
 the stan model uses this value.}
 
-\item{carefulfit}{Logical. If TRUE, priors are always used for a rough first pass to obtain starting values when nopriors=TRUE.}
+\item{carefulfit}{Logical. If TRUE, priors are always used for a rough first pass to obtain starting values when priors=FALSE}
 
 \item{bootstrapUncertainty}{Logical. If TRUE, subject wise gradient contributions are resampled to estimate the hessian, 
 for computing standard errors or initializing importance sampling.}
 
 \item{subsamplesize}{value between 0 and 1 representing proportion of subjects to include in first pass fit.}
 
-\item{finitediff}{Either 'ask', TRUE, or FALSE. Whether to use the slow finite difference calculations
-for the Hessian (used for confidence intervals) if other approaches do not give a positive definite result.}
-
 \item{parsteps}{ordered list of vectors of integers denoting which parameters should begin fixed
 at zero, and freed sequentially (by list order). Useful for complex models, e.g. keep all cross couplings fixed to zero 
 as a first step, free them in second step.}
 
 \item{plot}{Logical. If TRUE, plot iteration details. Probably slower.}
+
+\item{hessianType}{either 'numerical' or 'stochastic', the latter is experimental at present.}
+
+\item{stochasticHessianSamples}{number of samples to use for stochastic Hessian, if selected.}
+
+\item{stochasticHessianEpsilon}{SD of random samples for stochastic hessian, if selected.}
 
 \item{is}{Logical. Use importance sampling, or just return map estimates?}
 

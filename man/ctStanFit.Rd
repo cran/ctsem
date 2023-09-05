@@ -13,13 +13,15 @@ ctStanFit(
   binomial = FALSE,
   fit = TRUE,
   intoverpop = "auto",
+  sameInitialTimes = FALSE,
   stationary = FALSE,
   plot = FALSE,
-  derrind = "all",
+  derrind = NA,
   optimize = TRUE,
   optimcontrol = list(),
   nlcontrol = list(),
-  nopriors = TRUE,
+  nopriors = NA,
+  priors = FALSE,
   chains = 2,
   cores = ifelse(optimize, getOption("mc.cores", 2L), "maxneeded"),
   inits = NULL,
@@ -46,7 +48,7 @@ models respectively.}
 \item{stanmodeltext}{already specified Stan model character string, generally leave NA unless modifying Stan model directly.
 (Possible after modification of output from fit=FALSE)}
 
-\item{iter}{number of iterations, half of which will be devoted to warmup by default when sampling.
+\item{iter}{used when \code{optimize=FALSE}. number of iterations, half of which will be devoted to warmup by default when sampling.
 When optimizing, this is the maximum number of iterations to allow -- convergence hopefully occurs before this!}
 
 \item{intoverstates}{logical indicating whether or not to integrate over latent states using a Kalman filter. 
@@ -61,6 +63,10 @@ This now sets \code{intoverstates = FALSE} and the \code{manifesttype} of every 
 if TRUE, integrates over population distribution of parameters rather than full sampling.
 Allows for optimization of non-linearities and random effects.}
 
+\item{sameInitialTimes}{if TRUE, include an empty observation for every subject that has no observation 
+at the earliest observation time of the dataset. This ensures that the T0MEANS occurs for every subject at the same time,
+rather than just at the earliest observation for that subject. Important when modelling trends over time, age, etc.}
+
 \item{stationary}{Logical. If TRUE, T0VAR and T0MEANS input matrices are ignored, 
 the parameters are instead fixed to long run expectations. More control over this can be achieved
 by instead setting parameter names of T0MEANS and T0VAR matrices in the input model to 'stationary', for
@@ -69,10 +75,7 @@ elements that should be fixed to stationarity.}
 \item{plot}{if TRUE, for sampling, a Shiny program is launched upon fitting to interactively plot samples. 
 May struggle with many (e.g., > 5000) parameters. For optimizing, various optimization details are plotted -- in development.}
 
-\item{derrind}{vector of integers denoting which latent variables are involved in dynamic error calculations.
-latents involved only in deterministic trends or input effects can be removed from matrices (ie, that
-obtain no additional stochastic inputs after first observation), speeding up calculations. 
-If unsure, leave default of 'all' ! Ignored if intoverstates=FALSE.}
+\item{derrind}{deprecated, latents involved in dynamic error calculations are determined automatically now.}
 
 \item{optimize}{if TRUE, use \code{\link{stanoptimis}} function for maximum a posteriori / importance sampling estimates, 
 otherwise use the HMC sampler from Stan, which is (much) slower, but generally more robust, accurate, and informative.}
@@ -87,16 +90,20 @@ the integration is nested within an Euler like loop.
 Smaller values may offer greater accuracy, but are slower and not always necessary. Given the exponential integration,
 linear model elements are fit exactly with only a single step.}
 
-\item{nopriors}{logical. If TRUE, any priors are disabled -- sometimes desirable for optimization.}
+\item{nopriors}{deprecated, use priors argument. logical. If TRUE, any priors are disabled -- sometimes desirable for optimization.}
 
-\item{chains}{number of chains to sample, during HMC or post-optimization importance sampling. Unless the cores
+\item{priors}{if TRUE, priors are included in computations, otherwise specified priors are ignored.}
+
+\item{chains}{used when \code{optimize=FALSE}. Number of chains to sample, during HMC or post-optimization importance sampling. Unless the cores
 argument is also set, the number of chains determines the number of cpu cores used, up to 
 the maximum available minus one. Irrelevant when \code{optimize=TRUE}.}
 
 \item{cores}{number of cpu cores to use. Either 'maxneeded' to use as many as available minus one,
 up to the number of chains, or a positive integer. If \code{optimize=TRUE}, more cores are generally faster.}
 
-\item{inits}{vector of parameter start values, as returned by the rstan function \code{rstan::unconstrain_pars} for instance.}
+\item{inits}{either character string 'optimize, NULL, or vector of (unconstrained)
+parameter start values, as returned by the rstan function \code{rstan::unconstrain_pars}, or the parameter values
+found in a ctsem fit object \code{myfit$stanfit$rawest} (or \code{$rawposterior}) for instance.}
 
 \item{forcerecompile}{logical. For development purposes. 
 If TRUE, stan model is recompiled, regardless of apparent need for compilation.}
@@ -121,7 +128,7 @@ Generated data is in the $Ygen subobject after running \code{extract} on the fit
 For datasets with many manifest variables or time points, file size may be large.
 To generate data based on the posterior of a fitted model, see \code{\link{ctStanGenerateFromFit}}.}
 
-\item{control}{List of arguments sent to \code{\link[rstan]{stan}} control argument, 
+\item{control}{Used when \code{optimize=FALSE}. List of arguments sent to \code{\link[rstan]{stan}} control argument, 
 regarding warmup / sampling behaviour. Unless specified, values used are:
 list(adapt_delta = .8, adapt_window=2, max_treedepth=10, adapt_init_buffer=2, stepsize = .001)}
 
@@ -146,7 +153,7 @@ model<-ctModel(type='stanct',
   TIpredNames=c('TI1','TI2','TI3'),
   LAMBDA=diag(2)) 
 
-fit<-ctStanFit(ctstantestdat, model,nopriors=FALSE)
+fit<-ctStanFit(ctstantestdat, model,priors=TRUE)
 
 summary(fit) 
 
@@ -241,7 +248,7 @@ m1 <- ctModel(type = 'stanct',
 ctModelLatex(m1)
 
 #fit
-f1 <- ctStanFit(datalong = dat2, ctstanmodel = m1, optimize=TRUE, nopriors=TRUE)
+f1 <- ctStanFit(datalong = dat2, ctstanmodel = m1, optimize=TRUE, priors=FALSE)
 
 summary(f1)
 

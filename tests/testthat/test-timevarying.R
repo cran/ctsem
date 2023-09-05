@@ -1,6 +1,6 @@
-if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4 & !(
-  .Platform$OS.type=="windows" && R.Version()$major >=4 && R.Version()$minor >= 2 && 
-    compareVersion(as.character(packageVersion('rstan')[[1]]),'2.25.0')== -1)){
+if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4 & 
+    !(.Platform$OS.type=="windows" && R.version$major %in% 4 && as.numeric(R.version$minor) >= 2 &&
+    unlist(utils::packageVersion('rstan'))[2] < 25)){
   # Sys.setenv(NOT_CRAN = 'true')
   
   library(ctsem)
@@ -18,9 +18,9 @@ if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4 & !(
     dt=1
     
     for(subi in 1:nsubjects){
-      gm=ctModel(LAMBDA=diag(2), Tpoints=Tpoints, DRIFT=diag(-.2,2),T0MEANS = matrix(c(3,2)), 
+      gm=suppressMessages(ctModel(LAMBDA=diag(2), Tpoints=Tpoints, DRIFT=diag(-.2,2),T0MEANS = matrix(c(3,2)), 
         DIFFUSION=diag(.5,2),
-        T0VAR=diag(2))
+        T0VAR=diag(2)))
       d=suppressMessages(ctGenerate(gm,n.subjects = 1,burnin = 3,dtmean = dt))
       d[,'id'] <- subi
       if(subi==1) dat=d else dat=rbind(dat,d)

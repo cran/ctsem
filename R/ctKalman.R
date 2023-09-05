@@ -71,9 +71,10 @@ ctKalmanTIP <- function(sf,tipreds='all',subject=1,timestep='auto',plot=TRUE,ret
 #' indicating the time step to use for interpolating values. Lower values give a more accurate / smooth representation,
 #' but take a little more time to calculate. 
 #' @param subjects vector of integers denoting which subjects (from 1 to N) to plot predictions for. 
-#' @param removeObs Logical. If TRUE, observations (but not covariates)
-#' are set to NA, so only expectations based on
-#' parameters and covariates are returned. 
+#' @param removeObs Logical or integer. If TRUE, observations (but not covariates)
+#' are set to NA, so only expectations based on parameters and covariates are returned. If a positive integer N, 
+#' every N observations are retained while others are set NA for computing model expectations -- useful for observing prediction performance
+#' forward further in time than one observation.
 #' @param standardisederrors if TRUE, also include standardised error output (based on covariance
 #' per time point).
 #' @param plot Logical. If TRUE, plots output instead of returning it. 
@@ -118,13 +119,14 @@ ctKalmanTIP <- function(sf,tipreds='all',subject=1,timestep='auto',plot=TRUE,ret
 ctKalman<-function(fit, timerange='asdata', timestep='auto',
   subjects=fit$setup$idmap[1,1], removeObs = FALSE, plot=FALSE, 
   standardisederrors=TRUE,realid=TRUE,...){
-  type=NA
-  if('ctStanFit' %in% class(fit)) type='stan' 
-  if('ctsemFit' %in% class(fit)) type ='omx'
-  if(is.na(type)) stop('fit object is not from ctFit or ctStanFit!')
   
-  idmap <- fit$standata$idmap #store now because we may reduce it
   
+  if('ctsemFit' %in% class(fit)) stop('This function is no longer supported with ctsemOMX, try ctsem')
+  if(!'ctStanFit' %in% class(fit)) stop('fit object is not from ctStanFit!')
+  
+  
+  # get subjects ------------------------------------------------------------
+  idmap <- fit$setup$idmap #store now because we may reduce it
   subjectsarg <- subjects
   if(realid) subjects <- idmap[which(idmap[,1] %in% subjects),2]
   
@@ -134,45 +136,18 @@ ctKalman<-function(fit, timerange='asdata', timestep='auto',
       warning('Specified subjects not found in original id set -- assuming integers correspond to internal integer mapping. Consider setting realid=FALSE')
     } else stop('Specified subjects not found in original id set, and (some) are not integers...')
   }
-  
   subjects <- sort(subjects) #in case not entered in ascending order
-  if(type=='stan'){
-    if(timestep=='auto'){
-      if(fit$standata$intoverstates==1) timestep=sd(fit$standata$time,na.rm=TRUE)/50 else timestep ='asdata'
-    }
-    if(all(timerange == 'asdata')) timerange <- range(fit$standata$time[fit$standata$subject %in% subjects])
-    idstore <- fit$standata$subject
-    if(length(fit$stanfit$stanfit@sim)==0) {
-      fit$standata <- standatact_specificsubjects(fit$standata, subjects = subjects)
-    }
-    if(timestep != 'asdata' && fit$ctstanmodel$continuoustime) {
-      if(fit$ctstanmodel$continuoustime != TRUE) stop('Discrete time model fits must use timestep = "asdata"')
-      times <- seq(timerange[1],timerange[2],timestep)
-      fit$standata <- standataFillTime(fit$standata,times)
-    }
-    idstore <- as.integer(subjects[fit$standata$subject])
-    
-    if(!length(fit$stanfit$stanfit@sim)==0) fit$standata$dokalmanrows <-
-      as.integer(fit$standata$subject %in% subjects)# |
-    # as.logical(match(unique(fit$standata$subject),fit$standata$subject))) #what was this doing?
-    
-    if(removeObs){
-      sapply(c('nobs_y','nbinary_y','ncont_y','whichobs_y','whichbinary_y','whichcont_y'),
-        function(x) fit$standata[[x]][] <<- 0L)
-      fit$standata$Y[] <- 99999
-    }
-    out <- ctStanKalman(fit,pointest=length(fit$stanfit$stanfit@sim)==0, 
-      collapsefunc=mean, indvarstates = FALSE,standardisederrors = standardisederrors) #extract state predictions
-    out$id <- idstore #as.integer(subjects[out$id]) #get correct subject indicators
-    
-    out <- meltkalman(out)
-    out=out[!(out$Subject %in% subjects) %in% FALSE,]
-    if(realid){
-      # out$Subject <- as.integer(out$Subject)
-      out$Subject <- factor(idmap[
-        match(out$Subject,idmap[,2]),1])
-    }
+  
+  out <- ctStanKalman(fit,pointest=length(fit$stanfit$stanfit@sim)==0, removeObs=removeObs, subjects=subjects,timestep = timestep,
+    collapsefunc=mean, indvarstates = FALSE,standardisederrors = standardisederrors) #extract state predictions
+  
+  out <- meltkalman(out)
+  out=out[!(out$Subject %in% subjects) %in% FALSE,]
+  if(realid){
+    out$Subject <- factor(idmap[
+      match(out$Subject,idmap[,2]),1])
   }
+  
   
   if(plot) {
     plot(x=out,subjects=subjects,...)

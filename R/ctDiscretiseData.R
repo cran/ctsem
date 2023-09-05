@@ -21,6 +21,8 @@
 
 ctDiscretiseData <- function(dlong,timestep,timecol='time',idcol='id',TDpredNames=NULL,
   TIpredNames=NULL){
+  
+  if('data.table' %in% class(dlong)) dlong <- data.frame(dlong)
   if(any(is.na(dlong[,timecol]))) stop('Cannot discretise with missing time data!')
   if(any(is.na(dlong[,idcol]))) stop('Cannot discretise with missing id data!')
  

@@ -1,4 +1,6 @@
-if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
+if(identical(Sys.getenv("NOT_CRAN"), "true")& !(.Platform$OS.type=="windows" && 
+    R.version$major %in% 4 && as.numeric(R.version$minor) >= 2 &&
+    unlist(utils::packageVersion('rstan'))[2] < 25) ){
   library(ctsem)
   library(testthat)
   library(data.table)
@@ -43,7 +45,7 @@ if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
         corz <- (t0corz+zyg[subi]*zyg_t0corz) + age_corz*age +
           zyg_age_corz * age * zyg[subi]+
           agesq_corz*age^2
-        if(subi==1) print(paste0('age = ',age,'  corz= ', corz))
+        # if(subi==1) print(paste0('age = ',age,'  corz= ', corz))
         cholm <- t(chol(matrix(c(1,(inv_logit(corz)*2-1)*.99,(.99*inv_logit(corz)*2-1),1),2,2)))
         slope <- slope + (slopecrosseffect*y[i-1,] + slope * drift) * dt +
           cholm %*% rnorm(2,0,exp(diffusion+diffusionage*age)) * dt
@@ -69,10 +71,10 @@ if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
     dat[, "latentcors":= list(cor(adjValue1,adjValue2)), by=list(time,zyg)] #correlation on scaled (as check)
     dat[, "latentsds":= list(sd(c(adjValue1,adjValue2))), by=list(time,zyg)] #correlation on scaled (as check)
     
-    plot(unique(dat[zyg == 1,time]),unique(dat[zyg == 1,latentcor]),type='l',ylim=range(dat$latentcor))
-    points(unique(dat[zyg == -1,time]),unique(dat[zyg == -1,latentcor]),type='l',col='blue')
+    # plot(unique(dat[zyg == 1,time]),unique(dat[zyg == 1,latentcor]),type='l',ylim=range(dat$latentcor))
+    # points(unique(dat[zyg == -1,time]),unique(dat[zyg == -1,latentcor]),type='l',col='blue')
     
-    points(dat[id==1,time],dat[id==1,latentcors],type='l',lty=2,col='red')
+    # points(dat[id==1,time],dat[id==1,latentcors],type='l',lty=2,col='red')
     
     
     Nsubjects <- 50

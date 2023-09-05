@@ -1,4 +1,28 @@
-ctStanData <- function(ctm, datalong,optimize,derrind='all'){
+expmGetSubsets <- function(m){
+  nr = nrow(m)
+  m <- matrix(suppressWarnings(as.numeric(m)),nr,nr)
+  m[is.na(m)] <- 999
+  subsets <- list()
+  indices <- 1:nrow(m)
+  indexmat <- 1:nrow(m)
+  while(length(indices) >0){
+    oldsubsetsize <- -1
+    subindices <- indices[1]
+    while(length(subindices) > oldsubsetsize){
+      oldsubsetsize <- length(subindices)
+      subindices <- unique(c(subindices,
+        which(m!=0 & col(m) %in% subindices,arr.ind = TRUE),
+        which(m!=0 & row(m) %in% subindices,arr.ind = TRUE)))
+    }
+    subsets[[length(subsets)+1]] <- subindices
+    indices <- indices[!indices %in% subindices]
+  }
+  subsets <- lapply(subsets, function(x) c(x,rep(0,nr-length(x))))
+  subsets <- t(array(as.integer(unlist(subsets)),dim =c(nr,length(subsets))))
+  return(subsets)
+}
+
+ctStanData <- function(ctm, datalong,optimize,sameInitialTimes=FALSE){
   
   
   nsubjects <- length(unique(datalong[, ctm$subjectIDname])) 
@@ -19,7 +43,7 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
   if(!(ctm$subjectIDname %in% colnames(datalong))) stop(paste('id column', (ctm$subjectIDname), "not found in data"))
   
   
-  if(ctm$nopriors==FALSE){
+  if(ctm$priors){
     if(ctm$n.TIpred > 1 && any(abs(colMeans(datalong[,c(ctm$TIpredNames),drop=FALSE],na.rm=TRUE)) > .3)){
       message('Uncentered TI predictors noted -- interpretability may be hindered and default priors may not be appropriate')
     }
@@ -47,18 +71,6 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
   
   if( (nrow(ctm$t0varstationary) + nrow(ctm$t0meansstationary)) >0 && 
       length(c(ctm$modelmats$calcs$driftcint, ctm$modelmats$calcs$diffusion)) > 0) message('Stationarity assumptions based on initial states when using non-linear dynamics')
-  
-  
-  if(ctm$intoverstates==FALSE || all(derrind=='all') ) derrind = 1:ctm$n.latent
-  # if(all(derrind=='all')) derrind = sort(unique(ctm$pars$col[
-  #   ctm$pars$matrix=='DIFFUSION' & (!is.na(ctm$pars$param) | ctm$pars$value!=0)]))
-  derrind = as.integer(derrind)
-  if(any(derrind > ctm$n.latent)) stop('derrind > than n.latent found!')
-  if(length(derrind) > ctm$n.latent) stop('derrind vector cannot be longer than n.latent!')
-  if(length(unique(derrind)) < length(derrind)) stop('derrind vector cannot contain duplicates or!')
-  ndiffusion=length(derrind)
-  
-  
   
   nindvarying <- max(ctm$modelmats$matsetup$indvarying)
   nparams <- max(ctm$modelmats$matsetup$param[ctm$modelmats$matsetup$when %in% c(0,-1)])
@@ -135,6 +147,14 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
       }
     }
   }
+  
+  if(sameInitialTimes){
+    datanew <- datalong[!duplicated(datalong[[ctm$subjectIDname]]),]
+  datanew[[ctm$timeName]] <- min(datanew[[ctm$timeName]])
+  datalong <- merge.data.frame(x = datalong,y = datanew[,c(ctm$subjectIDname,ctm$timeName)],
+    by = c(ctm$subjectIDname,ctm$timeName),all = TRUE)
+  }
+  
   datalong[,ctm$manifestNames][is.na(datalong[,ctm$manifestNames])]<-99999 #missing data
   
   
@@ -210,12 +230,10 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
       nt0meansstationary=as.integer(nrow(ctm$t0meansstationary)),
       t0varstationary=matrix(as.integer(ctm$t0varstationary),ncol=2),
       t0meansstationary=matrix(as.integer(ctm$t0meansstationary),ncol=2),
-      derrind=array(as.integer(derrind),dim=ndiffusion),
-      ndiffusion=as.integer(ndiffusion),
       driftdiagonly = as.integer(driftdiagonly),
       intoverpop=as.integer(ctm$intoverpop),
       # nlmeasurement=as.integer(nlmeasurement),
-      nopriors=as.integer(ctm$nopriors),
+      priors=as.integer(ctm$priors),
       savescores=0L,
       savesubjectmatrices=0L,
       nJAxfinite = ifelse(ctm$recompile,0L,length(ctm$JAxfinite)),
@@ -250,6 +268,20 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
   # standata$jacoffdiagindex <- array(as.integer(sort(unique(c(1:ctm$n.latent,which(standata$jacoffdiag ==1))))))
   # standata$njacoffdiagindex <- as.integer(length(standata$jacoffdiagindex))
   
+
+  
+  standata$DRIFTsubsets <- expmGetSubsets(listOfMatrices(ctm$pars)$DRIFT)
+  standata$JAxsubsets <- expmGetSubsets(listOfMatrices(ctm$pars)$JAx)
+  standata$nDRIFTsubsets <- nrow(standata$DRIFTsubsets)
+  standata$nJAxsubsets <- nrow(standata$JAxsubsets)
+  
+  tempdiff <- listOfMatrices(ctm$pars)$DIFFUSION
+  derrind <- unique(c(which(tempdiff!=0,arr.ind = TRUE))) #which latents have some non zero diffusion
+  derrind <- unique(c(standata$JAxsubsets[ #and which expm subsets are these part of
+    apply(standata$JAxsubsets,1,function(x) any(derrind %in% x)),]))
+  derrind <- array(sort(derrind[derrind <= standata$nlatent & derrind > 0])) #exclude any elements that are stable individual differences
+  standata$derrind <- derrind
+  standata$ndiffusion <- length(derrind)
   
   standata$JAxfinite <- ctm$JAxfinite
   standata$Jyfinite <- ctm$Jyfinite
@@ -458,7 +490,7 @@ ctStanData <- function(ctm, datalong,optimize,derrind='all'){
   standata$statedep[31:33] <- standata$statedep[c(4,5,8)]
   
   #laplace priors
-  standata$laplaceprior <- rep(0L,standata$nparams)
+  standata$laplaceprior <- array(rep(0L,standata$nparams))
   standata$laplacetipreds <- 0L
   if(!is.null(ctm$laplaceprior)){
     if('tipreds' %in% ctm$laplaceprior) standata$laplacetipreds <- 1L

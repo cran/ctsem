@@ -20,9 +20,9 @@ if(identical(Sys.getenv("NOT_CRAN"), "true") & .Machine$sizeof.pointer != 4){
     sd(par)
     
     for(subi in 1:nsubjects){
-      gm=ctModel(LAMBDA=diag(1), Tpoints=Tpoints, DRIFT=matrix(-.5),T0MEANS = matrix(4), 
+      gm=suppressMessages(ctModel(LAMBDA=diag(1), Tpoints=Tpoints, DRIFT=matrix(-.5),T0MEANS = matrix(4), 
         CINT=matrix(par[subi]),DIFFUSION=matrix(1),
-        T0VAR=matrix(1), MANIFESTVAR=matrix(.3))
+        T0VAR=matrix(1), MANIFESTVAR=matrix(.3)))
       d=suppressMessages(ctGenerate(gm,n.subjects = 1,burnin = 0,dtmean = dt))
       if(subi==1) dat=cbind(subi,d) else dat=rbind(dat,cbind(subi,d))
     }
@@ -42,7 +42,7 @@ if(identical(Sys.getenv("NOT_CRAN"), "true") & .Machine$sizeof.pointer != 4){
     for(m in c('cm','dm')){
 
         f = ctStanFit(datalong = dat,ctstanmodel = get(m),optimize=TRUE,
-          verbose=0,savescores = FALSE,nopriors=TRUE)
+          verbose=0,savescores = FALSE,priors=FALSE)
       
       
         if(length(s)==0) s[[1]] = list()
@@ -91,9 +91,9 @@ if(identical(Sys.getenv("NOT_CRAN"), "true") & .Machine$sizeof.pointer != 4){
       sd(par)
       
       for(subi in 1:nsubjects){
-        gm=ctModel(LAMBDA=diag(1), Tpoints=Tpoints, DRIFT=matrix(-.5),T0MEANS = matrix(4), 
+        gm=suppressMessages(ctModel(LAMBDA=diag(1), Tpoints=Tpoints, DRIFT=matrix(-.5),T0MEANS = matrix(4), 
           CINT=matrix(par[subi]),DIFFUSION=matrix(2),
-          T0VAR=matrix(2), MANIFESTVAR=matrix(2))
+          T0VAR=matrix(2), MANIFESTVAR=matrix(2)))
         d=suppressMessages(ctGenerate(gm,n.subjects = 1,burnin = 10,dtmean = dt))
         if(subi==1) dat=cbind(subi,d) else dat=rbind(dat,cbind(subi,d))
       }

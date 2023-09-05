@@ -10,10 +10,14 @@ ctStanKalman(
   pointest = TRUE,
   collapsefunc = NA,
   cores = 1,
+  subjects = 1:max(fit$standata$subject),
+  timestep = "asdata",
+  timerange = "asdata",
   standardisederrors = FALSE,
   subjectpars = TRUE,
   tformsubjectpars = TRUE,
   indvarstates = FALSE,
+  removeObs = F,
   ...
 )
 }
@@ -28,6 +32,14 @@ ctStanKalman(
 
 \item{cores}{Integer number of cpu cores to use. Only needed if savescores was set to FALSE when fitting.}
 
+\item{subjects}{integer vector of subjects to compute for.}
+
+\item{timestep}{Either a positive numeric value, 'asdata' to use the times in the dataset, or 'auto' to select 
+a timestep automatically (resulting in some interpolation but not excessive computation).}
+
+\item{timerange}{only relevant if timestep is not 'asdata'. Positive numeric vector of length 2 denoting 
+time range for computations.}
+
 \item{standardisederrors}{If TRUE, computes standardised errors for prior, upd, smooth conditions.}
 
 \item{subjectpars}{if TRUE, state estimates are not returned, instead, predictions of each subjects parameters
@@ -36,6 +48,11 @@ are returned, for parameters that had random effects specified.}
 \item{tformsubjectpars}{if FALSE, subject level parameters are returned in raw, pre transformation form.}
 
 \item{indvarstates}{if TRUE, do not remove indvarying states from output}
+
+\item{removeObs}{Logical or integer. If TRUE, observations (but not covariates)
+are set to NA, so only expectations based on parameters and covariates are returned. If a positive integer N, 
+every N observations are retained while others are set NA for computing model expectations -- useful for observing prediction performance
+forward further in time than one observation.}
 
 \item{...}{additional arguments to collpsefunc.}
 }
