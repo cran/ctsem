@@ -1,6 +1,14 @@
 # ctsem News
 
-## 20/7/2023
+## 14/9/2023
+### 3.9.0
+- Add progress reports for stochastic optimizer and Hessian.
+- Add small noise to improve sampling performance when `inits='optimize'`.
+- Include ctACF and ctACFresiduafunction for approximate continuous time auto-correlations.
+- Update array syntax internally to rstan 2.26+ approach.
+- Improved stochastic optimizer.
+
+## 20/8/2023
 ### 3.8.1
 - Correct bug in nonlinear formulations when the same state is referenced for multiple nonlinearities.
 - Correct unnecessary memory usage when computing Hessian with multiple cores.

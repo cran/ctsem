@@ -35,7 +35,7 @@ ssfit3 <- ctStanFit(datalong, ssmodel,cores=1,nlcontrol=list(maxtimestep=.3))
 ssfit4 <- ctStanFit(datalong, ssmodel,chains=2,cores=2,iter=300,optimize=F,priors=F,
   control=list(max_treedepth=8),verbose=0,  
   inits='optimize',
-  intoverpop = T,plot=T)
+  intoverpop = T)
 # ssfit5 <- ctStanFit(datalong, ssmodel,chains=3,iter=300,intoverstates = FALSE,optimize=F,verbose=0)
 
 for(i in 2:4){
