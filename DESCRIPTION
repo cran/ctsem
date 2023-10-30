@@ -1,8 +1,8 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 3.9.0
-Date: 2023-09-12
+Version: 3.9.1
+Date: 2023-10-30
 Authors@R: c(person("Charles", "Driver", role =
     c("aut","cre","cph"),email="charles.driver@ife.uzh.ch"),
     person("Manuel", "Voelkle", role = c("aut","cph")),
@@ -43,11 +43,11 @@ RoxygenNote: 7.2.3
 SystemRequirements: GNU make
 NeedsCompilation: yes
 Biarch: true
-Packaged: 2023-09-13 18:37:40 UTC; Driver
+Packaged: 2023-10-30 12:24:21 UTC; Driver
 Author: Charles Driver [aut, cre, cph],
   Manuel Voelkle [aut, cph],
   Han Oud [aut, cph],
   Trustees of Columbia University [cph]
 Maintainer: Charles Driver <charles.driver@ife.uzh.ch>
 Repository: CRAN
-Date/Publication: 2023-09-14 09:50:02 UTC
+Date/Publication: 2023-10-30 14:20:02 UTC

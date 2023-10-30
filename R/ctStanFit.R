@@ -409,10 +409,11 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
   
   datalong <- data.frame(datalong)
   
-  if(is.null(datalong[[ctstanmodel$timeName]]) && ctstanmodel$continuoustime == FALSE) {
-    datalong <- data.frame(datalong)
+  if(ctstanmodel$continuoustime == FALSE) { #set time variable for discrete time
     datalong[ctstanmodel$timeName] <- 1:nrow(datalong)
   }
+  
+  datalong <- datalong[order(datalong[[ctstanmodel$subjectIDname]],datalong[[ctstanmodel$timeName]]),] #sort by subject, time.
   
   datavars <- c(ctstanmodel$timeName,ctstanmodel$subjectIDname, ctstanmodel$manifestNames,ctstanmodel$TDpredNames,ctstanmodel$TIpredNames)
   sapply(datavars,function(x){
@@ -514,7 +515,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
   
   
   ctm <- ctModel0DRIFT(ctm, ctm$continuoustime) #offset 0 drift
-  ctm$pars <- ctModelStatesAndPARS(ctm$pars,statenames=ctm$latentNames) #replace latent states and PARS with state and PAR[] refs, need this early because we rely on [] detection
+  ctm$pars <- ctModelStatesAndPARS(ctm$pars,statenames = ctm$latentNames,tdprednames=ctm$TDpredNames) #replace latent states and PARS with state and PAR[] refs, need this early because we rely on [] detection
   if(intoverpop)   ctm <- ctStanModelIntOverPop(ctm) #extend system matrices for individual differences
   
   #jacobian addition
@@ -537,7 +538,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
   
   ctm$pars <- rbind(ctm$pars,jl2)
   
-  ctm$pars <- ctModelStatesAndPARS(ctm$pars,statenames=ctm$latentNames) #replace any new state and par refs with square bracket refs
+  ctm$pars <- ctModelStatesAndPARS(ctm$pars,statenames = ctm$latentNames,tdprednames=ctm$TDpredNames) #replace any new state and par refs with square bracket refs
   
   ctm <- ctModelTransformsToNum(ctm)
   

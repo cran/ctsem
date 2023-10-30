@@ -45,7 +45,7 @@ ctStanUpdModel <- function(fit, datalong, ctstanmodel,...){
 
 
 
-ctModelStatesAndPARS <- function(ctspec, statenames){ #replace latentName and par references with square bracket refs
+ctModelStatesAndPARS <- function(ctspec, statenames,tdprednames){ #replace latentName and par references with square bracket refs
   #detect state refs
   # 
   ln <- statenames
@@ -54,13 +54,23 @@ ctModelStatesAndPARS <- function(ctspec, statenames){ #replace latentName and pa
       ctspec$param[ri] <- gsub(paste0('\\b(',ln[li],')\\b'),paste0('state[',li,']'),ctspec$param[ri])
     }
   }
+  
+  if(length(tdprednames)>0){
+    ln <- tdprednames
+  for(li in c(1:length(ln))){
+    for(ri in grep(paste0('\\b(',ln[li],')\\b'),ctspec$param)){
+      ctspec$param[ri] <- gsub(paste0('\\b(',ln[li],')\\b'),paste0('tdpreds[rowi, ',li,']'),ctspec$param[ri])
+    }
+  }
+  }
+  
   #expand pars
   
   ln <- ctspec$param[ctspec$matrix %in% 'PARS' & !is.na(ctspec$param)] #get extra pars
   
   for(li in seq_along(ln)){ #for every extra par
     parmatch <- which(ctspec$param %in% ln[li] & ctspec$matrix %in% 'PARS') #which row is the par itself
-    # if(grepl('taux',ln[li])) browser()
+    # if(grepl('beep2',ln[li])) browser()
     for(ri in grep(paste0('\\b',ln[li],'\\b'),ctspec$param)){ #which rows contain the par
       if(!(ctspec$param[ri] == ln[li] & ctspec$matrix[ri]=='PARS')){ #that are not the par itself in the pars matrix# #removed limitation of referencing within PARS matrices
         # print(ctspec$param[ri])
@@ -69,7 +79,7 @@ ctModelStatesAndPARS <- function(ctspec, statenames){ #replace latentName and pa
         # paste0('PARS[',ctspec$row[parmatch],',',ctspec$col[parmatch],']\\1'),ctspec$param[ri]))
         # browser()
         ctspec$param[ri] <- 
-          gsub(paste0('\\b',ln[li],'\\b([^\\[])'), #replace with PARS reference...
+          gsub(paste0('\\b',ln[li],'(\\b([^\\[])|$)'), #replace with PARS reference... 
             paste0('PARS[',ctspec$row[parmatch],',',ctspec$col[parmatch],']\\1'),ctspec$param[ri])
       }
     }
@@ -108,7 +118,7 @@ ctModelTransformsToNum<-function(ctm){
     # Try to fit each formula to the data.
     success <- FALSE
     for(tryi in 1:2){ #if no success try with more enthusiasm
-      if(success) break
+      if(success) next
       for(i in 1:nrow(formula.types)) {
         if(i > 1 && any((formula.types$lsfit < .001) %in% TRUE)) next #found the answer already
         tftype <- formula.types$type[i]
@@ -468,7 +478,7 @@ ctStanModelMatrices <-function(ctm){
   matlist <- listOfMatrices(ctspec) #put back into matrix form
   # matlist <- unfoldmats(matlist) #unfold references to basic state
   ctspecp <- ctModelUnlist(matlist,matnames = names(c(mats$base,mats$jacobian))) #convert back to list
-  ctspecp <- ctModelStatesAndPARS(ctspecp,statenames=ctm$latentNames) #ensure PARS[,] refs are not replaced by names
+  ctspecp <- ctModelStatesAndPARS(ctspecp,statenames=ctm$latentNames,tdprednames=ctm$TDpredNames) #ensure PARS[,] refs are not replaced by names
   ctspec[order(ctspec$matrix, ctspec$row,ctspec$col),colnames(ctspecp)] <-  
     ctspecp[order(ctspecp$matrix, ctspecp$row,ctspecp$col),] #replace updated columns, free of direct references
   
@@ -800,7 +810,7 @@ ctStanModelWriter <- function(ctm, gendata, extratforms,matsetup,savemodel=TRUE,
     int rowi = rowx ? rowx : 1;
     if( rowx==0 ||
       (dokalmanrows[rowi] && 
-        subject[rowi] >= (firstsub - .1) &&  subject[rowi] <= (lastsub + .1))){ //if doing this row for this subject
+        subject[rowi] >= (firstsub - .1) &&  subject[rowi] <= (lastsub + .1))){ //if doing this row for this subset
     
     int si = rowx ? subject[rowi] : 0;
     int full = (dosmoother==1 || si ==0);
@@ -823,7 +833,7 @@ ctStanModelWriter <- function(ctm, gendata, extratforms,matsetup,savemodel=TRUE,
       o0= whichequals(manifesttype,1,0);
     }
     
-    if(prevrow != 0 && rowi != 1) T0check = (si==subject[prevrow]) ? (T0check+1) : 0; //if same subject, add one, else zero
+    if(prevrow != 0) T0check = (si==subject[prevrow]) ? (T0check+1) : 0; //if same subject, add one, else zero
     if(T0check > 0){
       dt = time[rowi] - time[prevrow];
       dtchange = continuoustime ? dt!=prevdt : 0; 
@@ -1234,7 +1244,7 @@ if(verbose > 1){
   '),'
  } // end si loop (includes sub 0)
   
-  prevrow = rowi; //update previous row marker only after doing necessary calcs
+  prevrow = rowx; //update previous row marker only after doing necessary calcs
 }//end active rowi
 
 ',if(savemodel) 'if(savescores){
@@ -1302,16 +1312,16 @@ collectsubmats <- function(popmats=FALSE,matrices=c(mats$base,31, 32,33,21,22)){
 writemodel<-function(){
   paste0('
 functions{
-
- int[] vecequals(int[] a, int test, int comparison){ //do indices of a match test condition?
-    int check[size(a)];
+  
+  array[] int vecequals(array[] int a, int test, int comparison){ //do indices of a match test condition?
+      array[size(a)] int check;
     for(i in 1:size(check)) check[i] = comparison ? (test==a[i]) : (test!=a[i]);
     return(check);
   }
-
-int[] whichequals(int[] b, int test, int comparison){  //return array of indices of b matching test condition
-    int check[size(b)] = vecequals(b,test,comparison);
-    int which[sum(check)];
+  
+  array[] int whichequals(array[] int b, int test, int comparison){  //return array of indices of b matching test condition
+    array[size(b)] int check = vecequals(b,test,comparison);
+    array[sum(check)] int which;
     int counter = 1;
     if(size(b) > 0){
       for(i in 1:size(b)){
@@ -1323,8 +1333,8 @@ int[] whichequals(int[] b, int test, int comparison){  //return array of indices
     }
     return(which);
   }
-
- 
+  
+  
   matrix constraincorsqrt(matrix mat){ //converts from unconstrained lower tri matrix to cor
     int d=rows(mat);
     matrix[d,d] o;
@@ -1349,7 +1359,7 @@ int[] whichequals(int[] b, int test, int comparison){  //return array of indices
       s[i] += 1e-5;
       ss[i] += 1e-5;
     }
-
+    
     
     for(i in 1:d){
       o[i,i]=0;
@@ -1364,20 +1374,20 @@ int[] whichequals(int[] b, int test, int comparison){  //return array of indices
       }
       o[i,i]=sqrt(1-sum(square(o[i,]))+1e-5);
     }
-
+    
     return o;
-}  
-
+  }  
+  
   matrix sdcovsqrt2cov(matrix mat, int choleskymats){ //covariance from cholesky or unconstrained cor sq root
     if(choleskymats< 1) {
       //if(choleskymats== -1){
         return(tcrossprod(diag_pre_multiply(diagonal(mat),constraincorsqrt(mat))));
-      //} else {
-      //  return(quad_form_diag(constraincorsqrt(mat),diagonal(mat)));
-      //}
-      } else return(tcrossprod(mat));
+        //} else {
+          //  return(quad_form_diag(constraincorsqrt(mat),diagonal(mat)));
+          //}
+    } else return(tcrossprod(mat));
   }
-
+  
   matrix sqkron_prod(matrix mata, matrix matb){
     int d=rows(mata);
     matrix[d*d,d*d] out;
@@ -1392,97 +1402,97 @@ int[] whichequals(int[] b, int test, int comparison){  //return array of indices
     }
     return out;
   }
-
- 
- matrix ksolve(matrix A, matrix Q, int verbose){
-  int d= rows(A);
-  int d2= (d*d-d)/2;
-  matrix[d+d2,d+d2] O;
-  vector[d+d2] triQ;
-  matrix[d,d] AQ;
-  int z=0; //z is row of output
-  for(j in 1:d){//for column reference of solution vector
-    for(i in 1:j){ //and row reference...
-      if(j >= i){ //if i and j denote a covariance parameter (from upper tri)
-        int y=0; //start new output row
-        z+=1; //shift current output row down
-        
-        for(ci in 1:d){//for columns and
-          for(ri in 1:d){ //rows of solution
-            if(ci >= ri){ //when in upper tri (inc diag)
-              y+=1; //move to next column of output
-              
-              if(i==j){ //if output row is for a diagonal element
-                if(ri==i) O[z,y] = 2*A[ri,ci];
-                if(ci==i) O[z,y] = 2*A[ci,ri];
-              }
-              
-              if(i!=j){ //if output row is not for a diagonal element
-                if(y==z) O[z,y] = A[ri,ri] + A[ci,ci]; //if column of output matches row of output, sum both A diags
-                if(y!=z){ //otherwise...
-                  // if solution element we refer to is related to output row...
-                  if(ci==ri){ //if solution element is a variance
-                    if(ci==i) O[z,y] = A[j,ci]; //if variance of solution corresponds to row of our output
-                    if(ci==j) O[z,y] = A[i,ci]; //if variance of solution corresponds to col of our output
-                  }
-                  if(ci!=ri && (ri==i||ri==j||ci==i||ci==j)){//if solution element is a related covariance
-                    //for row 1,2 / 2,1 of output, if solution row ri 1 (match) and column ci 3, we need A[2,3]
-                    if(ri==i) O[z,y] = A[j,ci];
-                    if(ri==j) O[z,y] = A[i,ci];
-                    if(ci==i) O[z,y] = A[j,ri];
-                    if(ci==j) O[z,y] = A[i,ri];
+  
+  
+  matrix ksolve(matrix A, matrix Q, int verbose){
+    int d= rows(A);
+    int d2= (d*d-d)%/%2;
+    matrix[d+d2,d+d2] O;
+    vector[d+d2] triQ;
+    matrix[d,d] AQ;
+    int z=0; //z is row of output
+    for(j in 1:d){//for column reference of solution vector
+      for(i in 1:j){ //and row reference...
+        if(j >= i){ //if i and j denote a covariance parameter (from upper tri)
+          int y=0; //start new output row
+          z+=1; //shift current output row down
+          
+          for(ci in 1:d){//for columns and
+            for(ri in 1:d){ //rows of solution
+              if(ci >= ri){ //when in upper tri (inc diag)
+                y+=1; //move to next column of output
+                
+                if(i==j){ //if output row is for a diagonal element
+                  if(ri==i) O[z,y] = 2*A[ri,ci];
+                  if(ci==i) O[z,y] = 2*A[ci,ri];
+                }
+                
+                if(i!=j){ //if output row is not for a diagonal element
+                  if(y==z) O[z,y] = A[ri,ri] + A[ci,ci]; //if column of output matches row of output, sum both A diags
+                  if(y!=z){ //otherwise...
+                    // if solution element we refer to is related to output row...
+                    if(ci==ri){ //if solution element is a variance
+                      if(ci==i) O[z,y] = A[j,ci]; //if variance of solution corresponds to row of our output
+                      if(ci==j) O[z,y] = A[i,ci]; //if variance of solution corresponds to col of our output
+                    }
+                    if(ci!=ri && (ri==i||ri==j||ci==i||ci==j)){//if solution element is a related covariance
+                      //for row 1,2 / 2,1 of output, if solution row ri 1 (match) and column ci 3, we need A[2,3]
+                      if(ri==i) O[z,y] = A[j,ci];
+                      if(ri==j) O[z,y] = A[i,ci];
+                      if(ci==i) O[z,y] = A[j,ri];
+                      if(ci==j) O[z,y] = A[i,ri];
+                    }
                   }
                 }
+                if(is_nan(O[z,y])) O[z,y]=0;
               }
-              if(is_nan(O[z,y])) O[z,y]=0;
             }
           }
         }
       }
     }
-  }
-  
-  z=0; //get upper tri of Q
-  for(j in 1:d){
-    for(i in 1:j){
-    z+=1;
-    triQ[z] = Q[i,j];
+    
+    z=0; //get upper tri of Q
+    for(j in 1:d){
+      for(i in 1:j){
+        z+=1;
+        triQ[z] = Q[i,j];
+      }
     }
-  }
-  triQ=-O \\ triQ; //get upper tri of asymQ
-  
+    triQ=-O \\ triQ; //get upper tri of asymQ
+    
     z=0; // put upper tri of asymQ into matrix
-  for(j in 1:d){
-    for(i in 1:j){
-    z+=1;
-    AQ[i,j] = triQ[z];
-    if(i!=j) AQ[j,i] = triQ[z];
+    for(j in 1:d){
+      for(i in 1:j){
+        z+=1;
+        AQ[i,j] = triQ[z];
+        if(i!=j) AQ[j,i] = triQ[z];
+      }
     }
+    
+    if(verbose>1) print("AQ = ", AQ, "   triQ = ", triQ, "   O = ", O);
+    
+    return AQ;
   }
   
-  if(verbose>1) print("AQ = ", AQ, "   triQ = ", triQ, "   O = ", O);
-  
-  return AQ;
-}
-
   matrix makesym(matrix mat, int verbose, int pd){
     matrix[rows(mat),cols(mat)] out;
     for(coli in 1:cols(mat)){
-    //  if(pd ==1 && mat[coli,coli] < 1e-5){
-     //   out[coli,coli] = 1e-5;// 
-     // } else 
-      out[coli,coli] = mat[coli,coli] + 1e-10; 
-      for(rowi in 1:rows(mat)){
-        if(rowi > coli) {
-          out[rowi,coli] = mat[rowi,coli];
-          out[coli,rowi] = mat[rowi,coli];
-        }
-        
-      }
+      //  if(pd ==1 && mat[coli,coli] < 1e-5){
+        //   out[coli,coli] = 1e-5;// 
+          // } else 
+            out[coli,coli] = mat[coli,coli] + 1e-10; 
+          for(rowi in 1:rows(mat)){
+            if(rowi > coli) {
+              out[rowi,coli] = mat[rowi,coli];
+              out[coli,rowi] = mat[rowi,coli];
+            }
+            
+          }
     }
     return out;
   }
-
+ 
   real tform(real parin, int transform, data real scale, data real meanscale, data real shift, data real innershift){
     real param=parin;
     ',gsub('offset','shift',gsub('multiplier','scale',tformshapes(stan=TRUE))),
@@ -1614,14 +1624,14 @@ data {
   int choleskymats;
   int intoverstates;
   int verbose; //level of printing during model fit
-  int TIPREDEFFECTsetup[nparams, ntipred];
+  array[nparams, ntipred] int TIPREDEFFECTsetup;
   int nrowmatsetup;
-  int matsetup[nrowmatsetup,9];
-  real matvalues[nrowmatsetup,6];
-  array[',max(mats$all),',5]int whenmat;
+  array[nrowmatsetup,9] int matsetup;
+  array[nrowmatsetup,6] real matvalues;
+  array[',max(mats$all),',5] int whenmat;
   array[2,nparams]int whenvecp;
   array[6,nlatentpop]int whenvecs;
-  array[',max(mats$all),',2]int matrixdims;
+  array[',max(mats$all),',2] int matrixdims;
   int savescores;
   int savesubjectmatrices;
   int dokalman;
@@ -1796,11 +1806,11 @@ model{
 ',if(gendata) paste0('
   real ll = 0;
   vector[ndatapoints] llrow = rep_vector(0,ndatapoints);
-  matrix[nlatentpop,nlatentpop] etacova[3,savescores ? ndatapoints : 0];
-  matrix[nmanifest,nmanifest] ycova[3,savescores ? ndatapoints : 0];
-  vector[nlatentpop] etaa[3,savescores ? ndatapoints : 0];
-  vector[nmanifest] ya[3,savescores ? ndatapoints : 0];
-  vector[nmanifest] Ygen[ndatapoints];
+  array[3,savescores ? ndatapoints : 0] matrix[nlatentpop,nlatentpop] etacova;
+  array[3,savescores ? ndatapoints : 0] matrix[nmanifest,nmanifest] ycova;
+  array[3,savescores ? ndatapoints : 0] vector[nlatentpop] etaa;
+  array[3,savescores ? ndatapoints : 0] vector[nmanifest] ya;
+  array[ndatapoints] vector[nmanifest] Ygen;
   vector[nlatentpop*ndatapoints] etaupdbasestates = to_vector(normal_rng(rep_array(0.0,ndatapoints*nlatentpop),rep_array(1.0,ndatapoints*nlatentpop))); //sampled latent states posterior','
   ',subjectparaminit(pop=FALSE,smats=FALSE),'
   ',subjectparaminit(pop=TRUE,smats=FALSE)
@@ -1866,7 +1876,7 @@ model{
 
 ',if(gendata) paste0('
 {
-  vector[nmanifest] Ygenbase[ndatapoints];
+  array[ndatapoints] vector[nmanifest] Ygenbase;
   Ygen = rep_array(rep_vector(99999,nmanifest),ndatapoints);
   for(mi in 1:nmanifest){
     if(manifesttype[mi]==0 || manifesttype[mi]==2) {
