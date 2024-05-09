@@ -10,7 +10,7 @@ if(1==99){
     CINT=matrix(c('cint1||||TI1','cint2||||TI1'),ncol=1),
     LAMBDA=diag(2),tipredDefault=FALSE)  
   
-  ctstantestfit<-ctStanFit(ctsem::ctstantestdat,checkm,cores=1,control=list(max_treedepth=4),
+  ctstantestfit<-ctStanFit(ctstantestdat,checkm,cores=1,control=list(max_treedepth=4),
     optimize = F,optimcontrol=list(finishsamples=20,stochastic=F),nopriors=FALSE)
   
   s=ctstantestfit$standata

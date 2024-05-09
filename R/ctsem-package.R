@@ -37,6 +37,8 @@ utils::globalVariables(c("invDRIFT","II","DRIFTexp","vec2diag","diag2vec",
   "ACF", "ACFhigh", "ACFlow", "Element", "Estimate", "Model", "NobsDT", "Obs", 
   "ObsVsGenID", "ObsVsGenRow", "OutOf95Row", "Row", "Sample", "Time", 
   "TimeInterval", "V2", "Variable", "aic", "ci", "highdat", "leaveOutN", 
+  ".ObsCount", ".splitmedian", ".timerange", "DataType", "Iter", "Split", "Time.interval",
+  "Type", "condval", "ll", "var1",
   "lowdat", "lp", "mediandat", "mediandatRank", "np", "obsValue"))
 
 if(1==99){
@@ -76,6 +78,7 @@ if(1==99){
 #' @importFrom utils relist as.relistable tail capture.output
 #' @importFrom Deriv Simplify 
 #' @importFrom cOde jacobianSymb prodSymb
+#' @importFrom splines bs
 #' @useDynLib ctsem, .registration = TRUE
 #' 
 #' @references 

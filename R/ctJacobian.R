@@ -28,18 +28,16 @@ unfoldmats <- function(ml){
   return(ml)
 }
 
-#replace inverse logit
-inv_logit_gsub <- function(x){
-  try=0
-  while(try < 20 && any(grepl('\\<inv_logit\\((.*)\\)',x) | grepl('\\blog1p_exp\\((.*)\\)',x))){ 
-    try <- try + 1
-    x <- gsub('\\<inv_logit\\((.*)\\)','1/\\(1+exp\\(-\\(\\1\\)\\)\\)',x)
-    x <- gsub('\\<log1p_exp\\((.*)\\)','log1p\\(exp\\(\\1\\)\\)',x)
-  }
-  return(x)
-}
-
-
+# #replace inverse logit - problematic for complex parameters, now unneeded
+# inv_logit_gsub <- function(x){
+#   try=0
+#   while(try < 20 && any(grepl('\\<inv_logit\\((.*)\\)',x) | grepl('\\blog1p_exp\\((.*)\\)',x))){ 
+#     try <- try + 1
+#     x <- gsub('\\<inv_logit\\((.*)\\)','1/\\(1+exp\\(-\\(\\1\\)\\)\\)',x)
+#     x <- gsub('\\<log1p_exp\\((.*)\\)','log1p\\(exp\\(\\1\\)\\)',x)
+#   }
+#   return(x)
+# }
 
 ctJacobian <- function(m,types=c('J0','JAx','Jtd','Jy'),simplify=TRUE ){
   
@@ -59,7 +57,7 @@ ctJacobian <- function(m,types=c('J0','JAx','Jtd','Jy'),simplify=TRUE ){
   #   } else if(!grepl('[',m$pars$param[ri],fixed=TRUE) && !is.na(m$pars$param[ri])) m$pars$param[ri] <- paste0(m$pars$matrix[ri],'[',m$pars$row[ri],',',m$pars$col[ri],']')
   # }
   
-  m$pars$param <- inv_logit_gsub(m$pars$param) #replace inv_logit with known functions for differentiation
+  # m$pars$param <- inv_logit_gsub(m$pars$param) #replace inv_logit with known functions for differentiation
   
   mats <- listOfMatrices(m$pars)
   matnames <- names(ctStanMatricesList(unsafe=TRUE)$base)
@@ -141,7 +139,12 @@ ctJacobian <- function(m,types=c('J0','JAx','Jtd','Jy'),simplify=TRUE ){
     fn = gsub("]", "___rightsquarebracket___", fn, fixed = TRUE)
     
     # 3): calculate Jacobian of fn symbolically
-    J  = jacobianSymb(fn, state)
+    # J  = jacobianSymb(fn, state)
+    J = sapply(state,function(statei){ #use Deriv package to calculate Jacobian to handle new functions
+        sapply(fn, function(fni){
+        Deriv::Deriv(fni, statei,cache.exp = FALSE)
+      })})
+    # browser()
     # 4): create Jacobian list in STAN format
     # J = sapply(J,Simplify)
     
@@ -181,22 +184,7 @@ ctJacobian <- function(m,types=c('J0','JAx','Jtd','Jy'),simplify=TRUE ){
           }}
       }
     }
-    
-    #this was creating direct references but not needed here
-    # for(j in 1:ncol(Jm)){
-    #   for(i in 1:nrow(Jm)){
-    #     if(is.na(suppressWarnings(as.numeric(Jm[i,j])))){
-    #       for(mi in 1:length(mats)){
-    #         if(Jm[i,j] %in% mats[[mi]]){ 
-    #           arrind <- arrayInd(which(mats[[mi]] %in% Jm[i,j]),dim(mats[[mi]]))
-    #           for(ari in 1:nrow(arrind)){
-    #             Jm[i,j] <- paste0(names(mats)[mi],'[',arrind[ari,1],',',arrind[ari,2],']') #removed 's',
-    #           }
-    #         }
-    #       }
-    #     }
-    #   }
-    # }
+
     Jout[[typei]] <- Jm
   }#end type loop
   return(Jout)

@@ -30,7 +30,7 @@
 # }
 
 
-llsurface<- function(fit, sd=2, pars,nsamples=10000){
+llsurface<- function(fit, sd=2, pars,nsamples=1000,plot=T){
 
   np= get_num_upars(fit$stanfit$stanfit)
   
@@ -51,12 +51,9 @@ llsurface<- function(fit, sd=2, pars,nsamples=10000){
   iter <- ll <- value <- NULL
   dat=melt(dat,id.vars=c('iter','ll'))
   
-  ggplot2::ggplot(data = dat, aes(x=value,y=ll))+ geom_smooth() + facet_wrap(. ~ variable,scales = "free")
-    
-  # legend('topright',fit$setup$popsetup$parname[match(fit$setup$popsetup$param,1:ncol(grid))],text.col=col,bty='n')
-  
-  # of=optimizing(object = fit$stanmodel,data= fit$standata,save_iterations=T, hessian=FALSE, iter=1e6, as_vector=FALSE,draws=0,constrained=FALSE,
-  #     tol_obj=tol, tol_rel_obj=0,init_alpha=.00001, tol_grad=0,tol_rel_grad=0,tol_param=0,history_size=50)
-  # of$par$DRIFT
-  # unconstrain_pars(fit$stanfit$stanfit, of$par)
+  if(plot) return(llsurfacePlot(dat))
+  else return(dat)
 }
+
+
+llsurfacePlot <- function(dat) ggplot2::ggplot(data = dat, aes(x=value,y=ll))+ geom_smooth() + facet_wrap(. ~ variable,scales = "free")
