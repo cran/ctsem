@@ -149,6 +149,7 @@ T0VARredundancies <- function(ctm) {
 #' For datasets with many manifest variables or time points, file size may be large.
 #' To generate data based on the posterior of a fitted model, see \code{\link{ctStanGenerateFromFit}}.
 #' @param vb Logical. Use variational Bayes algorithm from stan? Only kind of working, not recommended.
+#' @param compileArgs List of arguments to pass to \code{\link[rstan]{stan_model}} for compilation of the Stan model.
 #' @param ... additional arguments to pass to \code{\link[rstan]{stan}} function.
 #' @export
 #' @examples
@@ -395,6 +396,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
   nlcontrol = list(), nopriors=NA, priors=FALSE, chains=2,
   cores=ifelse(optimize,getOption("mc.cores", 2L),'maxneeded'),
   inits=NULL,
+  compileArgs=list(),
   forcerecompile=FALSE,saveCompile=TRUE,savescores=FALSE,
   savesubjectmatrices=FALSE, saveComplexPars=FALSE,
   gendata=FALSE,
@@ -488,7 +490,7 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
     }
     message('Free T0VAR parameters fixed to diagonal matrix of 1 as only 1 subject - consider appropriateness!')
   }
-  
+
   if(binomial){
     message('Binomial argument deprecated -- in future set manifesttype in the model object to 1 for binary indicators')
     intoverstates <- FALSE
@@ -520,6 +522,17 @@ ctStanFit<-function(datalong, ctstanmodel, stanmodeltext=NA, iter=1000, intovers
   ctm <- ctModel0DRIFT(ctm, ctm$continuoustime) #offset 0 drift
   ctm$pars <- ctModelStatesAndPARS(ctm$pars,statenames = ctm$latentNames,tdprednames=ctm$TDpredNames) #replace latent states and PARS with state and PAR[] refs, need this early because we rely on [] detection
   if(intoverpop)   ctm <- ctStanModelIntOverPop(ctm) #extend system matrices for individual differences
+  
+  #check this *after* replacing PARS references as needed
+  if(any(duplicated(ctm$pars$param[ctm$pars$matrix %in% 'T0MEANS' & 
+      !grepl('[',ctm$pars$param,fixed=TRUE) &
+      !is.na(ctm$pars$param)]))) stop(paste0(
+        'Unfortunately, duplicate T0MEANS parameters must be specified via inclusion of additional PARS matrix in ctModel: e.g.,
+ctModel(... #regular model code
+PARS=c("t0mPar||TRUE"), #specify an additional parameter called t0mPar, with random effects
+T0MEANS=c("t0mPar","t0mPar"), #insert this parameter into the T0MEANS matrix as many times as needed.
+... #regular model code)
+'))
   
   #jacobian addition
   ctm$jacobian <- try(ctJacobian(ctm))
@@ -661,8 +674,10 @@ install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption
         #   install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
         # }
       }
-      
-      sm <- stan_model(model_name='ctsem', model_code = c(stanmodeltext),auto_write=TRUE)
+      compileArgs$model_name='ctsem'
+      compileArgs$model_code=stanmodeltext
+      compileArgs$auto_write=TRUE
+      sm <- do.call(stan_model,compileArgs)
       # ,allow_undefined = TRUE,verbose=TRUE,
       # includes = paste0(
       #   '\n#include "', file.path(getwd(), 'syl2.hpp'),'"',

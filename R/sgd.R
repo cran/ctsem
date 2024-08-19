@@ -205,7 +205,7 @@ sgd <- function(init,fitfunc,whichignore=c(),nsubsets=1,nsubjects=NA,plot=FALSE,
     deltaold=delta
     oldg=g
     g=attributes(lpg)$gradient
-    if(zeroG < 11){ #check zero gradient count
+    if(nsubsets == 1 && zeroG < 11){ #check zero gradient count
       if(any(g %in% 0)){
         message(paste0('Gradient of parameter ',paste0(which(g %in% 0),collapse=', '), ' is exactly zero -- if this repeats or optimization fails, maybe model problem?'))
         zeroG <- zeroG + 1

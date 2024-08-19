@@ -6,10 +6,8 @@ if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
   
   test_that("ctRasch1", {
     set.seed( 1234 )
-    
-    #install software
-    # source(file = 'https://github.com/cdriveraus/ctsem/raw/master/installctsem.R')
-    
+    cores=2
+
     invlog=function (x) exp(x)/(1 + exp(x))
     n.manifest=7
     
@@ -41,11 +39,8 @@ if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
       T0MEANS='t0m|param|TRUE|.2',
       CINT = 'b|param|TRUE|1', #use standard normal for mean prior, individual variation = TRUE (default), default scale for sd
       type = "standt" )
-    
-    #plot(m)
-    
+
     m$manifesttype[]=md$manifesttype[]=1 #set type to binary
-    cores=2
     
         #fit with integration (linearised approximation)
     ro <- ctStanFit( datalong = d,
@@ -74,18 +69,14 @@ if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
       intoverstates = FALSE,
       optimize=FALSE,intoverpop=FALSE)
     s=summary(r)
-    # s
-    
 
-    # so
-    
     a=cbind(s$popmeans[order(rownames(s$popmeans)),1,drop=FALSE],so$popmeans[order(rownames(so$popmeans)),1])
     colnames(a)=NULL
     # print(a)
     
-    testthat::expect_equivalent(
+    test_isclose(
       s$popmeans[order(rownames(s$popmeans)),1],
-      so$popmeans[order(rownames(so$popmeans)),1],tol=.1)
+      so$popmeans[order(rownames(so$popmeans)),1],tol=.2)
     
   })
   

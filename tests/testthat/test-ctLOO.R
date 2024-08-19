@@ -27,30 +27,28 @@ if(identical(Sys.getenv("NOT_CRAN"), "true")& .Machine$sizeof.pointer != 4){
     sm$pars$indvarying<- FALSE
     
     sf=ctStanFit(aa,
-      ctstanmodel = sm, optimize=TRUE,verbose=0,savescores = FALSE,cores=cores,
-      priors=FALSE,
-      optimcontrol=list(finishsamples=500,carefulfit=F))
+      ctstanmodel = sm, optimize=TRUE,verbose=0,savescores = FALSE,cores=cores)
     
     sdat <- sf$standata
     sdat$dokalmanrows[sdat$subject==1] <- 0L #remove 1 subject
     smf <- stan_reinitsf(sf$stanmodel,sdat)
-    testthat::expect_equivalent(
+    test_isclose(
       sf$stanfit$optimfit$value - rstan::log_prob(smf,sf$stanfit$rawest), #check ll equiv
       sum(sf$stanfit$transformedparsfull$llrow[sdat$subject==1]))
     
     loo=ctLOO(fit = sf,folds = 10,cores=cores,parallelFolds = T,subjectwise = T)
     loo2=ctLOO(fit = sf,folds = 10,cores=cores,parallelFolds = F,subjectwise = T)
     
-    testthat::expect_equivalent(
-      sum(loo2$outsampleLogLikRow-loo$outsampleLogLikRow),
-      0,tol=1)
+    test_isclose(
+      mean(loo2$outsampleLogLikRow-loo$outsampleLogLikRow),
+      0,tol=.01)
     
-    testthat::expect_equivalent(
-      sum(loo$outsampleLogLikRow),
+    test_isclose(
+      sum(loo$insampleLogLikRow),
       sum(sf$stanfit$transformedparsfull$llrow),tol=.1)
     
-    testthat::expect_equivalent(
-      sum(loo2$outsampleLogLikRow),
+    test_isclose(
+      sum(loo2$insampleLogLikRow),
       sum(sf$stanfit$transformedparsfull$llrow),tol=.1)
     
   })
