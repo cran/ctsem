@@ -15,9 +15,9 @@ ctStanDiscreteParsPlot(
   facets = NA,
   splitSubjects = TRUE,
   colour = "Effect",
-  title = "Temporal regressions | independent shock of 1.0",
+  title = "auto",
   polygonalpha = 0.1,
-  ggcode = NA
+  ggcode = FALSE
 )
 }
 \arguments{
@@ -47,7 +47,7 @@ The default plots 95\% credible intervals and the posterior median at 50\%.}
 
 \item{colour}{Character string denoting how colour varies. 'Effect' or 'Subject'.}
 
-\item{title}{Character string.}
+\item{title}{Character string. 'auto' generates automatically, NULL can be used to disable title.}
 
 \item{polygonalpha}{Numeric between 0 and 1 to multiply the alpha of 
 the fill.}
@@ -59,8 +59,7 @@ evaluated (with the necessary arguments such as ylab etc filled in). For modifyi
 A ggplot2 object. This can be modified by the various ggplot2 functions, or displayed using print(x).
 }
 \description{
-Plots model implied regression strengths at specified times for 
-continuous time models fit with ctStanFit.
+Plots the output from \code{\link{ctStanDiscretePars}}, for model implied regression strengths at specified times for continuous time models fit with ctStanFit.
 }
 \examples{
 data.table::setDTthreads(1) #ignore this line

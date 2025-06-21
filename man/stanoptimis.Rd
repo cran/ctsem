@@ -9,24 +9,22 @@ stanoptimis(
   sm,
   init = "random",
   initsd = 0.01,
-  sampleinit = NA,
-  deoptim = FALSE,
   estonly = FALSE,
   tol = 1e-08,
-  decontrol = list(),
   stochastic = TRUE,
   priors = TRUE,
   carefulfit = TRUE,
   bootstrapUncertainty = FALSE,
   subsamplesize = 1,
   parsteps = c(),
+  parstepsAutoModel = FALSE,
+  groupFreeThreshold = 0.5,
   plot = FALSE,
   is = FALSE,
-  isloopsize = 1000,
+  isitersize = 1000,
+  isESS = 100,
   finishsamples = 1000,
-  tdf = 10,
-  chancethreshold = 100,
-  finishmultiply = 5,
+  lproughnesstarget = 0.2,
   verbose = 0,
   cores = 2,
   matsetup = NA,
@@ -45,19 +43,11 @@ random values very close to zero.}
 \item{initsd}{positive numeric specifying sd of normal distribution governing random sample of init parameters,
 if init='random' .}
 
-\item{sampleinit}{either NA, or an niterations * nparams matrix of samples to initialise importance sampling.}
-
-\item{deoptim}{Do first pass optimization using differential evolution? Slower, but better for cases with multiple
-minima / difficult optimization.}
-
 \item{estonly}{if TRUE,just return point estimates under $rawest subobject.}
 
 \item{tol}{objective tolerance.}
 
-\item{decontrol}{List of control parameters for differential evolution step, to pass to \code{DEoptim.control}.}
-
-\item{stochastic}{Logical. Use stochastic gradient descent instead of mize (bfgs) optimizer.
-Still experimental, worth trying for either robustness checks or problematic, high dimensional, nonlinear, problems.}
+\item{stochastic}{Logical. Use stochastic gradient descent as main optimizer. Always finishes (double checks) with mize (bfgs) optimizer.}
 
 \item{priors}{logical. If TRUE, a priors integer is set to 1 (TRUE) in the standata object -- only has an effect if 
 the stan model uses this value.}
@@ -73,22 +63,22 @@ for computing standard errors or initializing importance sampling.}
 at zero, and freed sequentially (by list order). Useful for complex models, e.g. keep all cross couplings fixed to zero 
 as a first step, free them in second step.}
 
+\item{parstepsAutoModel}{if TRUE, determines model structure for the parameters specified in parsteps automatically. If 'group', determines this on a group level first and then a subject level. Primarily for internal ctsem use, see \code{?ctFitAuto}.}
+
+\item{groupFreeThreshold}{threshold for determining whether a parameter is free in a group level model. If the proportion of subjects with a non-zero parameter is above this threshold, the parameter is considered free. Only used with parstepsAutoModel = 'group'.}
+
 \item{plot}{Logical. If TRUE, plot iteration details. Probably slower.}
 
-\item{is}{Logical. Use importance sampling, or just return map estimates?}
+\item{is}{Logical. Use mixture importance sampling, or just return map estimates?}
 
-\item{isloopsize}{Number of samples of approximating distribution per iteration of importance sampling.}
+\item{isitersize}{Number of samples of approximating distribution per iteration of importance sampling.}
+
+\item{isESS}{target effective sample size for importance sampling. If is=TRUE, this is used to determine the number of samples to draw from the approximating distribution.}
 
 \item{finishsamples}{Number of samples to draw (either from hessian
 based covariance or posterior distribution) for final results computation.}
 
-\item{tdf}{degrees of freedom of multivariate t distribution. Higher (more normal) generally gives more efficent
-importance sampling, at risk of truncating tails.}
-
-\item{chancethreshold}{drop iterations of importance sampling where any samples are chancethreshold times more likely to be drawn than expected.}
-
-\item{finishmultiply}{Importance sampling stops once available samples reach \code{finishsamples * finishmultiply} , then the final samples are drawn
-without replacement from this set.}
+\item{lproughnesstarget}{target log posterior roughness for stochastic optimizer (suggest between .05 and .4).}
 
 \item{verbose}{Integer from 0 to 2. Higher values print more information during model fit -- for debugging.}
 

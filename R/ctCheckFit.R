@@ -1,89 +1,301 @@
-#' @title ctCheckFit
-#' @description Visual model fit diagnostics for ctsem fit objects.
-#' @param fit ctStanFit object.
-#' @param cor Logical. If TRUE, the correlation matrix is used instead of the covariance matrix.
-#' @return data.table containing quantiles of the model implied covariance matrix based on generated samples of data, the sample covariance matrix values, and the difference between the two.
-ctFitCovCheck <- function(fit,cor=FALSE){
-  gencov <- ctCovMatGenerated(fit)
-  sampcov <- cov(ctLongtoWideFromFitted(fit),use='pairwise.complete.obs')
+# ctFitCovCheck with group-specific model-implied covariances
+
+#' Visual model-fit diagnostics for ctsem fits, optionally split by the mean
+#' of a chosen observed variable.
+#' @param fit     A `ctStanFit` object.
+#' @param cor     Logical; if `TRUE` correlations are analysed instead of covariances.
+#' @param plot    Logical; if `TRUE` (default) a `ggplot2` object (or list of plots) is 
+#'   returned. If `FALSE`, the raw `data.table` with diagnostics is returned.
+#' @param splitby Optional character string giving the variable name on which to split subjects.
+#' @return Either a plot/list of plots (default, given by `plot.ctFitCovCheck`) or a `data.table`.
+#' @export
+#' @examples
+#' \donttest{
+#' ctFitCovCheck(ctstantestfit, cor = TRUE, plot = TRUE)
+#' 
+#' gg=ctFitCovCheck(ctstantestfit, cor = FALSE, plot = TRUE, splitby = "TI1")
+#' print(gg[[1]]+
+#' ggplot2::ggtitle("Covariance Check for Y1 with all other manifest variables, split by TI1"))
+#' }
+ctFitCovCheck <- function(fit, cor = FALSE, plot = TRUE, splitby = NULL) {
+
+  if(FALSE) .ColVar= .ObsCol= .ObsRow= .RowVar= .Sig= cn= pair_id= q025= q50= q975= rn=NULL
   
-  if(cor){
-    gencov <- suppressWarnings(lapply(gencov,function(x) cov2cor(x)))
-    sampcov <- suppressWarnings(cov2cor(sampcov))
+  # -----------------------------------------------------------------
+  # Helper: diagnostics for a single sample/generation --------------
+  # -----------------------------------------------------------------
+  .check_one <- function(sampcov, gencov) {
+    
+    if (cor) {
+      gencov  <- suppressWarnings(lapply(gencov, cov2cor))
+      sampcov <- suppressWarnings(cov2cor(sampcov))
+    }
+    
+    # Sample to long -------------------------------------------------
+    checkfit <- melt(as.data.table(sampcov, keep.rownames = "rn"),
+      id.vars = "rn", variable.name = "cn")
+    
+    # Generated list to long ----------------------------------------
+    mgencov <- melt(
+      rbindlist(lapply(gencov, function(x) as.data.table(x, keep.rownames = "rn")),
+        idcol = "iter"),
+      id.vars       = c("iter", "rn"),
+      variable.name = "cn")
+    
+    # Posterior summaries -------------------------------------------
+    mgencov[, `:=`(
+      q025 = quantile(value, 0.025, na.rm = TRUE),
+      q975 = quantile(value, 0.975, na.rm = TRUE),
+      q50  = quantile(value, 0.5,   na.rm = TRUE),
+      sd   = sd(value,   na.rm = TRUE),
+      mean = mean(value, na.rm = TRUE)
+    ), by = .(rn, cn)]
+    
+    # Merge ----------------------------------------------------------
+    checkfit <- merge(checkfit,
+      unique(mgencov[, .(rn, cn, q025, q50, q975, sd, mean)]),
+      by = c("rn", "cn"))
+    
+    # Lag / var names -----------------------------------------------
+    checkfit[,  .ObsRow := sub(".*_T([0-9]+)$", "\\1", rn)]
+    checkfit[,  .ObsCol := sub(".*_T([0-9]+)$", "\\1", cn)]
+    checkfit[, .RowVar := sub("^(.*)_T[0-9]+$", "\\1", rn)]
+    checkfit[, .ColVar := sub("^(.*)_T[0-9]+$", "\\1", cn)]
+    
+    # Significant deviations ----------------------------------------
+    checkfit[, .Sig := value > q975 | value < q025]
+    
+    # Quick report ---------------------------------------------------
+    tmp <- copy(checkfit)
+    tmp[, pair_id := paste(pmin(as.character(rn), as.character(cn)),
+      pmax(as.character(rn), as.character(cn)), sep = "_")]
+    tmp <- tmp[!duplicated(pair_id)]
+    sigprop <- if (!cor) mean(tmp$.Sig, na.rm = TRUE)
+    else       mean(tmp$.Sig[tmp$rn != tmp$cn], na.rm = TRUE)
+    message(sprintf("Proportion of model-implied %s cells outside 95%% CI = %.3f",
+      if (cor) "correlation" else "covariance", sigprop))
+    
+    checkfit
   }
   
-  msampcov <- melt(as.data.table(sampcov,keep.rownames=TRUE),id.vars = 'rn',variable.name = 'cn')
+  # -----------------------------------------------------------------
+  # Model-implied covariance list for the *full* sample -------------
+  # -----------------------------------------------------------------
+  gencov_full <- ctCovMatGenerated(fit)
   
+  # -----------------------------------------------------------------
+  # Wide data (rows = subjects) --------------------------------------
+  # -----------------------------------------------------------------
+  wide <- ctLongtoWideFromFitted(fit)
   
-  q025 <- rn <- cn <- q975 <- q50 <- iter <- .ObsRow <- .ObsCol <- .RowVar <- .ColVar <- .Sig <- interaction_id <- NULL
-  #convert list of covariance matrices to melted data.table, with row and column names identifiers
-  mgencov <- melt(rbindlist(lapply(gencov,function(x) as.data.table(x,keep.rownames=TRUE)),idcol = 'iter'),id.vars = c('iter','rn'),variable.name = 'cn')
-  mgencov[,q025:=quantile(value,0.025,na.rm=TRUE),by=.(rn,cn)]
-  mgencov[,q975:=quantile(value,0.975,na.rm=TRUE),by=.(rn,cn)]
-  mgencov[,q50:=quantile(value,0.5,na.rm=TRUE),by=.(rn,cn)]
-  mgencov[,sd:=sd(value,na.rm=TRUE),by=.(rn,cn)]
-  mgencov[,mean:=mean(value,na.rm=TRUE),by=.(rn,cn)]
+  # -----------------------------------------------------------------
+  # No split: baseline behaviour ------------------------------------
+  # -----------------------------------------------------------------
+  if (is.null(splitby)) {
+    sampcov <- cov(wide, use = "pairwise.complete.obs")
+    checkfit <- .check_one(sampcov, gencov_full)
+  } else { #if splitting
+    # -----------------------------------------------------------------
+    # Split setup ------------------------------------------------------
+    # -----------------------------------------------------------------
+    splitcols <- grep(sprintf("^%s_T[0-9]+$", splitby), colnames(wide), value = TRUE)
+    if (length(splitcols) == 0)
+      stop(sprintf("No columns found matching base name '%s'.", splitby))
+    
+    split_score <- rowMeans(wide[, splitcols, drop = FALSE], na.rm = TRUE)
+    if (all(is.na(split_score)))
+      stop(sprintf("All '%s' values are NA; cannot split.", splitby))
+    
+    grp_mean <- mean(split_score, na.rm = TRUE)
+    groupvec <- ifelse(split_score > grp_mean, "High", "Low")
+    highmask <- groupvec == "High"
+    lowmask  <- groupvec == "Low"
+    
+    # -----------------------------------------------------------------
+    # Helpers ----------------------------------------------------------
+    # -----------------------------------------------------------------
+    na_covmat <- matrix(NA_real_, ncol = ncol(wide), nrow = ncol(wide),
+      dimnames = list(colnames(wide), colnames(wide)))
+    
+    safe_cov <- function(mat) {
+      if (is.null(mat) || nrow(mat) < 2) return(na_covmat)
+      cov(mat, use = "pairwise.complete.obs")
+    }
+    
+    safe_gencov_list <- function(mask) {
+      if (sum(mask) < 2) return(rep(list(na_covmat), length(gencov_full)))
+      
+      # Ensure generated data exists once, keep separate object to avoid side-effects
+      genfit <- if (is.null(fit$generated)) ctStanGenerateFromFit(fit) else fit
+      nsamp  <- dim(genfit$generated$Y)[1]
+      
+      lapply(seq_len(nsamp), function(i) {
+        tmpfit <- genfit  # shallow copy to modify Y slot only
+        tmpfit$standata$Y <- genfit$generated$Y[i, , ]
+        wg <- ctLongtoWideFromFitted(tmpfit)
+        cov(wg[mask, , drop = FALSE], use = "pairwise.complete.obs")
+      })
+    }
+    
+    # -----------------------------------------------------------------
+    # Compute sample & model-implied covariances per group -------------
+    # -----------------------------------------------------------------
+    sampcov_high <- safe_cov(wide[highmask, , drop = FALSE])
+    sampcov_low  <- safe_cov(wide[lowmask , , drop = FALSE])
+    
+    gencov_high  <- safe_gencov_list(highmask)
+    gencov_low   <- safe_gencov_list(lowmask)
+    
+    res <- list(
+      High = .check_one(sampcov_high, gencov_high),
+      Low  = .check_one(sampcov_low , gencov_low )
+    )
+    checkfit <- rbindlist(res, idcol = splitby)
+  } #end split setup
   
-  msampcov <- merge(msampcov,mgencov[iter==1,.(rn,cn,q025,q50,q975,sd,mean)],by=c('rn','cn'))
-  #extrat trailing '_Tx' where x is digit to obtain observation number
-  msampcov[,.ObsRow:=gsub('^(.*)(\\d+)$','\\2',rn)]
-  msampcov[,.ObsCol:=gsub('^(.*)(\\d+)$','\\2',cn)]
-  
-  #extract variable name before trailing '_Tx' to obtain row and column variables
-  msampcov[,.RowVar:=gsub('^(.*)\\_T\\d+$','\\1',rn)]
-  msampcov[,.ColVar:=gsub('^(.*)\\_T\\d+$','\\1',cn)]
-  
-  msampcov[,.Sig:=ifelse(value>q975 | value<q025,TRUE,FALSE)]
-  
-  #for checking sig proportions:
-  msampcovlower <- copy(msampcov)
-  msampcovlower[, interaction_id := paste(pmin(as.character(rn), as.character(cn)), pmax(as.character(rn), as.character(cn)), sep = "_")]
-  msampcovlower <- msampcovlower[!duplicated(interaction_id)]
-  if(!cor) sigprop = mean(as.numeric(msampcovlower$.Sig),na.rm=T)
-  if(cor) sigprop = mean(as.numeric(msampcovlower$.Sig[msampcovlower$rn != msampcovlower$cn]),na.rm=T)
-  message(paste0('Proportion of model implied cov/cor cells outside 95% = ',sigprop))
-  
-  return(msampcov)
+  if (plot){
+    return(plot.ctFitCovCheck(checkfit,vars= fit$ctstanmodelbase$manifestNames,splitvar = splitby))
+  } else return(checkfit)
 }
 
 
-library(data.table)
 
-msampcov.plot <- function(msampcov, maxlag = 10) {
+#' @title plot.ctFitCovCheck
+#' @description Plot the results of ctFitCovCheck.
+#' @param x Output from ctFitCovCheck.
+#' @param maxlag Maximum lag to plot.
+#' @param vars Optional character vector of variable names to plot. If `NA`, all variables are plotted.
+#' @param splitvar Optional character string specifying a variable to split the plot by.
+#' @param ... not used.
+#' @return ggplot object.
+#' @examples
+#' \dontrun{
+#' plot.ctFitCovCheck(ctCheckFit(ctstantestfit,cor=TRUE),maxlag=3)
+#' }
+#' @export
+#'  
+
+plot.ctFitCovCheck <- function(x, maxlag = 10,vars=NA,splitvar=NA,...) {
+  
   gg <- list()
-  msampcov <- as.data.table(msampcov)  # Ensure msampcov is a data.table
+  checkfit <- as.data.table(x)  # Ensure checkfit is a data.table
   .RowVar <- .ObsRow <- .ObsCol <- count <- .ColVar <- q025 <- q975 <- q50 <- NULL
   
-  for (rowvari in unique(msampcov$.RowVar)) {
-    # Filter data and calculate lag and observation count for each unique lag
-    filtered_data <- msampcov[.RowVar %in% rowvari & 
-        ((as.numeric(.ObsRow) - as.numeric(.ObsCol)) <= maxlag) & 
-        ((as.numeric(.ObsRow) - as.numeric(.ObsCol)) >= 0)]
-    filtered_data[, lag := as.numeric(.ObsRow) - as.numeric(.ObsCol)]
-    filtered_data[, count := .N, by = lag]  # Count number of observations for each lag
-    collapsed_data <- filtered_data[, lapply(.SD, function(x) {
-      if (is.numeric(x)) {
-        mean(x, na.rm = TRUE)  # Calculate the mean for numeric columns
-      } else if (is.character(x)) {
-        unique(x)[1]  # Keep the first unique value for character columns
-      } else {
-        x[1]  # Default to the first value for other types
-      }
-    }), by = .(.RowVar, .ColVar, lag)]
-    
-    gg[[rowvari]] <- ggplot(collapsed_data, aes(x = lag, y = value)) +
-      # Define red points for mean sample correlation with alpha representing the observation count
-      geom_point(aes(color = "Mean Sample Correlation", alpha = count))+
-      geom_errorbar(aes(color = "Model Implied 95% Confidence Interval", ymin = q025, ymax = q975,y=q50)) +
-      theme_bw() +
-      geom_hline(yintercept = 0, linetype = 'dotted') +
-      geom_vline(xintercept = 0, linetype = 'dotted') +
-      facet_wrap(~.ColVar) +
-      labs(x = 'Lag (Observations)', y = paste0('Correlation with ',rowvari), color = '', alpha = 'Observations') +
-      scale_color_manual(values = c("Mean Sample Correlation" = "red", "Model Implied 95% Confidence Interval" = "black")) +
-      scale_alpha_continuous(range = c(0.1, 1), limits = c(1, max(filtered_data$count))) + # Set alpha scale from 0.1 to 1
-      guides(alpha='none') +
-      theme(legend.position = 'bottom')  # Move legend to top of plot
+  if(!all(is.na(vars)))  checkfit <- checkfit[.RowVar %in% vars & .ColVar %in% vars,]  # Filter by vars if provided
+  
+  if(all(is.na(splitvar))){
+    for (rowvari in unique(checkfit$.RowVar)) {
+      # Filter data and calculate lag and observation count for each unique lag
+      filtered_data <- checkfit[.RowVar %in% rowvari & 
+          ((as.numeric(.ObsRow) - as.numeric(.ObsCol)) <= maxlag) & 
+          ((as.numeric(.ObsRow) - as.numeric(.ObsCol)) >= 0)]
+      filtered_data[, lag := as.numeric(.ObsRow) - as.numeric(.ObsCol)]
+      filtered_data[, count := .N, by = lag]  # Count number of observations for each lag
+      collapsed_data <- filtered_data[, lapply(.SD, function(x) {
+        if (is.numeric(x)) {
+          mean(x, na.rm = TRUE)  # Calculate the mean for numeric columns
+        } else if (is.character(x)) {
+          unique(x)[1]  # Keep the first unique value for character columns
+        } else {
+          x[1]  # Default to the first value for other types
+        }
+      }), by = .(.RowVar, .ColVar, lag)]
+      
+      
+      
+      gg[[rowvari]] <- ggplot(collapsed_data, aes(x = lag, y = value)) +
+        # Define red points for mean sample correlation with alpha representing the observation count
+        geom_point(aes(color = "Mean Sample Correlation", alpha = count))+
+        geom_errorbar(aes(color = "Model Implied 95% Confidence Interval", ymin = q025, ymax = q975,y=q50)) +
+        theme_bw() +
+        geom_hline(yintercept = 0, linetype = 'dotted') +
+        geom_vline(xintercept = 0, linetype = 'dotted') +
+        facet_wrap(~.ColVar) +
+        labs(x = 'Lag (Observations)', y = paste0('Correlation with ',rowvari), color = '', alpha = 'Observations') +
+        scale_color_manual(values = c("Mean Sample Correlation" = "red", "Model Implied 95% Confidence Interval" = "black")) +
+        scale_alpha_continuous(range = c(0.1, 1), limits = c(1, max(filtered_data$count))) + # Set alpha scale from 0.1 to 1
+        guides(alpha='none') +
+        theme(legend.position = 'bottom')  # Move legend to top of plot
+    }
+  } else { #if splitting
+    dodge <- position_dodge(width = 0.35)   
+    for (rowvari in unique(checkfit$.RowVar)) {
+      # Filter data and calculate lag and observation count for each unique lag
+      filtered_data <- checkfit[.RowVar %in% rowvari & 
+          ((as.numeric(.ObsRow) - as.numeric(.ObsCol)) <= maxlag) & 
+          ((as.numeric(.ObsRow) - as.numeric(.ObsCol)) >= 0)]
+      filtered_data[, lag := as.numeric(.ObsRow) - as.numeric(.ObsCol)]
+      filtered_data[, count := .N, by = lag]  # Count number of observations for each lag
+      collapsed_data <- filtered_data[, lapply(.SD, function(x) {
+        if (is.numeric(x)) {
+          mean(x, na.rm = TRUE)  # Calculate the mean for numeric columns
+        } else if (is.character(x)) {
+          unique(x)[1]  # Keep the first unique value for character columns
+        } else {
+          x[1]  # Default to the first value for other types
+        }
+      }), by = .(.RowVar, .ColVar, lag, get(splitvar))]
+      
+      
+      
+      gg[[rowvari]] <-   ggplot(collapsed_data,
+        aes(x      = lag,
+          y      = value,
+          colour = factor(get(splitvar)),
+          group  = factor(get(splitvar)))) +
+        # empirical points
+        geom_point(aes(alpha = count,
+          shape = "Empirical"),
+          position = dodge,
+          size     = 3,
+          show.legend = TRUE) +
+        # model-implied error bars
+        geom_errorbar(aes(ymin     = q025,
+          ymax     = q975,
+          linetype = "Model implied 95%"),
+          position = dodge,
+          width    = 0.15,
+          size     = 1,
+          show.legend = TRUE) +
+        # manual scales for shape & linetype
+        scale_shape_manual(
+          name   = NULL,
+          values = c("Empirical"     = 16),      # solid circle
+          breaks = "Empirical"
+        ) +
+        scale_linetype_manual(
+          name   = NULL,
+          values = c("Model implied 95%" = "solid"), # solid line
+          breaks = "Model implied 95%"
+        ) +
+        # dodge the colour legend first, then override legend keys for the 2nd block
+        guides(
+          colour   = guide_legend(title = splitvar, order = 1),
+          shape    = guide_legend(order = 2,
+            override.aes = list(
+              linetype = 0,   # hide line in point key
+              size     = 3,
+              colour   = "black"
+            )),
+          linetype = guide_legend(order = 2,
+            override.aes = list(
+              shape = NA,     # hide point in line key
+              size  = 1,
+              colour = "black"
+            )),
+          alpha    = "none"
+        ) +
+        theme_bw() +
+        geom_hline(yintercept = 0, linetype = "dotted") +
+        facet_wrap(~ .ColVar) +
+        labs(
+          x      = "Lag (observations)",
+          y      = paste0("Correlation with ", rowvari),
+          colour = splitvar
+        ) +
+        theme(legend.position = "bottom")
+      
+    }
   }
   
   return(gg)
