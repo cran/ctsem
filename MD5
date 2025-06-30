@@ -1,10 +1,10 @@
-24933ae726189180e34482a39ee7233a *DESCRIPTION
+62da1ee5ea6ed2a248c5d423dc47a091 *DESCRIPTION
 a8e550b6e73e339cd9f4a86f1c99e94a *NAMESPACE
-85efc5ed78b916dd80ea6f534d3c0dd5 *NEWS.md
+790d40a233a2a3fa023aacdb73615dd2 *NEWS.md
 120c431db5ae5e1ee25ed4bb26bd04a5 *R/JKalman.R
 04c0a5e356c73d4def31b6496a5baf6b *R/covml.R
 288bd966c70ffe2ba4dc58334bf3fe72 *R/ctACF.R
-641b0856b7d747aebc356c391161a64e *R/ctCheckFit.R
+85702a2eae7ebf1af61c2b9ffa48ed3f *R/ctCheckFit.R
 034cd42153e71d66ab20d246e69ffb3b *R/ctCompare.R
 b33fe9f0a6c0ad490db33e5abbd251c7 *R/ctDataHelp.R
 c8730672f1f1d368e9a91830d3085a47 *R/ctDeintervalise.R
@@ -18,7 +18,7 @@ d3eb0c317360905d142af5b1fc55fe1f *R/ctFitMultiModel.R
 2aace1b30db0306891232d9fe087820a *R/ctIntervalise.R
 7d7a3e224ced3dab1d1add27401e2fb8 *R/ctJacobian.R
 8db758d7f18463511396946837603ac8 *R/ctKalman.R
-405690d8fbf9ec627a0bff6cfd051cd7 *R/ctLOO.R
+d0f155bfb2ae71b780e14a37eb2c7511 *R/ctLOO.R
 7a2a9c220ace987a7c51de403076397c *R/ctLabel.R
 18ae795b91c170d15554192540e6bfe3 *R/ctLongtowide.r
 8689ea979f1055be866b24e6ea221dd0 *R/ctModel.R
@@ -39,12 +39,12 @@ a910436721e5be65a2a82cff30590787 *R/ctStanModel.R
 60b606d5d3ec4b9449e1a69e6136b4d3 *R/ctStanProfileCI.R
 3179a2506b9c5335ec3612531cdea098 *R/ctStanTIpredeffects.R
 93b4b80fe26b9f9516877223a30ec403 *R/ctSummarise.R
-a98f7ec37d5f9573fa3f326f6d065411 *R/ctTIpredAuto.R
+4ac48e284f27656bd6fadb9cf3eb88c4 *R/ctTIpredAuto.R
 f5d0c5ccdafb7e9340cdd883c9d824ce *R/ctTransforms.R
 127e0a5834908e180a18cd00dd4f4894 *R/ctWideToLong.R
 62f5b99382b0a69970aac614d9f354c9 *R/ctdataupdate.R
 6a313147695df47c0464ed0e8028f6bf *R/ctsem-package.R
-5f882406c7aa77c13b44a468be6c98ff *R/ctsemUtils.R
+9e7d71e365164ce6ef11b84188b0e974 *R/ctsemUtils.R
 55ecfee385ba184ac35f6ec5eed536d9 *R/ctsmupdate.R
 6a215b7b8bb18c2aa0c0ca2b050b112d *R/databasedTIpreds.R
 a41fc3b27d2df9375ddaae1424af9dd3 *R/extract.ctStanFit.R
@@ -64,7 +64,7 @@ af440a3aec5c985a5771c6110d98844c *R/stanWplot.R
 7eafce42c5e62a445415e9531fe79f9e *R/stan_postcalc.R
 52c90c4248fcc474cb25a7f4f8ddc3b5 *R/stan_unconstrainsamples.R
 6c0a78aac1aa5b713d937d03744e2e16 *R/stanmodels.R
-9ff2f2797d08e9ab5fcf17164e8d5530 *R/stanoptimis.R
+4fe84cef0470da058d89ffbfcf69c620 *R/stanoptimis.R
 65aa20b509cca387b0fbf72955931aa6 *R/summary.ctStanFit.R
 d3de99c02711caf0a3076e9c30c682ae *R/tformshapes.R
 de00b8b72445f7683724858c9228aeaa *README.md
@@ -84,7 +84,7 @@ d5d6f2a03800f7c0a81eecf930cfdd35 *data/ctstantestfit.rda
 fa0c3e77a75242b33409e49b153434f9 *data/datastructure.rda
 69bf503e1c8a947c9a358186759c2fe5 *data/longexample.rda
 45eac38d75ab6644a2e74ec246ae5bfc *inst/CITATION
-ea56842fe7b58ddfd862b5fa6bd6afc2 *inst/doc/hierarchicalmanual.pdf
+2b7fd7431c6f06933824d92ef73adade *inst/doc/hierarchicalmanual.pdf
 016200cd8a387aa0473c22e039b9f3a0 *inst/doc/hierarchicalmanual.rnw
 855c064dbf8deaff96c8dc8a87169109 *inst/include/stan_meta_header.hpp
 c6da5a7ce0f7190161c295c478895adc *inst/stan/cov.stan

@@ -21,15 +21,16 @@ ctFitCovCheck <- function(fit, cor = FALSE, plot = TRUE, splitby = NULL) {
 
   if(FALSE) .ColVar= .ObsCol= .ObsRow= .RowVar= .Sig= cn= pair_id= q025= q50= q975= rn=NULL
   
+  covcor <- if (cor) stats::cor else stats::cov
   # -----------------------------------------------------------------
   # Helper: diagnostics for a single sample/generation --------------
   # -----------------------------------------------------------------
   .check_one <- function(sampcov, gencov) {
     
-    if (cor) {
-      gencov  <- suppressWarnings(lapply(gencov, cov2cor))
-      sampcov <- suppressWarnings(cov2cor(sampcov))
-    }
+    # if (cor) {
+    #   gencov  <- suppressWarnings(lapply(gencov, function(x) cov2cor((x))))
+    #   sampcov <- suppressWarnings(cov2cor((sampcov)))
+    # }
     
     # Sample to long -------------------------------------------------
     checkfit <- melt(as.data.table(sampcov, keep.rownames = "rn"),
@@ -92,7 +93,7 @@ ctFitCovCheck <- function(fit, cor = FALSE, plot = TRUE, splitby = NULL) {
   # No split: baseline behaviour ------------------------------------
   # -----------------------------------------------------------------
   if (is.null(splitby)) {
-    sampcov <- cov(wide, use = "pairwise.complete.obs")
+    sampcov <- covcor(wide, use = "pairwise.complete.obs")
     checkfit <- .check_one(sampcov, gencov_full)
   } else { #if splitting
     # -----------------------------------------------------------------
@@ -119,21 +120,28 @@ ctFitCovCheck <- function(fit, cor = FALSE, plot = TRUE, splitby = NULL) {
     
     safe_cov <- function(mat) {
       if (is.null(mat) || nrow(mat) < 2) return(na_covmat)
-      cov(mat, use = "pairwise.complete.obs")
+      cmat=covcor(mat, use = "pairwise.complete.obs")
+      # cmat=cmat[!is.na(diag(cmat)),
+      #   !is.na(diag(cmat)),drop=FALSE] #remove rows/cols with NA variance
+      # namat = is.na(cmat)
+      # cmat[namat]=0 #replace NAs with 0s
+      # cmat=Matrix::nearPD(cmat, corr = cor) #ensure positive-definite
+      # cmat[namat]<-NA #restore NAs after ensuring pd
+      cmat
     }
     
     safe_gencov_list <- function(mask) {
       if (sum(mask) < 2) return(rep(list(na_covmat), length(gencov_full)))
       
       # Ensure generated data exists once, keep separate object to avoid side-effects
-      genfit <- if (is.null(fit$generated)) ctStanGenerateFromFit(fit) else fit
-      nsamp  <- dim(genfit$generated$Y)[1]
+      if (is.null(fit$generated)) fit <- ctStanGenerateFromFit(fit)
+      nsamp  <- dim(fit$generated$Y)[1]
       
       lapply(seq_len(nsamp), function(i) {
-        tmpfit <- genfit  # shallow copy to modify Y slot only
-        tmpfit$standata$Y <- genfit$generated$Y[i, , ]
+        tmpfit <- fit  # shallow copy to modify Y slot only
+        tmpfit$standata$Y <- fit$generated$Y[i, , ]
         wg <- ctLongtoWideFromFitted(tmpfit)
-        cov(wg[mask, , drop = FALSE], use = "pairwise.complete.obs")
+        covcor(wg[mask, , drop = FALSE], use = "pairwise.complete.obs")
       })
     }
     
@@ -145,7 +153,7 @@ ctFitCovCheck <- function(fit, cor = FALSE, plot = TRUE, splitby = NULL) {
     
     gencov_high  <- safe_gencov_list(highmask)
     gencov_low   <- safe_gencov_list(lowmask)
-    
+    # browser()
     res <- list(
       High = .check_one(sampcov_high, gencov_high),
       Low  = .check_one(sampcov_low , gencov_low )
@@ -421,7 +429,7 @@ ctSaturatedFit <- function(fit,conditional=FALSE,reg=0, hmc=FALSE,
   # message('Min obs per columns: ',paste(apply(dat,2,function(x) nrow(dat)-sum(is.na(x))),collapse=', '))
   
   if(cores > 1){
-    cl=parallel::makeCluster(cores,'PSOCK')
+    cl=parallelly::makeClusterPSOCK(cores)
     parallel::clusterExport(cl,c('ucols','dat','reg'),environment())
     on.exit({parallel::stopCluster(cl)},add = TRUE)
   }
@@ -1007,7 +1015,7 @@ corplotmelt <- function(corm, label='Coef.',limits=NA,title=''){
     scale_fill_gradient2(low = "blue", high = "red", mid = "white",
       midpoint = limits[2]-(limits[2]-limits[1])/2, limits = limits, space = "Lab", 
       name=label)  +
-    theme_minimal()+ theme(axis.text.x = element_text(angle = 90)) + ggtitle(title)+
+    theme_minimal()+ theme(axis.text.x = element_text(angle = 90),legend.position = 'bottom') + ggtitle(title)+
     scale_x_discrete(position = "top")+scale_y_discrete(limits=rev)
 }
 
