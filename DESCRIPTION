@@ -1,8 +1,8 @@
 Package: ctsem
 Type: Package
 Title: Continuous Time Structural Equation Modelling
-Version: 3.10.4
-Date: 2025-6-27
+Version: 3.10.5
+Date: 2026-1-15
 Authors@R: c(person("Charles", "Driver", role =
     c("aut","cre","cph"),email="charles.driver2@uzh.ch"),
     person("Manuel", "Voelkle", role = c("aut","cph")),
@@ -30,7 +30,7 @@ Imports: cOde, data.table (>= 1.12.8), datasets, Deriv, expm, ggplot2,
         graphics, grDevices, MASS, Matrix, methods, mize, mvtnorm,
         parallel, plyr, RcppParallel (>= 5.0.1), rstan (>= 2.26.0),
         rstantools (>= 2.3.0), stats, tibble, tools, utils, splines,
-        parallelly
+        parallelly, corpcor, png
 Encoding: UTF-8
 LazyData: true
 ByteCompile: true
@@ -38,17 +38,18 @@ LinkingTo: BH (>= 1.66.0-1), Rcpp (>= 0.12.16), RcppEigen (>=
         0.3.3.4.0), RcppParallel (>= 5.0.1), rstan (>= 2.26),
         StanHeaders (>= 2.26.0), RcppParallel (>= 5.0.1)
 Suggests: knitr, testthat, devtools, tinytex, lme4, shiny, gridExtra,
-        arules, collapse, qgam, papaja, future, future.apply, diagis
+        arules, collapse, qgam, papaja, future, future.apply, diagis,
+        pdftools, rstudioapi
 VignetteBuilder: knitr
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 SystemRequirements: GNU make
 NeedsCompilation: yes
 Biarch: true
-Packaged: 2025-06-27 08:45:27 UTC; Driver
+Packaged: 2026-01-19 14:23:46 UTC; Driver
 Author: Charles Driver [aut, cre, cph],
   Manuel Voelkle [aut, cph],
   Han Oud [aut, cph],
   Trustees of Columbia University [cph]
 Maintainer: Charles Driver <charles.driver2@uzh.ch>
 Repository: CRAN
-Date/Publication: 2025-06-30 16:40:11 UTC
+Date/Publication: 2026-01-20 06:10:27 UTC

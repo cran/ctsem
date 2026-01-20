@@ -7,7 +7,7 @@
 #' @param plot    Logical; if `TRUE` (default) a `ggplot2` object (or list of plots) is 
 #'   returned. If `FALSE`, the raw `data.table` with diagnostics is returned.
 #' @param splitby Optional character string giving the variable name on which to split subjects.
-#' @return Either a plot/list of plots (default, given by `plot.ctFitCovCheck`) or a `data.table`.
+#' @return Either a plot/list of plots (default, given by `ctFitCovCheckPlot`) or a `data.table`.
 #' @export
 #' @examples
 #' \donttest{
@@ -17,7 +17,7 @@
 #' print(gg[[1]]+
 #' ggplot2::ggtitle("Covariance Check for Y1 with all other manifest variables, split by TI1"))
 #' }
-ctFitCovCheck <- function(fit, cor = FALSE, plot = TRUE, splitby = NULL) {
+ctFitCovCheck <- function(fit, cor = TRUE, plot = TRUE, splitby = NULL) {
 
   if(FALSE) .ColVar= .ObsCol= .ObsRow= .RowVar= .Sig= cn= pair_id= q025= q50= q975= rn=NULL
   
@@ -83,6 +83,9 @@ ctFitCovCheck <- function(fit, cor = FALSE, plot = TRUE, splitby = NULL) {
   # Model-implied covariance list for the *full* sample -------------
   # -----------------------------------------------------------------
   gencov_full <- ctCovMatGenerated(fit)
+  if(cor) {
+    gencov_full <- lapply(gencov_full, function(x) cov2cor(x))
+  }
   
   # -----------------------------------------------------------------
   # Wide data (rows = subjects) --------------------------------------
@@ -162,28 +165,29 @@ ctFitCovCheck <- function(fit, cor = FALSE, plot = TRUE, splitby = NULL) {
   } #end split setup
   
   if (plot){
-    return(plot.ctFitCovCheck(checkfit,vars= fit$ctstanmodelbase$manifestNames,splitvar = splitby))
+    return(ctFitCovCheckPlot(checkfit,vars= fit$ctstanmodelbase$manifestNames,splitvar = splitby))
   } else return(checkfit)
 }
 
 
 
-#' @title plot.ctFitCovCheck
+#' @title ctFitCovCheckPlot
 #' @description Plot the results of ctFitCovCheck.
 #' @param x Output from ctFitCovCheck.
 #' @param maxlag Maximum lag to plot.
 #' @param vars Optional character vector of variable names to plot. If `NA`, all variables are plotted.
 #' @param splitvar Optional character string specifying a variable to split the plot by.
+#' @param cor Logical; if `TRUE`, plot correlations instead of covariances. (label change)
 #' @param ... not used.
 #' @return ggplot object.
 #' @examples
 #' \dontrun{
-#' plot.ctFitCovCheck(ctCheckFit(ctstantestfit,cor=TRUE),maxlag=3)
+#' ctFitCovCheckPlot(ctFitCovCheck(ctstantestfit,cor=TRUE,plot=FALSE),maxlag=3)
 #' }
 #' @export
 #'  
 
-plot.ctFitCovCheck <- function(x, maxlag = 10,vars=NA,splitvar=NA,...) {
+ctFitCovCheckPlot <- function(x, maxlag = 10,vars=NA,splitvar=NA,cor=FALSE,...) {
   
   gg <- list()
   checkfit <- as.data.table(x)  # Ensure checkfit is a data.table
@@ -221,7 +225,7 @@ plot.ctFitCovCheck <- function(x, maxlag = 10,vars=NA,splitvar=NA,...) {
         facet_wrap(~.ColVar) +
         labs(x = 'Lag (Observations)', y = paste0('Correlation with ',rowvari), color = '', alpha = 'Observations') +
         scale_color_manual(values = c("Mean Sample Correlation" = "red", "Model Implied 95% Confidence Interval" = "black")) +
-        scale_alpha_continuous(range = c(0.1, 1), limits = c(1, max(filtered_data$count))) + # Set alpha scale from 0.1 to 1
+        scale_alpha_continuous(range = c(0.3, 1), limits = c(1, max(filtered_data$count))) + # Set alpha scale from 0.1 to 1
         guides(alpha='none') +
         theme(legend.position = 'bottom')  # Move legend to top of plot
     }
@@ -276,6 +280,7 @@ plot.ctFitCovCheck <- function(x, maxlag = 10,vars=NA,splitvar=NA,...) {
           values = c("Model implied 95%" = "solid"), # solid line
           breaks = "Model implied 95%"
         ) +
+        scale_alpha_continuous(range = c(0.3, 1), limits = c(1, max(filtered_data$count))) + # Set alpha scale from 0.3 to 1
         # dodge the colour legend first, then override legend keys for the 2nd block
         guides(
           colour   = guide_legend(title = splitvar, order = 1),

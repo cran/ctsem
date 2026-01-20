@@ -98,37 +98,27 @@ if(1==99){
 NULL
 
 .onAttach <- function(libname, pkgname) {
-  # to show a startup message
-  packageStartupMessage("ctsem also changes in time, for manual run ctDocs(), for blog see https://cdriver.netlify.app/, for citation info run citation('ctsem'), for original OpenMx functionality install.packages('ctsemOMX'), and for discussion https://github.com/cdriveraus/ctsem/discussions")
-  
-  try({
-    a=sapply(c('rstan','ctsem'),utils::packageVersion)
-    apkgs = data.frame(utils::available.packages(repos = 'https://cloud.r-project.org'))
-    apkgs = apkgs[apkgs$Package %in% names(a),]
-    apkgs = sapply(names(a), function(x){
-      v=paste0(a[[which(names(a) %in% x)]],collapse='.')
-      utils::compareVersion(a=apkgs$Version[apkgs$Package %in% x],b=v)
+  if(interactive()){
+    # to show a startup message
+    packageStartupMessage("ctsem also changes in time, for manual run ctDocs(), see https://github.com/cdriveraus/ctsem/ for quick start / resources / discussion, for citation info run citation('ctsem'), for original OpenMx functionality install.packages('ctsemOMX'), and for discussion https://github.com/cdriveraus/ctsem/discussions")
+    
+    try({
+      a=sapply(c('rstan','ctsem'),utils::packageVersion)
+      apkgs = data.frame(utils::available.packages(repos = getOption('repos')))
+      apkgs = apkgs[apkgs$Package %in% names(a),]
+      apkgs = sapply(names(a), function(x){
+        v=paste0(a[[which(names(a) %in% x)]],collapse='.')
+        utils::compareVersion(a=apkgs$Version[apkgs$Package %in% x],b=v)
+      })
+      if(any(apkgs > 0)) warning('The following important packages for ctsem are out of date: ', paste0(names(a)[apkgs > 0],collapse=', '))
+      
     })
-    if(any(apkgs > 0)) warning('The following important packages for ctsem are out of date: ', paste0(names(a)[apkgs > 0],collapse=', '))
-    
-    
-    # #check for rstan 2.26 / windows / r 4.2
-    # if(.Platform$OS.type=="windows" && R.Version()$major >=4 && R.Version()$minor >= 2 && 
-    #     compareVersion(as.character(packageVersion('rstan')[[1]]),'2.25.0') == -1){
-    #   
-    #   Sys.setenv(PKG_LIBS=
-    #       paste0(' \"',system.file('lib/x64', package = 'rstan', mustWork = TRUE),'/libStanServices.a','\"', 
-    #         ' -L','\"',system.file('libs/x64', package = 'StanHeaders', mustWork = TRUE),'\"',
-    #         ' -lStanHeaders -L','\"',system.file('lib/x64', package = 'RcppParallel', mustWork = TRUE),'\"',
-    #         ' -ltbb'))
-    # }
-  })
-  
+  }
 }
 
 #' Get documentation pdf for ctsem
 #'
-#' @return Nothing. Opens a pdf.
+#' @return Nothing. Opens a pdf when run interactively.
 #' @export
 #'
 #' @examples
