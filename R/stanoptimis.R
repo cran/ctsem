@@ -1443,6 +1443,7 @@ stanoptimis <- function(standata, sm, init='random',initsd=.01,
   if(all(optimArgs$init %in% 0)) optimArgs$init <- rep(0,npars)
   
   if(length(optimArgs$init) != npars){
+    browser()
     warning('Initialisation vector length does not match number of parameters in model, extending with zeros')
     optimArgs$init=c(optimArgs$init[1:min(length(optimArgs$init),npars)],rep(0,abs(npars-length(optimArgs$init))))
   }

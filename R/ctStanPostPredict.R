@@ -17,19 +17,18 @@
 #' @export
 ctPostPredData <- function(fit,residuals=F){
   if(is.null(fit$generated))  fit <- ctStanGenerateFromFit(fit) 
-  
   ll <- melt(
     data.table(sample=1:nrow(fit$generated$llrow),(fit$generated$llrow)),
     id.vars = c('sample'),variable.name = 'row')[order(sample),]
   
   ll[['row']] <- as.numeric(ll[['row']])
-  ll[['V1']] <- 'LogLik'
+  ll[['variable']] <- 'LogLik'
   dat=fit$generated$Y
   dat <- as.data.table(dat,na.rm = FALSE)
+  v1name <- colnames(dat)[!colnames(dat) %in% c('sample','row','value')]
+  data.table::setnames(dat,v1name,'variable')
   dat[['sample']] <- as.integer(dat[['sample']])
   dat[['row']] <- as.numeric(dat[['row']])
-  dat <- rbind(dat,ll)
-  setnames(dat,'V1','variable')
   setorder(dat,'sample','row')
   colnames(fit$standata$Y) <- fit$ctstanmodelbase$manifestNames
   
